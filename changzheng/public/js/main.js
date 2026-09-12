@@ -165,6 +165,8 @@ function preloadScenes() {
     '/assets/scenes/huining_flag.jpg', '/assets/scenes/lazikou_cliff.jpg',
     '/assets/scenes/xiangjiang_bridge.jpg', '/assets/scenes/zunyi_street.jpg', '/assets/scenes/huining_crowd.jpg',
     '/assets/scenes/luding_run.jpg', '/assets/scenes/luding_bridge.jpg', '/assets/scenes/jinsha_ferry.jpg',
+    '/assets/scenes/depart_crowd.jpg', '/assets/scenes/xiangjiang_wreck.jpg',
+    '/assets/scenes/xiangjiang_night.jpg', '/assets/scenes/zunyi_room.jpg',
     // 立绘（第三轮）：落盘即生效，见 portraitImage()
     '/assets/characters/mother.png', '/assets/characters/xianggui.png', '/assets/characters/guide.png',
     '/assets/characters/boatman.png', '/assets/characters/recruit.png', '/assets/characters/straggler.png',
@@ -1190,7 +1192,8 @@ async function doTalk(act, h) {
   const npcName = h.npc || '同伴';
   const comp = COMPANIONS.find((c) => npcName.includes(c.name)) || COMPANIONS[0];
   showScreen('screen-stage');
-  setStageBanner(`${act.title} · 交谈`, act.pano);
+  // 热点可以指定自己的近景（acts.json 的 img 字段），没写就用本幕全景
+  setStageBanner(`${act.title} · 交谈`, sceneImage(h.img, act.pano));
   setPortrait(npcName, h.sub || '同伴', comp.ava, '平静', comp.img || portraitImage(npcName));
   setStagePanel(`
     <div class="chat-row">

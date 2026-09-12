@@ -8,11 +8,12 @@
       "subtitle": "告别与出发",
       "date": "1934年10月",
       "pano": "/assets/scenes/depart_pano.jpg",
+      "cutAlt": "/assets/scenes/depart_crowd.jpg",
       "apDays": 1,
       "apPerDay": 2,
       "theme": "为什么出发",
       "hotspots": [
-        { "id": "mother", "label": "母亲", "sub": "告别", "x": 20, "y": 55, "kind": "talk", "npc": "母亲" },
+        { "id": "mother", "label": "母亲", "sub": "告别", "x": 20, "y": 55, "kind": "talk", "npc": "母亲", "img": "/assets/scenes/depart_crowd.jpg" },
         { "id": "bridge", "label": "浮桥", "sub": "过河抉择", "x": 48, "y": 58, "kind": "choice", "action": "cross" },
         { "id": "rest", "label": "背囊旁", "sub": "歇一会儿", "x": 72, "y": 50, "kind": "rest" },
         { "id": "march", "label": "北岸", "sub": "继续行军 →", "x": 90, "y": 48, "kind": "march" }
@@ -27,12 +28,13 @@
       "subtitle": "代价",
       "date": "1934年11月",
       "pano": "/assets/scenes/xiangjiang_pano.jpg",
+      "cutAlt": "/assets/scenes/xiangjiang_night.jpg",
       "apDays": 2,
       "apPerDay": 2,
       "theme": "队伍为何还在",
       "hotspots": [
         { "id": "escort", "label": "担架队", "sub": "护送伤员", "x": 18, "y": 55, "kind": "choice", "action": "escort" },
-        { "id": "veteran", "label": "沉默的老兵", "sub": "说话", "x": 42, "y": 50, "kind": "talk", "npc": "湘江老兵" },
+        { "id": "veteran", "label": "沉默的老兵", "sub": "说话", "x": 42, "y": 50, "kind": "talk", "npc": "湘江老兵", "img": "/assets/scenes/xiangjiang_wreck.jpg" },
         { "id": "share", "label": "干粮", "sub": "分给担架队", "x": 62, "y": 52, "kind": "share" },
         { "id": "rest", "label": "背囊", "sub": "休息", "x": 78, "y": 48, "kind": "rest" },
         { "id": "march", "label": "北岸小路", "sub": "行军 →", "x": 90, "y": 50, "kind": "march" }
@@ -51,7 +53,7 @@
       "apPerDay": 2,
       "theme": "往哪里走",
       "hotspots": [
-        { "id": "listen", "label": "小楼门口", "sub": "旁听争论", "x": 28, "y": 52, "kind": "talk", "npc": "指导员" },
+        { "id": "listen", "label": "小楼门口", "sub": "旁听争论", "x": 28, "y": 52, "kind": "talk", "npc": "指导员", "img": "/assets/scenes/zunyi_room.jpg" },
         { "id": "map", "label": "地图桌", "sub": "辨路抉择", "x": 52, "y": 48, "kind": "choice", "action": "direction" },
         { "id": "message", "label": "一封密信", "sub": "送或不送", "x": 70, "y": 42, "kind": "choice", "action": "message" },
         { "id": "school", "label": "夜校摊", "sub": "认字", "x": 18, "y": 60, "kind": "school" },

@@ -58,6 +58,10 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `snow_let_clothes.jpg` | 幕前「让棉衣」抉择 |
 | `luding_bridge.jpg` | 飞夺泸定桥小游戏 |
 | `luding_run.jpg` | 第三幕过场第二帧（`acts.json` 的 `cutAlt`） |
+| `depart_crowd.jpg` | 开场过场第二帧（`cutAlt`）+ 于都河「母亲」交谈 |
+| `xiangjiang_night.jpg` | 第一幕过场第二帧（`cutAlt`） |
+| `xiangjiang_wreck.jpg` | 湘江「沉默的老兵」交谈（热点 `img` 字段） |
+| `zunyi_room.jpg` | 遵义「小楼门口」交谈（热点 `img` 字段） |
 | `jinsha_ferry.jpg` | 「今夜能不能渡」抉择 |
 | `map_desk.jpg` | 「往哪里走」抉择 |
 | `depart_bridge.jpg` | 开场「怎么过河」抉择 |
