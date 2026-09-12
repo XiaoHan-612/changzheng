@@ -108,6 +108,21 @@ async function run() {
   }
   if (!backToCamp) throw new Error('一次互动未在 120s 内回到营地（真调可能超时）');
 
+  // 设置面板 = 模型控制台：模型（下拉+自定义）/ 推理档位 / Key / 接口 / 测试键
+  await page.click('#btn-settings').catch(async () => { await page.click('#btn-settings2').catch(() => {}); });
+  await page.waitForTimeout(400);
+  assert(await page.locator('#screen-settings').isVisible(), '设置面板可打开');
+  assert((await page.locator('#set-model option').count()) >= 2, '模型下拉有选项');
+  assert((await page.locator('#set-model-custom').count()) === 1, '可自定义模型名');
+  assert((await page.locator('#set-effort option').count()) >= 3, '推理档位有 low/high/max');
+  assert((await page.locator('#set-key').count()) === 1, 'Key 输入');
+  assert((await page.locator('#set-url').count()) === 1, '接口地址输入');
+  assert((await page.locator('#btn-set-test').count()) === 1, '测试连通键');
+  assert((await page.locator('#btn-set-save').count()) === 1, '保存键');
+  console.log('设置面板 OK · 模式标签 =', await page.locator('#ai-mode').innerText());
+  await page.click('#btn-settings-close');
+  await page.waitForTimeout(200);
+
   await page.screenshot({ path: 'tests/e2e/artifacts/smoke.png' });
   if (errs.length) throw new Error('page errors: ' + errs.join('; '));
   console.log('SMOKE PASS');
