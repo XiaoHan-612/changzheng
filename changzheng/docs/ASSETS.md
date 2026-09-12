@@ -72,7 +72,7 @@
 | 操作音效 | **合成兜底** | click / cast / hook / echo / correct / wrong / march / day 等，同上 |
 | 预录台词 | **已有 21 条** | `public/audio/voices/*.wav` + 索引 `public/audio/voice-lines.json` |
 | 同伴反应音 | **已有 6 条** | `public/audio/reactions/*.wav`（老班长赞成/反对、卫生员担忧、红小鬼嘴硬、向导建议、新兵自责） |
-| TTS 缓存 | **目录已建，待产出** | `public/audio/cache/`；清单与哈希文件名见 [`TTS-MANIFEST.md`](TTS-MANIFEST.md) |
+| TTS 缓存 | **已就位 20 条（2026-09-12）** | `public/audio/cache/*.wav`（22050Hz 单声道，2.33MB）。清单见 [`TTS-MANIFEST.md`](TTS-MANIFEST.md)；验收 `npm run qa:tts`。真调一局实测命中 **17 次**（14 张史实卡标题 + 哨兵/泸定/分糖/篝火夜开场句） |
 
 ## 五、数据与配置（非素材，但属于交付面）
 

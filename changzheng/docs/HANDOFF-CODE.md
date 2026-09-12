@@ -100,6 +100,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 12. **静态资源找不到必须 404** —— SPA 兜底只对页面路由生效（`server/index.js` 里排除了 `/assets`、`/audio`、`/css`、`/js`）。如果让缺图回 index.html（200），前端的素材探测和 `qa:assets` 都会被骗过。
 13. **契约标记要随状态撤销** —— 过场按钮是静态 DOM，结束后必须 `delete dataset.action`；已用掉的糖/已落子的格必须移除 `data-mini-action` 或置 `aria-disabled`，否则"当前可交互项"会撒谎（这几条都是踩过的坑）。
 14. **自动化只认契约** —— `tests/e2e/full-run.mjs` 的驱动按 `body[data-step]` + `data-action`/`data-choice-index`/`data-mini-*` 操作，不认识任何中文标签或屏内元素 id。新增玩法时先声明契约，别再改驱动。
+15. **TTS 缓存靠"逐字一致"命中** —— 哈希是 `sha1(voiceId|text)`，所以：① 代码里 `say()` 的文本改了，就要同步改 `data/tts-lines.json` 并重跑 `npm run tts:manifest`，否则文件白做（曾 21/24 条不可达）；② `speak()` 的 voiceId 必须走 `audio.js` 的 `ACTOR_VOICE` 映射（中文角色名会被清洗成 `default`，哈希对不上）；③ 史实回响会念 `facts.json` 的标题，标题即 TTS 文本。验收：`npm run qa:tts` + 跑一局看 `ttsHits`（E2E 已断言 ≥5）。
 
 ## 六、下一步建议（按价值排序）
 

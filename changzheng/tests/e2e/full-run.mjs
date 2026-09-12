@@ -78,6 +78,15 @@ async function run() {
   page.on('pageerror', (e) => errs.push(e.message));
   const consoleErrs = [];
   page.on('console', (m) => { if (m.type() === 'error') consoleErrs.push(m.text().slice(0, 200)); });
+  // 统计语音缓存命中：证明「台词 → /api/tts → 命中缓存」这条链在真实流程里跑通
+  const ttsHits = [];
+  page.on('response', async (r) => {
+    if (!r.url().includes('/api/tts')) return;
+    try {
+      const j = await r.json();
+      if (j.url) ttsHits.push(j.url);
+    } catch { /* 忽略 */ }
+  });
   page.on('dialog', (d) => d.accept().catch(() => {}));
 
   await page.goto(`${BASE}/?e2e=${Date.now()}`, { waitUntil: 'networkidle' });
@@ -290,7 +299,7 @@ async function run() {
   const sources = [...new Set(allLogs.map((l) => l.source))];
 
   console.log(JSON.stringify({
-    ended, endTitle, acts: seenActs, logCount,
+    ended, endTitle, acts: seenActs, logCount, ttsHits: ttsHits.length,
     soupTimes, fishTimes, candyTimes, sentryTimes, gomokuTimes, ludingTimes, nightTimes,
     sources, errs: errs.slice(0, 5),
   }, null, 2));
@@ -309,6 +318,7 @@ async function run() {
   if (ludingTimes !== 1) throw new Error(`泸定桥未按预期触发: ${ludingTimes} 次`);
   if (nightTimes !== 2) throw new Error(`夜间抉择应有 night_options + night_resolve 两条: ${nightTimes}`);
   if (sources.some((s) => s !== 'GLM')) throw new Error('出现非真调来源（已移除 MOCK）: ' + sources.join(','));
+  if (ttsHits.length < 5) throw new Error(`语音缓存命中过少（${ttsHits.length}），检查 say() 的文本与 voiceId 是否与 TTS 清单一致`);
 
   console.log('E2E FULL PASS');
   await browser.close();

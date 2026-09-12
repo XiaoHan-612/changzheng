@@ -32,6 +32,18 @@ const AMBIENT_FILE = {
   huining: '/audio/ambient/huining_low.ogg',
 };
 
+/**
+ * 角色显示名 → 音色 id（一人一色，与 docs/TTS-MANIFEST.md 一致）。
+ * 必须映射到英文 voiceId：直接把中文名当 voiceId 会被清洗成空、回落成 default，
+ * 哈希与清单对不上 → 语音缓存永远 miss（踩过）。
+ */
+const ACTOR_VOICE = {
+  旁白: 'narr', 叙事: 'narr', 你: 'narr',
+  老班长: 'laoban', 指导员: 'zhiyuan', 红小鬼: 'xiaogui', 卫生员: 'weisheng',
+  哨兵: 'sentry', 突击队长: 'captain', 船工: 'guide', 向导: 'guide', 向导老乡: 'guide',
+  老乡: 'guide', 母亲: 'guide', 宣传员: 'drummer', 文化教员: 'drummer',
+};
+
 class GameAudio {
   constructor() {
     this.ctx = null;
@@ -172,11 +184,13 @@ class GameAudio {
       ({ text, actorId, voiceId } = text);
     }
     if (!this.enabled) return;
+    // 没显式给 voiceId 时，用角色名查表；查不到再退回 default
+    if (!voiceId && actorId && ACTOR_VOICE[actorId]) voiceId = ACTOR_VOICE[actorId];
     try {
       const line = await this.findLine(text, voiceId);
       if (line?.file) return await this._playFile(line.file);
       if (text) {
-        const url = await this._cachedTts(text, voiceId || actorId || 'narr');
+        const url = await this._cachedTts(text, voiceId || 'narr');
         if (url) return await this._playFile(url);
       }
     } catch {

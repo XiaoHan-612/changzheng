@@ -628,7 +628,9 @@ function showEcho({ title, play, real, fic }) {
   markAction($('btn-echo-ok'), 'echo-ok');
   return new Promise((resolve) => {
     audio.playSfx('echo');
-    audio.speak('你刚经历的，和真实发生过的，往往只隔着一层时间。', '叙事', 'narr_echo');
+    // 史实回响的播报点：有史实卡就念卡名（命中 14 张标题的 TTS 缓存），没有才念固定旁白
+    if (title) audio.speak(title, '旁白', 'narr').catch(() => {});
+    else audio.speak('你刚经历的，和真实发生过的，往往只隔着一层时间。', '叙事', 'narr_echo');
     $('echo-title').textContent = title || '刚刚发生的事';
     $('echo-play').textContent = play || '';
     $('echo-real').textContent = real || '';
@@ -1334,7 +1336,7 @@ async function doCandy() {
   setPortrait('红小鬼', '16岁小战士', '鬼', '倔强', '/assets/characters/xiaogui.png');
   setStagePanel('<div id="candy-host"></div>');
   markMini($('candy-host'), 'candy');
-  await say('红小鬼', '我腿不软。就是夜里冷，想家的时候数干粮。', 'xiaogui_home');
+  await say('红小鬼', '我兜里有三颗糖。你说，给谁？');
   const op = await runCandy($('candy-host'));
   S.sugarPlan = op.detail || null;
   markLine(S, 'candy');
@@ -1368,7 +1370,7 @@ async function doSentry() {
   setPortrait('哨兵', '夜哨', '哨', '警觉');
   setStagePanel('<div id="sentry-host"></div>');
   markMini($('sentry-host'), 'sentry');
-  await say('哨兵', '后半夜归你。听不清就再听一遍——别喊，别急着开枪。');
+  await say('哨兵', '后半夜归你。听不清就再听一遍，别急着开枪。');
   const op = await runSentry(S.tonightPassword, $('sentry-host'));
   S.sentryScore = op.score;
   markLine(S, 'sentry');
@@ -1951,6 +1953,7 @@ async function runNightChoice(act) {
     : { label: String(o.label), sub: String(o.sub || ''), key: String(o.key ?? i) }));
 
   $('night-lead').textContent = gen?.lead || '火压低了。没人先开口。';
+  audio.speak('火压低了。后半夜怎么过，明天的口粮怎么带，得在火边定下来。', '旁白', 'narr').catch(() => {});
   const body = $('night-body');
   body.innerHTML = '';
   const picked = await askChoice(body, options, { extraOf: () => '' });
