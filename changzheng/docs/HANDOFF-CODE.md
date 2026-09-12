@@ -94,6 +94,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 7. **改台词文本会让 TTS 哈希文件名变化** —— 重跑 `npm run tts:manifest`。
 8. **真调会偶发空 JSON** —— 实测 54 次真调里 8 次返回 `{}`，且耗时都在 9.6–12.3 秒（token 上限被推理占满）。现已把 `max_tokens` 提到 2000（sim 2400），并把空对象当失败处理：重试一次，仍失败就走 FALLBACK，玩家不会再看到空白叙事。真调后跑 `npm run qa:audit` 复查 `docs/LOG-AUDIT.md` 的「字段缺失明细」。
 9. **真调可能等 10 秒以上** —— 点「思考中」的指示器会显示已等待秒数；若现场网络差，直接切 MOCK 演示。
+10. **日志审计要按 id 去重** —— 同一条调用会同时写进「按日文件」和 `session-full.jsonl`；`audit-logs.mjs` 已去重。`docs/LOG-AUDIT.md` 里的「字段缺失」混有旧版本历史记录；想只看当前版本，用 `LOG_DIR=<临时目录>` 单独跑一局再审计（当前版本 MOCK 全流程字段缺失为 0）。
 
 ## 六、下一步建议（按价值排序）
 

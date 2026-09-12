@@ -32,13 +32,20 @@ const REQUIRED = {
 function readLogs() {
   if (!fs.existsSync(LOG_DIR)) return [];
   const files = fs.readdirSync(LOG_DIR).filter((f) => f.endsWith('.jsonl'));
+  // 注意：同一条调用会同时写进「按日文件」和 session-full.jsonl，
+  // 直接遍历会重复计数，所以按 id 去重。
+  const seen = new Set();
   const out = [];
   for (const f of files) {
     for (const line of fs.readFileSync(path.join(LOG_DIR, f), 'utf8').split('\n')) {
       const t = line.trim();
       if (!t) continue;
       try {
-        out.push({ ...JSON.parse(t), _file: f });
+        const rec = JSON.parse(t);
+        const key = rec.id || `${f}:${out.length}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ ...rec, _file: f });
       } catch { /* 跳过坏行 */ }
     }
   }

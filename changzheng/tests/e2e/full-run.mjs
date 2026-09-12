@@ -149,6 +149,12 @@ async function run() {
     }
     if (await tryClick(page, '#night-body .btn.choice:not([disabled])')) { await page.waitForTimeout(150); continue; }
 
+    // --aivia：走 ai_vs_ai 分支（两个 AI 对答），覆盖双 AI 判分
+    if (process.argv.includes('--aivia') && await tryClick(page, '#quiz-auto:not([disabled])')) {
+      await page.waitForTimeout(400);
+      continue;
+    }
+
     if (await page.locator('#screen-camp').isVisible().catch(() => false)) {
       // 第四幕先把可选的「两个小鬼」点掉，保证五子棋也被覆盖
       if (act.includes('雪山') && !didGomoku) {

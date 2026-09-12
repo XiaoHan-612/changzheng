@@ -2,11 +2,11 @@
 
 > 由 node scripts/audit-logs.mjs 生成 · 日志目录 logs
 
-- 总记录：**1008** 条
+- 总记录：**957** 条
 - 覆盖 callType：**13** 类
-- 平均耗时：371ms　·　p95：1641ms　·　最慢：12340ms
-- source 分布：GLM-5.1=54　MOCK_AI=954
-- model 分布：glm-5.3-flash=1008
+- 平均耗时：391ms　·　p95：2388ms　·　最慢：12340ms
+- source 分布：GLM-5.1=54　MOCK_AI=903
+- model 分布：glm-5.3-flash=957
 - 字段缺失：**125** 条　·　FALLBACK：**0** 条
 - 说明：日志按日累积，可能混入旧版本产生的记录；判断当前版本是否合规，以本轮之后新增的记录为准。
 
@@ -14,17 +14,17 @@
 
 | callType | 次数 | 平均耗时 | 最慢 | 字段缺失 |
 |---|---:|---:|---:|---:|
-| branch_judge | 191 | 873ms | 12340ms | 6 |
-| quiz_generate | 141 | 702ms | 10742ms | 2 |
-| quiz_answer_ai | 134 | 80ms | 2388ms | 0 |
-| quiz_judge | 134 | 191ms | 5360ms | 0 |
-| scene_gen | 102 | 193ms | 12118ms | 42 |
-| choice_hint | 90 | 71ms | 6362ms | 36 |
-| act_review | 79 | 108ms | 8559ms | 36 |
-| share_judge | 47 | 0ms | 1ms | 0 |
-| minigame_review | 37 | 348ms | 8759ms | 0 |
+| branch_judge | 184 | 906ms | 12340ms | 6 |
+| quiz_generate | 135 | 733ms | 10742ms | 2 |
+| quiz_answer_ai | 128 | 84ms | 2388ms | 0 |
+| quiz_judge | 128 | 200ms | 5360ms | 0 |
+| scene_gen | 94 | 210ms | 12118ms | 42 |
+| choice_hint | 83 | 77ms | 6362ms | 36 |
+| act_review | 73 | 117ms | 8559ms | 36 |
+| share_judge | 45 | 0ms | 1ms | 0 |
+| minigame_review | 35 | 368ms | 8759ms | 0 |
 | sim_turn | 27 | 0ms | 1ms | 0 |
-| ending_review | 16 | 0ms | 1ms | 0 |
+| ending_review | 15 | 0ms | 1ms | 0 |
 | npc_chat | 8 | 3059ms | 5476ms | 1 |
 | study_report | 2 | 0ms | 0ms | 2 |
 
