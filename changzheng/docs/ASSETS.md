@@ -40,8 +40,8 @@
 
 | 幕 | 待生成 |
 |---|---|
-| 开场 | `depart_bridge`、`depart_crowd` |
-| 一幕 | `xiangjiang_bridge`、`xiangjiang_wreck`、`xiangjiang_night` |
+| 开场 | `depart_bridge` ✅（船只+门板浮桥，夜行列队）· `depart_crowd` ✅（返工后为短打布衣 + 包头巾/斗笠，不再像长袍） |
+| 一幕 | `xiangjiang_bridge` ✅（断桥无遗体）· `xiangjiang_wreck` ✅（行装与担架，严格无人物）· `xiangjiang_night` ✅（江边宿营，绑腿与八角帽） |
 | 二幕 | `zunyi_room`、`map_desk`、`zunyi_street` |
 | 三幕 | `jinsha_ferry` ✅ · `luding_bridge` ✅（铁索压中段，适配横版小游戏）· `luding_run` ✅（湿脚印 + 丢下的草鞋 + 远处火把） |
 | 四幕 | `snow_camp` ✅ · `snow_let_clothes` ✅ 均已就位（2026-09-12，返工后双手为自然肤色，红军红只留帽徽） |
