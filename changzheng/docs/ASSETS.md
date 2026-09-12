@@ -44,7 +44,7 @@
 | 一幕 | `xiangjiang_bridge`、`xiangjiang_wreck`、`xiangjiang_night` |
 | 二幕 | `zunyi_room`、`map_desk`、`zunyi_street` |
 | 三幕 | `jinsha_ferry`、`luding_bridge`、`luding_run` |
-| 四幕 | `snow_camp`、`snow_let_clothes` |
+| 四幕 | `snow_camp` ✅ 已就位（2026-09-12，灰蓝军装/纸纹毛边/雪线营地达标）· `snow_let_clothes` ⚠ 待修（两名战士**双手是鲜红色**，应改成与脸部一致的自然肤色） |
 | 五幕 | `lazikou_cliff`、`huining_flag`、`huining_crowd` |
 | 通用 | `map_route`、`echo_paper` |
 
