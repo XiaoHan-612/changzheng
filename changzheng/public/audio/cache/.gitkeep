@@ -1,0 +1,3 @@
+# TTS 音色缓存目录
+# 音频模型产出的 wav 放这里，文件名 = <sha1(text|voice) 前16位>_<voiceId>.wav
+# 服务端 POST /api/tts 会自动命中缓存并返回 /audio/cache/<同名文件>

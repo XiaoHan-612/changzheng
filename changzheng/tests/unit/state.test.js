@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, applyEffects, unlockFact } from '../../public/js/state.js';
+import { markLineDone, linesDoneCount, canNight, apPerDay, dayScene, checkFailure } from '../../public/js/state.js';
 
 test('createState 默认五维与锁字段', () => {
   const s = createState();
@@ -47,4 +48,54 @@ test('好感可增减且钳制', () => {
   assert.equal(s.好感_老班长, 100);
   applyEffects(s, { 好感_老班长: -200 });
   assert.equal(s.好感_老班长, 0);
+});
+
+test('附身线：幂等计数 + 篝火夜门槛 ≥3', () => {
+  const s = createState();
+  assert.equal(linesDoneCount(s), 0);
+  assert.equal(canNight(s), false);
+  assert.equal(markLineDone(s, 'fishing'), true);
+  assert.equal(markLineDone(s, 'fishing'), false);
+  markLineDone(s, 'candy');
+  assert.equal(canNight(s), false);
+  markLineDone(s, 'sentry');
+  assert.equal(linesDoneCount(s), 3);
+  assert.equal(canNight(s), true);
+});
+
+test('行动点：读取 acts 的 apPerDay，缺省 2', () => {
+  assert.equal(apPerDay({ apPerDay: 3 }), 3);
+  assert.equal(apPerDay({}), 2);
+  assert.equal(apPerDay({ apPerDay: 0 }), 2);
+  assert.equal(apPerDay(null), 2);
+});
+
+test('每日场景：无 dayScenes 回退 act.pano，有则按天取并夹紧', () => {
+  const act = { pano: '/a.jpg', hotspots: [{ id: 'x' }] };
+  assert.deepEqual(dayScene(act, 1), { pano: '/a.jpg', hotspots: act.hotspots });
+
+  const multi = {
+    pano: '/fallback.jpg',
+    hotspots: [],
+    dayScenes: [
+      { pano: '/snow.jpg', hotspots: [{ id: 's' }] },
+      { pano: '/grass.jpg', hotspots: [{ id: 'g' }] },
+    ],
+  };
+  assert.equal(dayScene(multi, 1).pano, '/snow.jpg');
+  assert.equal(dayScene(multi, 2).pano, '/grass.jpg');
+  assert.equal(dayScene(multi, 9).pano, '/grass.jpg');
+});
+
+test('失败判定：体力归零、断粮见底；研学模式不触发', () => {
+  const march = { ...createState(), mode: 'march' };
+  assert.equal(checkFailure(march), null);
+  march.体力 = 0;
+  assert.equal(checkFailure(march).kind, '体力耗尽');
+
+  const hungry = { ...createState(), mode: 'march', 粮食: 0, 体力: 30 };
+  assert.equal(checkFailure(hungry).kind, '断粮掉队');
+
+  const study = { ...createState(), mode: 'study', 体力: 0, 粮食: 0 };
+  assert.equal(checkFailure(study), null);
 });

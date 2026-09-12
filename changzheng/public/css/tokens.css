@@ -1,0 +1,20 @@
+/* ═══ 设计变量（全站唯一真相）═══
+   style.css / cinema.css / sandbox.css / minigames.css 共用 */
+:root {
+  --bg: #0f1216;
+  --bg2: #171b20;
+  --paper: #e8dcc8;
+  --paper-dim: #c9bfa8;
+  --muted: #8a8478;
+  --ink: #2c2416;
+  --red: #8b2e2e;
+  --red-bright: #c23a2e;
+  --gold: #c4a35a;
+  --teal: #5c6b73;
+  --line: rgba(232, 220, 200, 0.14);
+  --panel: rgba(18, 22, 28, 0.92);
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  --radius: 14px;
+  --font: "Noto Serif SC", "Songti SC", "SimSun", "Microsoft YaHei", serif;
+  --font-ui: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}

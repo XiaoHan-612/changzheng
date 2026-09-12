@@ -18,7 +18,7 @@ export async function callGlm51(payload) {
   } = payload || {};
 
   const startTime = Date.now();
-  const system = systemPrompt || buildSystemPrompt(callType, scene);
+  const system = systemPrompt || buildSystemPrompt(callType, scene, operation);
   const userMessage = buildUserMessage({ scene, situation, state, options, extraContext, operation, callType, agent });
 
   if (CONFIG.MOCK_AI) {
@@ -60,7 +60,8 @@ export async function callGlm51(payload) {
             { role: 'user', content: userMessage },
           ],
           temperature: 0.75,
-          max_tokens: 1000,
+          // 留足 token：实测 max_tokens=1000 时模型偶发返回空 JSON（内容被推理占满）
+          max_tokens: 2000,
           response_format: { type: 'json_object' },
         }),
         signal: controller.signal,
@@ -81,6 +82,10 @@ export async function callGlm51(payload) {
         const match = content.match(/\{[\s\S]*\}/);
         if (!match) throw new Error('模型返回无法解析为 JSON');
         parsed = JSON.parse(match[0]);
+      }
+      // 空对象视为失败：重试，仍失败则走 FALLBACK，别让玩家看到空白叙事
+      if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
+        throw new Error('模型返回空 JSON（可能是 token 被占满或内容被过滤）');
       }
 
       logAiCall({
@@ -130,7 +135,7 @@ export async function callGlm51(payload) {
   return fallback;
 }
 
-function buildSystemPrompt(callType, scene) {
+function buildSystemPrompt(callType, scene, operation) {
   const base = `你是《长征·抉择》的叙事与裁决引擎。题材：1934–1936 中国工农红军长征关键节点（于都河、湘江、遵义、金沙江、泸定桥、雪山草地、腊子口、会宁）。
 【语气】第二人称、克制、具体、有画面感；不堆口号，不戏说，不编造具体真实历史人物姓名。
 【史实】以提供的事实为锚；文学典型须可辨认为文学化记述。
@@ -162,6 +167,24 @@ call_type=npc_chat。你是营地中的红军同伴，接住玩家的话并回�
 {"reply":"同伴的话（40-80字）","affinity_delta":-2到3,"mood":"平静|温和|警觉|感伤","topic_hint":"可选下一句话题"}`;
   }
   if (callType === 'share_judge' || callType === 'minigame_review') {
+    // 分糖要逐颗判定，其余小游戏只写整体后果
+    if (operation?.type === 'sugar') {
+      return `${base}
+call_type=share_judge（分糖）。玩家把三颗糖分给伤员 / 倔强的新兵 / 小号手，或自留。
+逐颗判定谁接受、谁推辞、谁转赠，再给整局评价。不羞辱任何选择：自留也写情绪复杂度，不写道德指责。
+返回：
+{"items":[{"who":"伤员|倔强的新兵|小号手|自留","accepted":true,"reaction":"20字内"},...],
+"choice":"一句话结论","reason":"40字内","effects":{"士气":0,"信念":0,"好感_红小鬼":0,"好感_卫生员":0,"粮食":0},
+"narrative":"50-100字叙事","factId":"h_share"}`;
+    }
+    if (operation?.type === 'sentry') {
+      return `${base}
+call_type=minigame_review（夜岗）。玩家在五个信号（脚步/口令/光点/兽/静默）中各选一次处置。
+按误报与漏报写后果：漏报要付代价，误报同样要付代价，别只奖励保守。
+返回：
+{"choice":"短结论","reason":"40字内","effects":{"士气":0,"信念":0,"体力":0},
+"narrative":"50-90字叙事","factId":"h_sentry"}`;
+    }
     return `${base}
 call_type=${callType}。根据玩家操作与分配方案写后果。
 返回：
@@ -315,6 +338,83 @@ function mockDecision({ scene, callType, options, state, operation, agent }) {
   }
 
   if (callType === 'minigame_review' || callType === 'share_judge') {
+    // 分糖：逐颗判定（一次调用返回数组）
+    if (operation?.type === 'sugar' || /分糖|三颗糖/.test(s)) {
+      const a = operation || {};
+      const n = (k) => Number(a[k] || 0);
+      const gave = n('shangyuan') + n('xinbing') + n('xiaohaoshou');
+      const self = n('self');
+      const items = [
+        { who: '伤员', accepted: n('shangyuan') > 0, reaction: n('shangyuan') > 0 ? '他先把糖推回来，被按住了手' : '他摆手：给小鬼吃' },
+        { who: '倔强的新兵', accepted: n('xinbing') > 0, reaction: n('xinbing') > 0 ? '他嘴上说谁稀罕，糖纸却没有丢' : '他把脸别过去，说你留着' },
+        { who: '小号手', accepted: n('xiaohaoshou') > 0, reaction: n('xiaohaoshou') > 0 ? '他先说只舔一口，后来舔了三口' : '他说自己牙疼，其实没有' },
+      ];
+      if (self > 0) items.push({ who: '自留', accepted: true, reaction: '夜里你把糖纸攥皱了，又抚平' });
+      return {
+        items,
+        choice: self === 0 ? '三颗都递了出去' : self >= 2 ? '大半留给了自己' : '留了一颗给自己',
+        reason: self === 0 ? '先顾伤员和新兵' : self >= 2 ? '先顾自己' : '留一点给自己扛夜路',
+        effects: self === 0
+          ? { 士气: 4, 信念: 7, 好感_红小鬼: 3, 好感_卫生员: 2 }
+          : self >= 2
+            ? { 士气: -2, 信念: -3, 粮食: 1, 好感_红小鬼: -1 }
+            : { 士气: 2, 信念: 3, 粮食: 1, 好感_红小鬼: 1 },
+        narrative: self === 0
+          ? '糖一颗颗递出去。小号手把糖含在腮边，舍不得嚼。没人说谢谢，火光照着几张年轻的脸。'
+          : self >= 2
+            ? '你把糖收进贴身口袋。夜里很静，你摸到糖纸的棱角，忽然想不起上一次吃甜是什么时候。'
+            : '你留了一颗，其余分了出去。没人多问，只是有人把自己的干粮袋往你这边挪了挪。',
+        factId: 'h_share',
+      };
+    }
+    // 夜岗：五信号处置
+    if (operation?.type === 'sentry' || /夜岗|口令|哨位/.test(s)) {
+      const hits = Number(operation?.hits ?? 0);
+      const total = Number(operation?.total || 5);
+      const ok = hits / total;
+      return {
+        choice: ok >= 0.8 ? '一夜无事' : ok >= 0.5 ? '有惊无险' : '出了纰漏',
+        reason: ok >= 0.8 ? '该报的报了，不该报的忍住了' : ok >= 0.5 ? '漏了一次，队伍补上了' : '误报与漏报都出现了',
+        effects: ok >= 0.8
+          ? { 士气: 5, 信念: 4, 体力: -3 }
+          : ok >= 0.5
+            ? { 士气: 1, 体力: -5 }
+            : { 士气: -4, 信念: -3, 体力: -6 },
+        narrative: ok >= 0.8
+          ? '后半夜风停了。你把听到的都记住了，该喊的时候才喊。天快亮时，前哨换班，拍了拍你的肩。'
+          : ok >= 0.5
+            ? '有一回你举棋不定，延误了片刻。好在班里的人醒了，枪口一致朝外，什么都没发生，也什么都差点发生。'
+            : '你喊早了一次，又沉默得太久。全班被折腾起来，冻着挨到天亮。没人骂你，只是再没人提让你站后半夜。',
+        factId: 'h_sentry',
+      };
+    }
+    // 五子棋 / 泸定桥：只写整体后果
+    if (operation?.type === 'gomoku') {
+      const r = operation?.result;
+      return {
+        choice: r === 'win' ? '你赢了' : r === 'draw' ? '平手' : '小鬼赢了',
+        reason: '按棋局结果结算',
+        effects: r === 'win' ? { 士气: 3, 好感_红小鬼: 2 } : r === 'draw' ? { 士气: 2, 好感_红小鬼: 1 } : { 士气: 1, 好感_红小鬼: 2 },
+        narrative: r === 'win'
+          ? '你把最后一颗石子按下去的时候，小鬼盯着泥地看了很久，然后说：再来一盘。'
+          : '小鬼从泥地上跳起来，围着火堆跑了半圈才想起来不能出声。你看着他的背影，也跟着笑了一下。',
+      };
+    }
+    if (operation?.type === 'luding') {
+      const cleared = !!operation?.cleared;
+      const falls = Number(operation?.falls || 0);
+      return {
+        choice: cleared ? (falls ? '过桥了，代价不小' : '过桥了') : '没能过去',
+        reason: '按过桥表现结算',
+        effects: cleared
+          ? (falls ? { 体力: -8, 士气: 4, 信念: 6 } : { 体力: -5, 士气: 6, 信念: 8 })
+          : { 体力: -10, 士气: -4, 信念: 2 },
+        narrative: cleared
+          ? '铁索在手里发烫。你爬到对岸时，身后的火还没停。有人把你从桥头拖进来，一句话没说，先递了水。'
+          : '你没能在火力停歇前过去。后来是第二拨人把桥板一块块铺上，队伍从上面走了过去——只是走得比原计划晚了半天。',
+        factId: 'h_luding',
+      };
+    }
     // 先认 operation.type / 明确钓鱼场景，避免「鱼钩」被误判成分汤
     if (operation?.type === 'fishing' || /钓鱼|咬钩|起竿|鱼钩/.test(s)) {
       const n =
@@ -434,7 +534,8 @@ function mockDecision({ scene, callType, options, state, operation, agent }) {
 
   if (callType === 'night_resolve') {
     return {
-      effects: { 体力: -5, 粮食: -1, 士气: 4, 信念: 3, 安全感: 5 },
+      // 只回状态里真实存在的维度（曾经的「安全感」会被 applyEffects 静默丢弃）
+      effects: { 体力: -5, 粮食: -1, 士气: 4, 信念: 3, 民心: 2 },
       narrative: '你们把岗排密了。后半夜有人咳嗽，又被轻轻拍背止住。天快亮时，火堆只剩一点红。',
       nextBeat: '队伍在微光里收拢背囊。',
     };

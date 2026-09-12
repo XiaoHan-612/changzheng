@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "note": "固定台词清单：文本稳定、可离线合成后放进 public/audio/cache/。文件名 = sha1(voiceId|text) 前16位 + '_' + voiceId + '.wav'；跑 node scripts/tts-manifest.mjs 生成对照表。",
+  "lines": [
+    { "id": "fact_h_depart", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "于都出发" },
+    { "id": "fact_h_xiangjiang", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "湘江战役" },
+    { "id": "fact_h_zunyi", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "遵义会议" },
+    { "id": "fact_h_chishui", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "四渡赤水" },
+    { "id": "fact_h_jinsha", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "巧渡金沙江" },
+    { "id": "fact_h_luding", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "飞夺泸定桥" },
+    { "id": "fact_h_xueshan", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "翻越雪山" },
+    { "id": "fact_h_fishhook", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "金色的鱼钩" },
+    { "id": "fact_h_grassland", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "过松潘草地" },
+    { "id": "fact_h_share", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "行军中的分享" },
+    { "id": "fact_h_nightschool", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "行军中的文化学习" },
+    { "id": "fact_h_sentry", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "夜间警戒与口令" },
+    { "id": "fact_h_campfire", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "篝火与夜间议事" },
+    { "id": "fact_h_huining", "actor": "旁白", "voiceId": "narr", "when": "史实回响·标题", "text": "会宁会师" },
+    { "id": "sentry_open", "actor": "哨兵", "voiceId": "sentry", "when": "夜岗·开场", "text": "后半夜归你。听不清就再听一遍，别急着开枪。" },
+    { "id": "sentry_pass_ok", "actor": "哨兵", "voiceId": "sentry", "when": "夜岗·全对", "text": "该报的报了，不该报的忍住了。天快亮时，前哨换班，拍了拍你的肩。" },
+    { "id": "sentry_pass_bad", "actor": "哨兵", "voiceId": "sentry", "when": "夜岗·失误", "text": "你喊早了一次，又沉默得太久。全班被折腾起来，冻着挨到天亮。" },
+    { "id": "luding_open", "actor": "突击队长", "voiceId": "captain", "when": "泸定桥·开场", "text": "桥板被人抽了，铁索还在。跟着我，别往下看。" },
+    { "id": "luding_cleared", "actor": "突击队长", "voiceId": "captain", "when": "泸定桥·成功", "text": "过桥了。铁索在手里发烫，身后的火还没停。" },
+    { "id": "luding_failed", "actor": "突击队长", "voiceId": "captain", "when": "泸定桥·未过", "text": "没能过去。第二拨人把桥板一块块铺上，队伍从上面走了过去。" },
+    { "id": "candy_open", "actor": "红小鬼", "voiceId": "xiaogui", "when": "分糖·开场", "text": "我兜里有三颗糖。你说，给谁？" },
+    { "id": "snow_grab_open", "actor": "你", "voiceId": "narr", "when": "陡坡·开场", "text": "他的手在滑。前面的雪是硬的，下面是空的。" },
+    { "id": "roster_open", "actor": "你", "voiceId": "narr", "when": "会师·清点", "text": "队伍汇合了，人山人海。你在人群里找那些熟悉的脸。" },
+    { "id": "night_open", "actor": "旁白", "voiceId": "narr", "when": "篝火夜·开场", "text": "火压低了。后半夜怎么过，明天的口粮怎么带，得在火边定下来。" }
+  ]
+}

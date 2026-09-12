@@ -113,7 +113,7 @@ export function renderWorld(w) {
   saveWorld(w);
 }
 
-const VISUALS = {
+const DEFAULT_VISUALS = {
   rain: '/assets/events/ev_rain.jpg',
   night_march: '/assets/events/ev_night_march.jpg',
   starve: '/assets/events/ev_starve.jpg',
@@ -123,10 +123,32 @@ const VISUALS = {
   march: '/assets/events/ev_night_march.jpg',
   camp: '/assets/scenes/camp_pano.jpg',
 };
-const TAG_LABEL = {
+const DEFAULT_TAG_LABEL = {
   rain: '雨中行军', night_march: '夜行', starve: '断粮', village: '遇见老乡',
   loss: '有人留下', river: '涉水', march: '草地行军', camp: '宿营',
 };
+
+// 事件图与标签的唯一真相在 data/sim-visuals.json，这里只做兜底
+let VISUALS = { ...DEFAULT_VISUALS };
+let TAG_LABEL = { ...DEFAULT_TAG_LABEL };
+
+async function loadSimVisuals() {
+  try {
+    const res = await fetch('/api/data/sim-visuals');
+    if (!res.ok) return;
+    const j = await res.json();
+    const tags = j?.tags || {};
+    const imgs = {};
+    const labels = {};
+    for (const [k, v] of Object.entries(tags)) {
+      if (v?.img) imgs[k] = v.img;
+      if (v?.label) labels[k] = v.label;
+    }
+    if (Object.keys(imgs).length) VISUALS = { ...VISUALS, ...imgs };
+    if (Object.keys(labels).length) TAG_LABEL = { ...TAG_LABEL, ...labels };
+    if (j?.reactions) REACTION_FILE = { ...REACTION_FILE, ...j.reactions };
+  } catch { /* 用内置兜底 */ }
+}
 
 /** 角色 → 反应语音（仅固定台词命中，模型自由句静默） */
 const REACTION_VOICE = {
@@ -136,7 +158,7 @@ const REACTION_VOICE = {
   向导老乡: { 支持: 'guide_advice', 担忧: 'guide_advice', 反对: 'guide_advice', 沉默: null },
   新兵: { 担忧: 'recruit_guilt', 反对: 'recruit_guilt', 支持: 'recruit_guilt', 沉默: null },
 };
-const REACTION_FILE = {
+let REACTION_FILE = {
   laoban_oppose: '/audio/reactions/laoban_oppose.wav',
   laoban_support: '/audio/reactions/laoban_support.wav',
   weisheng_worry: '/audio/reactions/weisheng_worry.wav',
@@ -305,7 +327,8 @@ async function runSimEnding(w, reason) {
   }
 }
 
-export function bindSandbox({ onExit }) {
+export async function bindSandbox({ onExit }) {
+  await loadSimVisuals();
   const exit = () => {
     activeSubmit = null;
     onExit && onExit();

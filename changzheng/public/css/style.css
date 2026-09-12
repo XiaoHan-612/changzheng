@@ -1,22 +1,6 @@
-/* 长征·抉择 — 纸黄淡彩 + 墨色话剧 */
-:root {
-  --bg: #0f1216;
-  --bg2: #171b20;
-  --paper: #e8dcc8;
-  --paper-dim: #c9bfa8;
-  --muted: #8a8478;
-  --ink: #2c2416;
-  --red: #8b2e2e;
-  --red-bright: #c23a2e;
-  --gold: #c4a35a;
-  --teal: #5c6b73;
-  --line: rgba(232, 220, 200, 0.14);
-  --panel: rgba(18, 22, 28, 0.92);
-  --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
-  --radius: 14px;
-  --font: "Noto Serif SC", "Songti SC", "SimSun", "Microsoft YaHei", serif;
-  --font-ui: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-}
+/* 长征·抉择 — 纸黄淡彩 + 墨色话剧
+   设计变量统一在 tokens.css；本文件只放组件样式。
+   暮色营地/电影卡/回响/手记由 cinema.css 覆盖实现。 */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
@@ -43,7 +27,6 @@ body {
 #topbar > * { pointer-events: auto; }
 .brand { display: flex; align-items: center; gap: 8px; font-family: var(--font); letter-spacing: 0.06em; white-space: nowrap; }
 .brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red-bright); box-shadow: 0 0 10px var(--red-bright); }
-.chapter-tag { font-size: 12px; color: var(--gold); opacity: 0.9; margin-left: 4px; }
 .stats { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
 .stat {
   background: rgba(232,220,200,0.06); border: 1px solid var(--line);
@@ -153,40 +136,13 @@ body {
 .cut-actions {
   display: flex; gap: 12px; justify-content: center; margin-top: 18px;
 }
-.cut-hint { margin-top: 10px; opacity: 0.7; }
-.cut-skip { position: absolute; right: 20px; bottom: 20px; z-index: 3; }
-
-/* Camp day */
-.camp-bg {
-  position: absolute; inset: 0;
-  background-size: cover; background-position: center;
-  filter: brightness(0.55) saturate(0.85);
-}
-.camp-bg::after {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(10,12,14,0.82) 0%, rgba(10,12,14,0.55) 45%, rgba(10,12,14,0.7));
-}
-.camp-layout {
-  position: relative; z-index: 2; display: grid;
-  grid-template-columns: 260px 1fr; gap: 18px;
-  width: min(960px, 94vw); height: min(620px, 86vh);
-}
-.camp-side {
-  padding: 18px; display: flex; flex-direction: column; overflow: auto;
-}
-.day-badge {
-  font-family: var(--font); font-size: 15px; letter-spacing: 0.08em;
-  padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 12px;
-}
-.day-badge b { color: var(--gold); font-size: 20px; }
-.ap-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-size: 13px; color: var(--paper-dim); }
+/* Camp day（营地本体由 cinema.css 的 .dusk/.hud-left 实现） */
 .ap-dots { display: flex; gap: 6px; }
 .ap-dot {
   width: 14px; height: 14px; border-radius: 50%;
   border: 1px solid var(--gold); background: transparent;
 }
 .ap-dot.on { background: var(--gold); }
-.side-block { flex: 1; min-height: 0; }
 .companion-list { display: flex; flex-direction: column; gap: 8px; }
 .comp-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 10px;
@@ -204,25 +160,6 @@ body {
 .comp-meta span { font-size: 11px; color: var(--muted); }
 .comp-aff { font-size: 11px; color: var(--gold); }
 
-.camp-main {
-  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 20px 22px; display: flex; flex-direction: column; overflow: auto; box-shadow: var(--shadow);
-}
-.camp-head h2 { font-family: var(--font); font-size: 20px; letter-spacing: 0.06em; }
-.camp-head p { margin: 6px 0 16px; font-size: 13px; }
-.action-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;
-}
-.action-card {
-  border: 1px solid var(--line); border-radius: 12px; padding: 14px 12px;
-  background: rgba(232,220,200,0.04); cursor: pointer; text-align: left;
-  transition: 0.15s ease; color: var(--paper);
-}
-.action-card:hover { border-color: var(--gold); background: rgba(196,163,90,0.08); }
-.action-card:disabled { opacity: 0.4; cursor: not-allowed; }
-.action-card .icon { font-family: var(--font); font-size: 22px; color: var(--gold); margin-bottom: 6px; }
-.action-card b { display: block; font-size: 14px; margin-bottom: 4px; }
-.action-card span { font-size: 12px; color: var(--muted); line-height: 1.45; }
 .camp-log {
   margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--line);
   font-size: 12px; color: var(--paper-dim); line-height: 1.7; max-height: 140px; overflow: auto;
@@ -230,35 +167,13 @@ body {
 .camp-log div { padding: 2px 0; }
 .camp-log .tag { color: var(--gold); margin-right: 6px; }
 
-/* Stage */
-.stage-bg {
-  position: absolute; inset: 0; background-size: cover; background-position: center;
-  filter: brightness(0.5) saturate(0.85);
-}
-.stage-layout {
-  position: relative; z-index: 2; display: grid; grid-template-columns: 200px 1fr; gap: 16px;
-  width: min(920px, 94vw); height: min(600px, 86vh);
-}
-.stage-portrait {
-  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px;
-}
-.portrait-frame { text-align: center; }
-.portrait-art {
-  width: 96px; height: 96px; border-radius: 50%; margin: 0 auto 10px;
-  display: grid; place-items: center; font-family: var(--font); font-size: 36px;
-  background: radial-gradient(circle at 30% 30%, rgba(196,163,90,0.35), rgba(139,46,46,0.45));
-  border: 2px solid rgba(196,163,90,0.4);
-  background-size: cover; background-position: center top;
-}
-.portrait-art.has-img { color: transparent; font-size: 0; }
+/* Stage（舞台本体由 cinema.css 的 .sheet 实现） */
 .portrait-name { font-family: var(--font); font-size: 16px; letter-spacing: 0.08em; }
 .portrait-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .portrait-mood {
   font-size: 12px; color: var(--gold); padding: 4px 12px;
   border: 1px solid rgba(196,163,90,0.35); border-radius: 999px;
 }
-.stage-main { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .stage-banner {
   font-family: var(--font); font-size: 18px; letter-spacing: 0.08em;
   text-shadow: 0 2px 10px rgba(0,0,0,0.5);
@@ -292,9 +207,6 @@ canvas.mini {
   background: linear-gradient(180deg, #1a2830 0%, #243840 55%, #1a3028 100%);
   max-width: 100%;
 }
-.bar-track { height: 10px; background: rgba(0,0,0,0.3); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
-.bar-fill { height: 100%; background: linear-gradient(90deg, var(--red), var(--gold)); border-radius: 999px; transition: width 0.2s; }
-
 /* Quiz */
 .quiz-bg, .night-bg, .end-bg {
   position: absolute; inset: 0; background-size: cover; background-position: center;
@@ -413,8 +325,7 @@ canvas.mini {
   100% { opacity: 0; }
 }
 
-/* 鈹€鈹€鈹€ 鍙插疄鍥炲搷 鈹€鈹€鈹€ */
-.echo-panel { max-width: 720px; }
+/* ─── 史实回响（面板本体在 cinema.css 的 .echo-cinema）─── */
 .echo-head {
   display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
 }
@@ -443,9 +354,9 @@ canvas.mini {
   font-size: 12px; color: var(--muted); line-height: 1.7;
   margin: 0 0 16px; padding-left: 10px; border-left: 2px solid var(--line);
 }
-.echo-panel .btn.primary { width: 100%; }
+.echo-cinema .btn.primary { width: 100%; }
 
-/* 鈹€鈹€鈹€ Path choice on image 鈹€鈹€鈹€ */
+/* ─── 岔路点选（过草地）─── */
 .path-bg {
   position: absolute; inset: 0; background-size: cover; background-position: center;
   filter: brightness(0.55) saturate(0.9);
@@ -472,8 +383,6 @@ canvas.mini {
 .path-zone span { font-size: 12px; color: var(--paper-dim); margin-top: 4px; text-shadow: 0 1px 6px #000; }
 
 @media (max-width: 820px) {
-  .camp-layout, .stage-layout { grid-template-columns: 1fr; height: auto; min-height: 86vh; }
-  .camp-side, .stage-portrait { max-height: 180px; }
   .end-grid, .echo-grid { grid-template-columns: 1fr; }
   #topbar { flex-wrap: wrap; }
 }
@@ -490,5 +399,3 @@ select.set-input option { background:#1a1e24; color:var(--paper); }
 .set-actions { display:flex; gap:8px; flex-wrap:wrap; }
 .set-test { margin-top:8px; }
 @media (max-width:820px){ .settings-grid{grid-template-columns:1fr;} }
-
-

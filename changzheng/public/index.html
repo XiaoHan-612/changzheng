@@ -4,9 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>长征·抉择</title>
+  <meta name="description" content="《长征·抉择》— 五幕 AI 科普互动游戏：暮色营地探索、抉择交大模型裁决、立刻对照真实史实。适合红色研学、党建数字课堂与校园思政。" />
+  <meta name="theme-color" content="#0f1216" />
+  <meta property="og:title" content="长征·抉择" />
+  <meta property="og:description" content="用有限的暮色走近光点：每一步抉择交给大模型裁决，立刻对照真实史实。" />
+  <meta property="og:image" content="/assets/scenes/depart_pano.jpg" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/css/tokens.css" />
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="/css/cinema.css" />
   <link rel="stylesheet" href="/css/sandbox.css" />
+  <link rel="stylesheet" href="/css/minigames.css" />
 </head>
 <body>
   <div id="app">
@@ -52,8 +60,13 @@
             <b>自由行军</b>
             <span>不选选项——写下或说出你要做什么，模型当世界裁判。</span>
           </button>
+          <button type="button" class="mode-card" id="btn-mode-quick">
+            <b>快速演示</b>
+            <span>每幕只跑主玩法与对决，约 18 分钟，专供路演。</span>
+          </button>
         </div>
         <div class="title-actions">
+          <button type="button" id="btn-continue-run" class="btn primary lg hidden">继续上一局</button>
           <button type="button" id="btn-judge" class="btn gold lg">评委演示</button>
           <button type="button" id="btn-how" class="btn ghost lg">怎么玩</button>
           <button type="button" id="btn-settings2" class="btn ghost lg">设置</button>
@@ -202,6 +215,17 @@
         <h2>前面岔开了三条路</h2>
         <p class="muted sm">没有标准答案，只有代价。</p>
         <div id="path-zones" class="path-zones"></div>
+      </div>
+    </section>
+
+    <!-- 篝火深夜：夜间互斥抉择（选项由模型生成） -->
+    <section id="screen-night" class="screen hidden">
+      <div class="night-bg" style="background-image:url('/assets/scenes/night_fire.jpg')"></div>
+      <div class="panel wide glass night-panel">
+        <h2 id="night-title">篝火 · 深夜</h2>
+        <p id="night-lead" class="muted"></p>
+        <div id="night-stats" class="stats big"></div>
+        <div id="night-body"></div>
       </div>
     </section>
 
@@ -363,7 +387,7 @@
     </section>
 
     <div id="toast" class="toast hidden"></div>
-    <div id="thinking" class="thinking hidden"><span class="spin"></span> <span id="thinking-label">模型在书写…</span></div>
+    <div id="thinking" class="thinking hidden"><span class="spin"></span> <span id="thinking-label">模型在书写…</span><span id="thinking-elapsed" class="muted"></span></div>
     <aside id="ai-inspector" class="ai-inspector hidden" aria-live="polite">
       <div class="ai-ins-head">AI 决策监视器 <button type="button" id="btn-inspect-close" class="btn ghost sm">收起</button></div>
       <div id="ai-ins-body" class="ai-ins-body"></div>

@@ -45,7 +45,7 @@ export async function callSim({ world, action, intent }) {
             { role: 'user', content: user },
           ],
           temperature: 0.8,
-          max_tokens: 1200,
+          max_tokens: 2400,
           response_format: { type: 'json_object' },
         }),
         signal: controller.signal,
@@ -61,6 +61,9 @@ export async function callSim({ world, action, intent }) {
         const m = content.match(/\{[\s\S]*\}/);
         if (!m) throw new Error('无法解析 JSON');
         parsed = JSON.parse(m[0]);
+      }
+      if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
+        throw new Error('模型返回空 JSON');
       }
       logAiCall({
         scene: `沙盘·${world?.place || '路上'}`,

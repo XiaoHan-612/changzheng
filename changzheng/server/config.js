@@ -44,7 +44,8 @@ export const CONFIG = {
     envFile.GLM_API_URL ||
     'https://open.bigmodel.cn/api/paas/v4/chat/completions',
   GLM_API_KEY: runtime.GLM_API_KEY || process.env.GLM_API_KEY || envFile.GLM_API_KEY || '',
-  GLM_MODEL: runtime.GLM_MODEL || process.env.GLM_MODEL || envFile.GLM_MODEL || 'glm-5.3-flash',
+  // 赛制指定 glm-5.1；本机网络受限时用 .env 覆盖成 glm-5.3-flash 便于测试
+  GLM_MODEL: runtime.GLM_MODEL || process.env.GLM_MODEL || envFile.GLM_MODEL || 'glm-5.1',
   // 设置界面点过「MOCK 模式」后，即使 .env 里有 Key 也保持 MOCK，直到显式关闭
   MOCK_FLAG: runtime.MOCK_AI === true,
   get MOCK_AI() {

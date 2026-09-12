@@ -112,28 +112,59 @@ class GameAudio {
    * @param {string} text
    * @param {string} [voiceId] 强制指定预置 id
    */
+  /** 播一个音频文件，返回 Promise（被打断/出错都会 resolve） */
+  _playFile(file) {
+    this.ensure();
+    this.stopVoice();
+    return new Promise((resolve) => {
+      const el = new Audio(file);
+      el.volume = 0.95;
+      this.voiceEl = el;
+      const done = () => {
+        if (this.voiceEl === el) this.voiceEl = null;
+        resolve();
+      };
+      el.onended = done;
+      el.onerror = done;
+      el.play().catch(done);
+      setTimeout(done, 12000);
+    });
+  }
+
+  /** 查 TTS 缓存：命中返回 url，未命中返回 null（不阻塞流程） */
+  async _cachedTts(text, voiceId) {
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voiceId, actorId: voiceId }),
+      });
+      if (!res.ok) return null;
+      const j = await res.json();
+      return j?.url || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 播语音。支持 speak({text, voiceId, actorId}) 或 speak(text, actorId, voiceId)。
+   * 命中顺序：预置 wav → TTS 缓存 → 静默（策划案 §2.6.2）。
+   */
   async speak(text, actorId, voiceId) {
+    if (text && typeof text === 'object') {
+      ({ text, actorId, voiceId } = text);
+    }
     if (!this.enabled) return;
     try {
       const line = await this.findLine(text, voiceId);
-      if (!line || !line.file) return;
-      this.ensure();
-      this.stopVoice();
-      return new Promise((resolve) => {
-        const el = new Audio(line.file);
-        el.volume = 0.95;
-        this.voiceEl = el;
-        const done = () => {
-          if (this.voiceEl === el) this.voiceEl = null;
-          resolve();
-        };
-        el.onended = done;
-        el.onerror = done;
-        el.play().catch(done);
-        setTimeout(done, 12000);
-      });
+      if (line?.file) return await this._playFile(line.file);
+      if (text) {
+        const url = await this._cachedTts(text, voiceId || actorId || 'narr');
+        if (url) return await this._playFile(url);
+      }
     } catch {
-      return;
+      /* 静默降级 */
     }
   }
 

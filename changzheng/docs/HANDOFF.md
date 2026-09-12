@@ -1,5 +1,8 @@
 # 交接说明（Handoff）
 
+> ⚠️ **本文件是总览。分工交接请看：**
+> [`HANDOFF-CODE.md`](HANDOFF-CODE.md)（代码 agent）· [`HANDOFF-ART.md`](HANDOFF-ART.md)（生图模型）· [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md)（音频/TTS 模型）· [`ASSETS.md`](ASSETS.md)（素材清单）
+
 > 给接力的模型/同学：这份文档说明**已经做完什么、还差什么、怎么验证**。
 > 目前所有自动化测试均为绿色，可以直接在现有基础上继续。
 

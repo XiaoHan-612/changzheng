@@ -1,6 +1,8 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import zlib from 'zlib';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { CONFIG, saveRuntimeConfig } from './config.js';
 import { callGlm51 } from './ai.js';
@@ -10,7 +12,34 @@ import { readSessionLogs, clearSessionLogs } from './logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// 文本响应 gzip（无第三方依赖）：只压缩 >1KB 的 text/json/js/css/svg
+app.use((req, res, next) => {
+  if (!/\bgzip\b/.test(String(req.headers['accept-encoding'] || ''))) return next();
+  const end = res.end.bind(res);
+  res.end = (chunk, enc, cb) => {
+    try {
+      const type = String(res.getHeader('Content-Type') || '');
+      if (chunk && !res.getHeader('Content-Encoding') && /(text|javascript|json|css|svg)/.test(type)) {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, typeof enc === 'string' ? enc : 'utf8');
+        if (buf.length > 1024) {
+          const gz = zlib.gzipSync(buf);
+          res.setHeader('Content-Encoding', 'gzip');
+          res.setHeader('Content-Length', String(gz.length));
+          return end(gz, undefined, cb);
+        }
+      }
+    } catch { /* 压缩失败就原样发送 */ }
+    return end(chunk, enc, cb);
+  };
+  next();
+});
+
+// 静态资源：图片/音频给长缓存，页面与脚本给短缓存
+const PUB = path.join(__dirname, '..', 'public');
+app.use('/assets', express.static(path.join(PUB, 'assets'), { maxAge: '7d' }));
+app.use('/audio', express.static(path.join(PUB, 'audio'), { maxAge: '7d' }));
+app.use(express.static(PUB, { maxAge: '1h' }));
 
 app.post('/api/decide', async (req, res) => {
   try {
@@ -63,6 +92,23 @@ app.get('/api/config', (_req, res) => {
       : '',
     availableModels: ['glm-5.3-flash', 'glm-5.1', 'glm-4-flash', 'glm-4-air', 'glm-4-plus'],
   });
+});
+
+// ─── 语音合成（表现层，不是「AI 决策」）───
+// 只服务 public/audio/cache/ 里已存在的音色文件（由音频模型离线生成，文件名 = hash_voice.wav）；
+// 没有缓存就静默降级，绝不阻塞流程（策划案 §2.6.2）。
+app.post('/api/tts', (req, res) => {
+  const { text = '', voiceId = 'default', actorId = '' } = req.body || {};
+  const t = String(text).trim();
+  if (!t) return res.status(400).json({ ok: false, error: '缺少 text' });
+  const voice = String(voiceId || 'default').replace(/[^\w-]/g, '') || 'default';
+  const hash = crypto.createHash('sha1').update(`${voice}|${t}`).digest('hex').slice(0, 16);
+  const name = `${hash}_${voice}.wav`;
+  const file = path.join(PUB, 'audio', 'cache', name);
+  if (fs.existsSync(file)) {
+    return res.json({ ok: true, url: `/audio/cache/${name}`, source: 'CACHE', voiceId: voice, actorId });
+  }
+  res.json({ ok: true, url: null, source: 'MOCK', reason: 'no-cached-voice', voiceId: voice, actorId });
 });
 
 // 设置：切换模型 / API Key / 接口
@@ -124,6 +170,12 @@ app.get('/api/data/acts', (_req, res) => {
   const p = path.join(__dirname, '..', 'data', 'acts.json');
   if (fs.existsSync(p)) res.sendFile(p);
   else res.json({ ok: false, error: 'no acts' });
+});
+
+app.get('/api/data/sim-visuals', (_req, res) => {
+  const p = path.join(__dirname, '..', 'data', 'sim-visuals.json');
+  if (fs.existsSync(p)) res.sendFile(p);
+  else res.json({ ok: false, error: 'no sim-visuals' });
 });
 
 app.get('*', (_req, res) => {

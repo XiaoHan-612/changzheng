@@ -14,6 +14,8 @@
     "qa:smoke": "node tests/e2e/smoke.mjs",
     "qa:sandbox": "node tests/e2e/sandbox.mjs",
     "qa:regress": "node tests/e2e/regressions.mjs",
+    "qa:audit": "node scripts/audit-logs.mjs",
+    "tts:manifest": "node scripts/tts-manifest.mjs",
     "reset:logs": "node scripts/reset-logs.mjs"
   },
   "engines": {

@@ -8,41 +8,59 @@
 
 ```
 changzheng/
-  package.json          # scripts: start / test / test:unit / test:e2e
-  .env                  # GLM_API_KEY / MODEL / PORT（不入库）
-  runtime-config.json   # 设置界面写入，可覆盖 .env
+  package.json          # scripts: start / test:* / qa:* / tts:manifest
+  .env                  # GLM_API_KEY / GLM_MODEL / PORT（不入库）
+  runtime-config.json   # 设置界面写入，可覆盖 .env（含 MOCK 锁定）
   server/               # 服务端：静态托管 + AI 代理 + 日志
-    index.js
-    ai.js               # callGlm51：MOCK / 真调 / FALLBACK
-    config.js
-    logger.js
+    index.js            # 路由 /api/decide /api/sim /api/tts /api/config /api/logs /api/data/*
+    ai.js               # VN 侧：提示词 + MOCK + FALLBACK
+    sim.js              # 沙盘世界裁判（sim_turn）
+    config.js           # 双层配置 + 损坏容错
+    logger.js           # JSONL 落盘 + 8MB 轮转
   public/               # 客户端（无构建，ES Module）
     index.html
-    css/style.css       # 基础组件
-    css/cinema.css      # 暮色营地 / 电影卡 / 回响（覆盖旧样式）
+    favicon.svg
+    css/tokens.css      # 设计变量（唯一真相）
+    css/style.css       # 基础组件（旧三栏 UI 已清理）
+    css/cinema.css      # 暮色营地 / 电影卡 / 回响
+    css/sandbox.css     # 自由行军沙盘
+    css/minigames.css   # 分糖/夜岗/五子棋/泸定桥/陡坡
     js/
-      main.js           # 流程状态机（幕、强制链、锁定）
-      state.js          # 资源/好感/effects（可单测）
+      main.js           # 流程状态机（幕、每日场景、强制链、锁、篝火夜）
+      state.js          # 资源/好感/附身线/行动点/失败判定（可单测）
       data.js           # 同伴、路径热区
-      acts.json 所在 data/ 服务端下发
-      audio.js          # 环境床 + SFX + 预置语音
-      minigames.js
+      audio.js          # 环境床 + SFX + 预录 wav + TTS 缓存
+      minigames.js      # 7 个小游戏
+      sandbox.js        # 沙盘循环
       ui.js
       ai-client.js
-    audio/voices/       # 预生成角色台词 wav
-    assets/scenes|characters/
+    audio/voices|cache/ # 预生成角色台词 / TTS 缓存
+    assets/scenes|characters|events/
   data/
-    acts.json           # 五幕定义（热点、强制链、对决）
-    facts.json          # 史实卡 real/fiction
+    acts.json           # 五幕定义（热点、dayScenes、强制链、对决）
+    facts.json          # 史实卡 14 张 real/fiction
+    sim-visuals.json    # 沙盘事件图与标签映射
+    tts-lines.json      # 固定台词清单
   tests/
-    unit/state.test.js  # node --test
-    e2e/full-run.mjs    # 五幕通关
+    unit/               # node --test（状态层 + 配置层）
+    e2e/full-run.mjs    # 五幕通关（--quick 快速模式）
     e2e/smoke.mjs       # 冒烟
-    e2e/artifacts/      # 截图
+    e2e/sandbox.mjs     # 沙盘
+    e2e/regressions.mjs # 监听泄漏 / 存档回合
+    manual/             # 开发期一次性排查脚本
+  scripts/
+    audit-logs.mjs      # 日志 schema 审计 → docs/LOG-AUDIT.md
+    tts-manifest.mjs    # 语音哈希清单 → docs/TTS-MANIFEST.md
+    reset-logs.mjs
   docs/
-    ARCHITECTURE.md
-    QA.md
-  logs/                 # AI 调用 JSONL
+    ARCHITECTURE.md · QA.md · SCORING.md · PITCH.md · HANDOFF.md
+    HANDOFF-CODE.md     # 给代码 agent
+    HANDOFF-ART.md      # 给生图模型
+    HANDOFF-AUDIO.md    # 给音频模型
+    ASSETS.md           # 素材清单
+    TTS-MANIFEST.md     # 生成物
+    LOG-AUDIT.md        # 生成物
+  logs/                 # AI 调用 JSONL（单文件 8MB 轮转）
 ```
 
 ## 运行时数据流
@@ -73,6 +91,8 @@ npm run qa:smoke      # 标题→营地→一次互动
 npm run test:e2e      # 五幕 MOCK 通关
 npm run qa:sandbox    # 沙盘两回合 + 存档恢复
 npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
+npm run qa:audit      # 日志 schema 审计（真调一局后跑，产出 docs/LOG-AUDIT.md）
+npm run tts:manifest  # 更新语音清单（改台词后必跑）
 ```
 
 有 Key 时：设置里测试连通，再手玩一幕真调。

@@ -1,5 +1,6 @@
 import { COMPANIONS, PATH_ZONES } from './data.js';
-import { createState, applyEffects, unlockFact, saveState, checkFailure, addLoss, applyStarvation } from './state.js';
+import { createState, applyEffects, unlockFact, saveState, checkFailure, addLoss, applyStarvation,
+  markLineDone, linesDoneCount, canNight, apPerDay, dayScene, loadState } from './state.js';
 import { decide, fetchConfig, fetchLogs, fetchFacts, fetchActs, saveConfig, testConfig, clearLogs } from './ai-client.js';
 
 let judgeMode = false;
@@ -56,7 +57,7 @@ function setJudgeMode(on) {
     toast('评委演示模式：右侧实时显示每次大模型调用', 3500);
   }
 }
-import { runFishing, runNightSchool } from './minigames.js';
+import { runFishing, runNightSchool, runCandy, runSentry, runGomoku, runBendNeedle, runLuding, runGrab } from './minigames.js';
 import { audio } from './audio.js';
 import { bindSandbox } from './sandbox.js';
 import * as UI from './ui.js';
@@ -115,17 +116,6 @@ const CHOICE_SETS = {
     ],
     factId: 'h_jinsha',
   },
-  luding: {
-    title: '飞夺泸定桥',
-    callType: 'minigame_review',
-    options: [
-      { label: '攀铁索冲过去', sub: '拼了' },
-      { label: '铺板边打边过', sub: '稳一点' },
-      { label: '火力掩护，分组突进', sub: '配合' },
-    ],
-    factId: 'h_luding',
-    operationType: 'luding',
-  },
   let_clothes: {
     title: '让出棉衣',
     callType: 'share_judge',
@@ -156,6 +146,27 @@ const CHOICE_SETS = {
     ],
     factId: 'h_huining',
   },
+  snow_help: {
+    title: '扶他一把',
+    callType: 'branch_judge',
+    loss: { who: '掉队的战士', reason: '风雪里他没能跟上，队伍在天黑前下不了山' },
+    options: [
+      { label: '架起他的胳膊一起走', sub: '慢，但谁都不落' },
+      { label: '替他背枪，让他自己走', sub: '分担一点是一点' },
+      { label: '先赶到山顶再说', sub: '保存自己' },
+    ],
+    factId: 'h_xueshan',
+  },
+  message: {
+    title: '一封密信',
+    callType: 'branch_judge',
+    options: [
+      { label: '按地址送到，不问内容', sub: '守规矩' },
+      { label: '先交给指导员', sub: '稳妥' },
+      { label: '拆开看一眼', sub: '心里不踏实' },
+    ],
+    factId: 'h_zunyi',
+  },
 };
 
 // ─── boot ───
@@ -169,8 +180,35 @@ async function boot() {
   bindTitle();
   bindEcho();
   bindSettings();
+  offerResume();
   showScreen('screen-title');
   setTopbar(false);
+}
+
+/** 有未完成的局就露出「继续上一局」（状态由 sessionStorage 保存） */
+function offerResume() {
+  const saved = loadState();
+  const btn = $('btn-continue-run');
+  if (!saved || !btn || saved.actIndex == null) return;
+  btn.classList.remove('hidden');
+  btn.onclick = () => resumeRun(saved);
+}
+
+function resumeRun(saved) {
+  S = { ...createState(), ...saved, busy: false };
+  setTopbar(true);
+  renderStats(S);
+  renderAp(S);
+  renderCompanions(S);
+  renderJourney();
+  $('ai-count').textContent = String(S.aiCount || 0);
+  const act = currentActDef();
+  if (!act) {
+    startRun(S.mode || 'study');
+    return;
+  }
+  toast(`接着上一局：${act.title} · 第 ${S.day || 1} 日`, 3200);
+  enterCampDay(act, S.day || 1);
 }
 
 function currentActDef() {
@@ -269,7 +307,10 @@ function openJournal() {
     : '<li class="empty">还没有照亮史实。</li>';
 
   $('journal-foot').textContent =
-    `体力 ${S.体力} · 粮食 ${S.粮食} · 士气 ${S.士气} · 信念 ${S.信念} · 民心 ${S.民心}　｜　对决 ${S.quiz?.human ?? 0}:${S.quiz?.ai ?? 0}　｜　模型 ${config.model}${config.mockMode ? '（MOCK）' : ''}`;
+    `体力 ${S.体力} · 粮食 ${S.粮食} · 士气 ${S.士气} · 信念 ${S.信念} · 民心 ${S.民心}`
+    + `　｜　附身线 ${linesDoneCount(S)}/${LINES_TOTAL}`
+    + `　｜　对决 ${S.quiz?.human ?? 0}:${S.quiz?.ai ?? 0}`
+    + `　｜　模型 ${config.model}${config.mockMode ? '（MOCK）' : ''}`;
 }
 
 function logChoice(act, label, mood) {
@@ -337,6 +378,8 @@ function bindTitle() {
   const march = $('btn-mode-march');
   if (study) study.onclick = () => startRun('study');
   if (march) march.onclick = () => startRun('march');
+  const quick = $('btn-mode-quick');
+  if (quick) quick.onclick = () => startRun('quick');
   const judge = $('btn-judge');
   if (judge) {
     judge.onclick = () => {
@@ -351,12 +394,12 @@ function bindTitle() {
   $('btn-inspect-close') && ($('btn-inspect-close').onclick = () => setJudgeMode(false));
 }
 
-function startSandbox() {
+async function startSandbox() {
   setTopbar(true);
   showScreen('screen-sandbox');
   const sbLogs = $('btn-sb-logs');
   if (sbLogs) sbLogs.onclick = () => $('btn-logs')?.click();
-  bindSandbox({
+  await bindSandbox({
     onExit: () => {
       audio.stopAmbient();
       showScreen('screen-title');
@@ -484,6 +527,7 @@ async function startRun(mode = 'study') {
   S.aiCount = 0;
   $('ai-count').textContent = '0';
   toast(mode === 'march' ? '行军模式：资源与抉择都可能真的带不走一些人' : '研学模式：不会失去战友', 3200);
+  if (mode === 'quick') toast('快速演示：每幕只跑主玩法与对决', 3200);
   await runActIntro();
 }
 
@@ -561,7 +605,31 @@ async function runActIntro() {
     { img: act.pano, text: '营地在暮色里安顿下来。光点在呼吸，走近一处，把事做完。' },
   ]);
   if (act.prelude) await runPrelude(act);
+  if (S.mode === 'quick') return runQuickAct(act);
   enterCampDay(act, 1);
+}
+
+/** 快速模式：跳过营地日，只跑「一次关键交谈 + 主玩法 + 对决」 */
+async function runQuickAct(act) {
+  S.day = 1;
+  S.maxAp = 1;
+  S.ap = 1;
+  S.phase = 'camp';
+  renderStats(S);
+  renderAp(S);
+  renderCompanions(S);
+  renderJourney();
+  const talkHotspot = (dayScene(act, 1).hotspots || []).find((h) => h.kind === 'talk');
+  if (talkHotspot) {
+    // 快速模式常在 finishAct 的锁内被调用，先释放锁再进流程（沿用行军按钮的既有做法）
+    S.busy = false;
+    await withLock(() => doTalk(act, talkHotspot));
+    renderStats(S);
+    renderCompanions(S);
+    saveState(S);
+  }
+  S.busy = false;
+  await runForcedChain(act);
 }
 
 async function runCutscene(frames) {
@@ -661,12 +729,14 @@ function makeChoice(label, sub, onClick, icon, extra, keyHint) {
 
 function enterCampDay(act, day) {
   S.day = day;
+  S.maxAp = apPerDay(act);
   S.ap = S.maxAp;
   S.phase = 'camp';
   S.行动日志 = [];
+  const scene = dayScene(act, day);
   showScreen('screen-camp');
-  $('pano-img').style.backgroundImage = `url('${act.pano}')`;
-  $('act-title').textContent = act.title;
+  $('pano-img').style.backgroundImage = `url('${scene.pano}')`;
+  $('act-title').textContent = scene.label ? `${act.title} · ${scene.label}` : act.title;
   $('day-num').textContent = String(day);
   $('day-max').textContent = String(act.apDays || 1);
   $('camp-hint').textContent = '用光照亮他们。点余烬，走进他的一夜。';
@@ -676,7 +746,7 @@ function enterCampDay(act, day) {
   renderStats(S);
   renderAp(S);
   renderCompanions(S);
-  renderHotspots(act);
+  renderHotspots(act, scene.hotspots);
   bindMarchButton(act);
   updateDusk();
   renderJourney();
@@ -776,11 +846,11 @@ async function marchTransition(label) {
   flash.remove();
 }
 
-function renderHotspots(act) {
+function renderHotspots(act, hotspots) {
   const box = $('hotspots');
   box.innerHTML = '';
-  const icons = { talk: '谈', choice: '择', rest: '歇', share: '分', fishing: '钩', school: '字', fire: '火', march: '行' };
-  act.hotspots.forEach((h) => {
+  const list = hotspots || dayScene(act, S?.day || 1).hotspots;
+  list.forEach((h) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'hotspot' + (h.kind === 'march' ? ' march' : '');
@@ -797,8 +867,44 @@ function renderHotspots(act) {
     b.onclick = () => onHotspot(act, h);
     box.appendChild(b);
   });
-  void icons;
 }
+
+/** 第四幕营地的五条附身线：点亮 ≥3 条解锁篝火夜 */
+const LINE_NAMES = {
+  fishing: '钓鱼分汤',
+  candy: '分糖',
+  sentry: '夜岗',
+  school: '夜校识字',
+  gomoku: '五子棋',
+};
+const LINES_TOTAL = Object.keys(LINE_NAMES).length;
+
+function markLine(state, key) {
+  if (!state || !LINE_NAMES[key]) return;
+  if (markLineDone(state, key)) {
+    appendCampLog(state, '附身线', `点亮「${LINE_NAMES[key]}」（${linesDoneCount(state)}/${LINES_TOTAL}）`);
+  }
+  saveState(state);
+}
+
+/** 热点种类 → 处理函数（新增玩法只加一行，不动主流程） */
+const HOTSPOT_HANDLERS = {
+  talk: (act, h) => doTalk(act, h),
+  fishing: (act) => doFishing(act, false),
+  school: () => doSchool(),
+  rest: () => doRest(),
+  share: () => doShare(),
+  candy: () => doCandy(),
+  sentry: () => doSentry(),
+  gomoku: () => doGomoku(),
+  grab: () => doGrab(),
+  roster: () => doRoster(),
+  choice: async (act, h) => {
+    await doChoice(act, h.action);
+    // 热点做过的抉择，强制链不再重播
+    if (h.action) markDone(act.id, h.action);
+  },
+};
 
 async function onHotspot(act, h) {
   if (S?.busy) return;
@@ -836,26 +942,18 @@ async function onHotspot(act, h) {
     S.ap -= 1;
     S.行动日志.push(h.label);
     renderAp(S);
-    renderHotspots(act);
+    renderHotspots(act, dayScene(act, S.day).hotspots);
     updateMarchButton();
     updateDusk();
 
-    if (h.kind === 'talk') await doTalk(act, h);
-    else if (h.kind === 'fishing') await doFishing(act, false);
-    else if (h.kind === 'school') await doSchool();
-    else if (h.kind === 'rest') await doRest();
-    else if (h.kind === 'share') await doShare();
-    else if (h.kind === 'choice') {
-      await doChoice(act, h.action);
-      // 热点做过的抉择，强制链不再重播
-      if (h.action) markDone(act.id, h.action);
-    }
+    const handler = HOTSPOT_HANDLERS[h.kind];
+    if (handler) await handler(act, h);
 
     renderStats(S);
     renderCompanions(S);
     saveState(S);
     showScreen('screen-camp');
-    $('pano-img').style.backgroundImage = `url('${act.pano}')`;
+    $('pano-img').style.backgroundImage = `url('${dayScene(act, S.day).pano}')`;
     updateMarchButton();
     updateDusk();
     if (S.ap <= 0) {
@@ -893,7 +991,7 @@ function renderFireMenu(act) {
         S.ap -= 1;
         S.行动日志.push(f.label);
         renderAp(S);
-        renderHotspots(act);
+        renderHotspots(act, dayScene(act, S.day).hotspots);
         updateMarchButton();
         updateDusk();
         if (f.action === 'talk') await doTalk(act, { npc: '老班长' });
@@ -902,7 +1000,7 @@ function renderFireMenu(act) {
         renderCompanions(S);
         saveState(S);
         showScreen('screen-camp');
-        $('pano-img').style.backgroundImage = `url('${act.pano}')`;
+        $('pano-img').style.backgroundImage = `url('${dayScene(act, S.day).pano}')`;
       });
     };
     box.appendChild(b);
@@ -1059,6 +1157,7 @@ async function doSchool() {
   await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
   const op = await runNightSchool($('school-host'));
   S.tonightPassword = op.detail?.password || '瑞金';
+  markLine(S, 'school');
   showThinking(true);
   let result;
   try {
@@ -1080,14 +1179,177 @@ async function doSchool() {
   await afterJudge(result, '行军中的文化学习', 'h_nightschool');
 }
 
+/** 红小鬼 · 分糖：三颗糖，AI 逐颗判定 */
+async function doCandy() {
+  showScreen('screen-stage');
+  setStageBanner('分糖', '/assets/scenes/camp_pano.jpg');
+  setPortrait('红小鬼', '16岁小战士', '鬼', '倔强', '/assets/characters/xiaogui.png');
+  setStagePanel('<div id="candy-host"></div>');
+  await say('红小鬼', '我腿不软。就是夜里冷，想家的时候数干粮。', 'xiaogui_home');
+  const op = await runCandy($('candy-host'));
+  S.sugarPlan = op.detail || null;
+  markLine(S, 'candy');
+  showThinking(true);
+  let result;
+  try {
+    result = await callAI({
+      scene: '分糖·红小鬼',
+      callType: 'share_judge',
+      situation: `三颗糖的分配：${op.summary}`,
+      state: publicState(),
+      options: [op.summary],
+      operation: { type: 'sugar', ...op.detail },
+    });
+    bumpAiCount(S);
+    applyEffects(S, result.effects);
+    await say('叙事', result.narrative || '');
+    appendCampLog(S, '分糖', op.summary);
+  } finally {
+    showThinking(false);
+  }
+  await waitBtn('继续');
+  await afterJudge(result, '行军中的分享', 'h_share');
+}
+
+/** 哨兵 · 夜岗：五信号判断，夜校口令在此生效 */
+async function doSentry() {
+  showScreen('screen-stage');
+  setStageBanner('夜岗', '/assets/scenes/camp_pano.jpg');
+  setPortrait('哨兵', '夜哨', '哨', '警觉');
+  setStagePanel('<div id="sentry-host"></div>');
+  await say('哨兵', '后半夜归你。听不清就再听一遍——别喊，别急着开枪。');
+  const op = await runSentry(S.tonightPassword, $('sentry-host'));
+  S.sentryScore = op.score;
+  markLine(S, 'sentry');
+  showThinking(true);
+  let result;
+  try {
+    result = await callAI({
+      scene: '夜岗·哨位',
+      callType: 'minigame_review',
+      situation:
+        `五个信号处置 ${op.detail.hits}/${op.detail.total}`
+        + (S.tonightPassword ? `，夜校口令「${S.tonightPassword}」用上了` : '，未学过口令只能硬扛'),
+      state: publicState(),
+      operation: { type: 'sentry', ...op.detail },
+    });
+    bumpAiCount(S);
+    applyEffects(S, result.effects);
+    await say('叙事', result.narrative || '');
+    appendCampLog(S, '夜岗', op.summary);
+  } finally {
+    showThinking(false);
+  }
+  await waitBtn('继续');
+  await afterJudge(result, '夜间警戒', 'h_sentry');
+}
+
+/** 两个小鬼 · 泥地五子棋 */
+async function doGomoku() {
+  showScreen('screen-stage');
+  setStageBanner('泥地五子棋', '/assets/scenes/camp_pano.jpg');
+  setPortrait('两个小鬼', '泥地上的棋', '棋', '专注', '/assets/characters/xiaogui.png');
+  setStagePanel('<div id="gomoku-host"></div>');
+  await say('红小鬼', '石子当子，泥地当盘。你要是输了，可不许说没吃饱。');
+  const op = await runGomoku($('gomoku-host'));
+  markLine(S, 'gomoku');
+  showThinking(true);
+  let result;
+  try {
+    result = await callAI({
+      scene: '泥地五子棋',
+      callType: 'minigame_review',
+      situation: op.summary || '两个小鬼下了一盘棋',
+      state: publicState(),
+      operation: { type: 'gomoku', ...op.detail },
+    });
+    bumpAiCount(S);
+    applyEffects(S, result.effects);
+    await say('叙事', result.narrative || '');
+    appendCampLog(S, '五子棋', op.summary || '');
+  } finally {
+    showThinking(false);
+  }
+  await waitBtn('继续');
+}
+
+/** 雪山陡坡 · 拽住同伴（时机操作） */
+async function doGrab() {
+  showScreen('screen-stage');
+  setStageBanner('陡坡上', '/assets/scenes/snow_pano.jpg');
+  setPortrait('你', '年轻战士', '你', '咬牙');
+  setStagePanel('<div id="grab-host"></div>');
+  await say('你', '他的手在滑。前面的雪是硬的，下面是空的。');
+  const op = await runGrab($('grab-host'));
+  showThinking(true);
+  let result;
+  try {
+    result = await callAI({
+      scene: '雪山·拽住同伴',
+      callType: 'minigame_review',
+      situation: op.summary || '在陡坡上拉住同伴',
+      state: publicState(),
+      operation: { type: 'grab', ...op.detail },
+    });
+    bumpAiCount(S);
+    applyEffects(S, result.effects);
+    await say('叙事', result.narrative || result.scene_text || '');
+    appendCampLog(S, '陡坡', op.summary || '');
+  } finally {
+    showThinking(false);
+  }
+  await waitBtn('继续');
+  await afterJudge(result, '风雪中的手', 'h_xueshan');
+}
+
+/** 会宁 · 数一数熟面孔（读关系与牺牲名单） */
+async function doRoster() {
+  showScreen('screen-stage');
+  setStageBanner('会宁 · 数一数熟面孔', '/assets/scenes/huining_pano.jpg');
+  setPortrait('你', '年轻战士', '你', '平静');
+  setStagePanel('<p class="hint">队伍汇合了，人山人海。你在人群里找那些熟悉的脸。</p>');
+  await say('你', '（你在数。有些位置，怎么数都空着。）');
+  showThinking(true);
+  let r = null;
+  try {
+    r = await callAI({
+      scene: '会宁·数一数熟面孔',
+      callType: 'act_review',
+      situation: '会师了，清点这一路还认得出来的人',
+      state: publicState(),
+      extraContext:
+        `关系：${COMPANIONS.map((c) => `${c.name}${S[`好感_${c.name}`] ?? 40}`).join('、')}`
+        + `；没能跟上的人：${(S.losses || []).map((l) => l.who).join('、') || '无'}`,
+    });
+    bumpAiCount(S);
+    const box = $('stage-panel');
+    box.innerHTML = `<h3 class="mg-title">${escapeHtml(r.title || '这一路')}</h3>`
+      + (r.lines || []).map((l) => `<p style="line-height:1.9;color:var(--paper-dim);margin:8px 0">${escapeHtml(l)}</p>`).join('');
+    await say('叙事', (r.lines || []).join(' '));
+    appendCampLog(S, '会师', (r.lines || [])[0] || '');
+  } catch (err) {
+    toast('清点失败：' + err.message);
+  } finally {
+    showThinking(false);
+  }
+  await waitBtn('继续');
+}
+
 async function doFishing(act, forced) {
   showScreen('screen-stage');
-  setStageBanner('金色的鱼钩 · 起竿', '/assets/scenes/pond_close.jpg');
+  // 弯针 → 咬钩起竿（与报名信息一致：先做钩，再钓鱼）
+  setStageBanner('金色的鱼钩 · 弯针', '/assets/scenes/pond_close.jpg');
   setPortrait('老班长', '炊事班长', '班', '专注', '/assets/characters/laoban.png');
-  await say('老班长', '漂相看真了再起竿。晃是假的，沉才是口。', 'laoban_hook');
+  setStagePanel('<div id="needle-host"></div>');
+  await say('老班长', '鱼钩是缝衣针弯的。手上稳着点，别掰断。');
+  await runBendNeedle($('needle-host'));
+
+  setStageBanner('金色的鱼钩 · 起竿', '/assets/scenes/pond_close.jpg');
   setStagePanel('<div id="fish-host"></div>');
+  await say('老班长', '漂相看真了再起竿。晃是假的，沉才是口。', 'laoban_hook');
   const op = await runFishing($('fish-host'));
   S.fishingBest = Math.max(S.fishingBest || 0, op.score);
+  markLine(S, 'fishing');
   showThinking(true);
   let result;
   try {
@@ -1224,9 +1486,41 @@ async function doChoice(act, actionId) {
   await afterJudge(result, cs.title, cs.factId);
 }
 
-function waitBtn(label) {
+/** 飞夺泸定桥：横版过桥（第一次跌落由战友拉住，体力 −10） */
+async function doLuding(act) {
+  showScreen('screen-stage');
+  setStageBanner('飞夺泸定桥', '/assets/scenes/luding_pano.jpg');
+  setPortrait('突击队长', '红四团', '勇', '决绝');
+  setStagePanel('<div id="luding-host"></div>');
+  await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
+  const op = await runLuding($('luding-host'));
+  S.ludingResult = op.detail || null;
+  // 战友拉住的那一下，先落到状态里再交给模型写后果
+  if (op.detail?.retry) applyEffects(S, { 体力: -10 });
+  showThinking(true);
+  let result;
+  try {
+    result = await callAI({
+      scene: `${act.title}·飞夺泸定桥`,
+      callType: 'minigame_review',
+      situation: op.summary || '突击队过桥',
+      state: publicState(),
+      operation: { type: 'luding', ...op.detail },
+    });
+    bumpAiCount(S);
+    applyEffects(S, result.effects);
+    await say('叙事', result.narrative || result.scene_text || '');
+    appendCampLog(S, '泸定桥', op.summary || '');
+  } finally {
+    showThinking(false);
+  }
+  await waitBtn('继续');
+  await afterJudge(result, '飞夺泸定桥', 'h_luding');
+}
+
+function waitBtn(label, hostEl) {
   return new Promise((resolve) => {
-    const host = $('sheet-actions') || $('stage-panel') || document.body;
+    const host = hostEl || $('sheet-actions') || $('stage-panel') || document.body;
     host.querySelectorAll('#btn-continue').forEach((n) => n.remove());
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1264,8 +1558,10 @@ async function runForcedChain(act) {
       }
       if (fid === 'fishing') { await doFishing(act, true); markDone(act.id, 'fishing'); }
       else if (fid === 'soup') { await doSoup(); markDone(act.id, 'soup'); }
+      else if (fid === 'candy') { await doCandy(); markDone(act.id, 'candy'); }
+      else if (fid === 'sentry') { await doSentry(); markDone(act.id, 'sentry'); }
       else if (fid === 'path') { await runPathOnImage(); markDone(act.id, 'path'); }
-      else if (fid === 'luding') { await doChoice({ ...act, pano: '/assets/scenes/luding_pano.jpg' }, 'luding'); markDone(act.id, 'luding'); }
+      else if (fid === 'luding') { await doLuding(act); markDone(act.id, 'luding'); }
       else { await doChoice(act, fid); markDone(act.id, fid); }
     }
     if (act.quiz && !isDone(act.id, 'quiz')) {
@@ -1345,6 +1641,7 @@ async function runQuiz(act) {
     <p class="quiz-q">${escapeHtml(q.question || '题目')}</p>
     <div class="quiz-opts" id="quiz-opts"></div>
     <div id="quiz-feedback" class="quiz-result"></div>
+    <button type="button" class="btn ghost sm" id="quiz-auto" style="margin-top:10px">看两个 AI 对答（ai_vs_ai）</button>
     <button type="button" class="btn primary" id="quiz-next" style="margin-top:12px;display:none">继续</button>
   `;
   const optsBox = $('quiz-opts');
@@ -1359,12 +1656,31 @@ async function runQuiz(act) {
   };
   await new Promise((resolveQuiz) => {
     let answered = false;
-    const finish = async (humanIdx) => {
+    const finish = async (humanIdx, auto = false) => {
       if (answered) return;
       answered = true;
       const ans = normIdx(q.answer_index, opts.length);
       const answerKnown = ans >= 0;
       showThinking(true);
+      // ai_vs_ai：玩家这一侧由第二个 AI 人设代答
+      let humanAns = humanIdx;
+      if (auto) {
+        try {
+          const h = await callAI({
+            scene: '知识对决·AI 代答（ai_vs_ai）',
+            callType: 'quiz_answer_ai',
+            situation: `题目：${q.question}\n选项：${opts.join(' / ')}`,
+            state: publicState(),
+            agent: '激进派小张',
+            options: opts,
+          });
+          bumpAiCount(S);
+          humanAns = normIdx(h.answer_index, opts.length);
+        } finally {
+          showThinking(false);
+          showThinking(true);
+        }
+      }
       let aiAns;
       try {
         const ai = await callAI({
@@ -1380,7 +1696,7 @@ async function runQuiz(act) {
       } finally {
         showThinking(false);
       }
-      const humanRight = answerKnown && humanIdx === ans;
+      const humanRight = answerKnown && humanAns === ans;
       const aiRight = answerKnown && aiAns === ans;
       if (humanRight) S.quiz.human += 1;
       if (aiRight) S.quiz.ai += 1;
@@ -1391,15 +1707,16 @@ async function runQuiz(act) {
         judge = await callAI({
           scene: '知识对决·判分',
           callType: 'quiz_judge',
-          situation: `标准答案 index=${ans}。玩家=${humanIdx}。AI=${aiAns}`,
+          situation: `标准答案 index=${ans}。${auto ? '红方(激进派小张)' : '玩家'}=${humanAns}。蓝方(稳健派老李)=${aiAns}`,
           state: publicState(),
-          operation: { human: humanIdx, ai: aiAns, answer_index: ans },
+          agent: auto ? 'ai_vs_ai' : 'human_vs_ai',
+          operation: { human: humanAns, ai: aiAns, answer_index: ans, mode: auto ? 'ai_vs_ai' : 'human_vs_ai' },
         });
         bumpAiCount(S);
         applyEffects(S, judge.effects || { 士气: humanRight ? 3 : -1 });
         audio.playSfx(humanRight ? 'correct' : 'wrong');
         $('quiz-feedback').innerHTML = `
-          <div>你：<b>${humanRight ? '正确' : '错误'}</b> · AI：<b>${aiRight ? '正确' : '错误'}</b></div>
+          <div>${auto ? '激进派小张' : '你'}：<b>${humanRight ? '正确' : '错误'}</b> · 稳健派老李：<b>${aiRight ? '正确' : '错误'}</b></div>
           <div style="margin-top:6px">${escapeHtml(answerKnown ? (q.explain || judge.explain || '') : '本题标准答案解析失败，双方均不计分。')}</div>
         `;
       } finally {
@@ -1408,7 +1725,7 @@ async function runQuiz(act) {
       [...optsBox.children].forEach((el, i) => {
         el.disabled = true;
         if (i === ans) el.classList.add('correct');
-        else if (i === humanIdx) el.classList.add('wrong');
+        else if (i === humanAns) el.classList.add('wrong');
       });
       const next = $('quiz-next');
       await new Promise((r) => {
@@ -1416,7 +1733,7 @@ async function runQuiz(act) {
         next.style.display = 'inline-block';
       });
       await afterJudge({
-        narrative: `你答：${opts[humanIdx]}。标准答案：${opts[ans] ?? '（本题答案缺失）'}。${q.explain || ''}`,
+        narrative: `${auto ? '小张' : '你'}答：${opts[humanAns] ?? '（未作答）'}。标准答案：${opts[ans] ?? '（本题答案缺失）'}。${q.explain || ''}`,
       }, `知识对决 · ${act.title}`, act.facts?.[0]);
       resolveQuiz();
     };
@@ -1428,7 +1745,107 @@ async function runQuiz(act) {
       b.onclick = () => finish(i);
       optsBox.appendChild(b);
     });
+    const autoBtn = $('quiz-auto');
+    if (autoBtn) autoBtn.onclick = () => { autoBtn.disabled = true; finish(null, true); };
   });
+}
+
+/** 交给夜间的上下文：这一夜之前到底发生了什么 */
+function nightContext() {
+  const done = (S.linesDone || []).map((k) => LINE_NAMES[k] || k);
+  return [
+    `已点亮附身线：${done.join('、') || '无'}`,
+    `钓鱼最佳 ${(S.fishingBest || 0).toFixed(2)}`,
+    `夜岗 ${Math.round((S.sentryScore || 0) * 100)} 分`,
+    S.tonightPassword ? `今晚口令「${S.tonightPassword}」` : '没上过夜校，不会口令',
+    S.sugarPlan ? `分糖：${JSON.stringify(S.sugarPlan)}` : '',
+  ].filter(Boolean).join('；');
+}
+
+/**
+ * 第四幕幕末 · 篝火深夜：模型生成互斥抉择 → 玩家选 → 模型写「当夜之后」
+ * 选项禁止写死；生成失败才用内置兜底两项。
+ */
+async function runNightChoice(act) {
+  if (isDone(act.id, 'night')) return false;
+  if (!canNight(S, 3)) {
+    appendCampLog(S, '系统', `附身线不足三条（${linesDoneCount(S)}/${LINES_TOTAL}），今夜没有议事。`);
+    return false;
+  }
+
+  showScreen('screen-night');
+  renderStats(S);
+  $('night-title').textContent = '篝火 · 深夜';
+  $('night-lead').textContent = '正在请模型写今夜的抉择…';
+  $('night-body').innerHTML = '';
+
+  showThinking(true);
+  let gen = null;
+  try {
+    gen = await callAI({
+      scene: `${act.title}·篝火夜`,
+      callType: 'night_options',
+      situation: '这一天结束了。后半夜怎么过、明天的口粮怎么带，得在火边定下来。',
+      state: publicState(),
+      extraContext: nightContext(),
+    });
+    bumpAiCount(S);
+  } catch { /* 用兜底选项 */ } finally {
+    showThinking(false);
+  }
+
+  const raw = Array.isArray(gen?.options)
+    ? gen.options.filter((o) => o && (typeof o === 'string' || o.label))
+    : [];
+  const options = (raw.length >= 2 ? raw : [
+    { label: '加岗并匀出口粮', sub: '安全优先，明天更苦', key: 'a' },
+    { label: '按原编制休息', sub: '保留体力，伤员优先', key: 'b' },
+  ]).slice(0, 3).map((o, i) => (typeof o === 'string'
+    ? { label: o, sub: '', key: String(i) }
+    : { label: String(o.label), sub: String(o.sub || ''), key: String(o.key ?? i) }));
+
+  $('night-lead').textContent = gen?.lead || '火压低了。没人先开口。';
+  const body = $('night-body');
+  body.innerHTML = '';
+  const choice = await new Promise((resolve) => {
+    options.forEach((o, i) => {
+      body.appendChild(makeChoice(o.label, o.sub, () => {
+        body.querySelectorAll('.btn.choice').forEach((x) => { x.disabled = true; });
+        resolve(o);
+      }, '夜', '', String(i + 1)));
+    });
+  });
+  logChoice(act, choice.label, '篝火夜');
+  S.nightChoice = choice.label;
+  markDone(act.id, 'night');
+
+  showThinking(true);
+  let res = null;
+  try {
+    res = await callAI({
+      scene: `${act.title}·篝火夜结算`,
+      callType: 'night_resolve',
+      situation: `玩家选择：${choice.label}${choice.sub ? ` — ${choice.sub}` : ''}`,
+      state: publicState(),
+      options: [choice.label],
+      operation: { choice: choice.key, label: choice.label },
+      extraContext: nightContext(),
+    });
+    bumpAiCount(S);
+    applyEffects(S, res?.effects);
+    renderStats(S);
+    body.innerHTML = '<p id="night-out" style="line-height:1.85;margin:10px 0;color:var(--paper-dim)"></p>';
+    await typeText($('night-out'), res?.narrative || '当夜无事。');
+    appendCampLog(S, '篝火夜', res?.narrative || choice.label);
+  } catch (err) {
+    body.innerHTML = `<p class="muted">当夜无话：${escapeHtml(err.message)}</p>`;
+  } finally {
+    showThinking(false);
+  }
+  await waitBtn('天亮了 · 继续', body);
+  await afterJudge(res || { narrative: `你决定：${choice.label}` }, '篝火之夜', 'h_campfire');
+  saveState(S);
+  return true;
 }
 
 async function finishAct(act) {
@@ -1450,6 +1867,9 @@ async function finishAct(act) {
   } catch { /* 非阻塞 */ } finally {
     showThinking(false);
   }
+
+  // 第四幕幕末：篝火深夜（模型生成互斥抉择，一局一次）
+  if (act.id === 'act4') await runNightChoice(act);
 
   S.actIndex = (S.actIndex || 0) + 1;
   renderJourney();
@@ -1544,6 +1964,10 @@ function publicState() {
     好感_老班长: S.好感_老班长, 好感_指导员: S.好感_指导员, 好感_红小鬼: S.好感_红小鬼,
     好感_卫生员: S.好感_卫生员, 好感_老乡: S.好感_老乡,
     tonightPassword: S.tonightPassword, 行动日志: S.行动日志, day: S.day, act: S.actIndex,
+    附身线: (S.linesDone || []).map((k) => LINE_NAMES[k] || k),
+    夜岗表现: S.sentryScore || 0,
+    分糖方案: S.sugarPlan || null,
+    夜间抉择: S.nightChoice || '',
   };
 }
 

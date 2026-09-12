@@ -82,21 +82,6 @@ export function renderCompanions(state) {
   }).join('');
 }
 
-export function renderActions(actions, onPick, disabled) {
-  const grid = $('action-grid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  actions.forEach((a) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'action-card';
-    b.disabled = !!disabled;
-    b.innerHTML = `<div class="icon">${a.icon}</div><b>${a.name}</b><span>${a.desc}</span>`;
-    b.onclick = () => onPick(a);
-    grid.appendChild(b);
-  });
-}
-
 export function appendCampLog(state, tag, text) {
   state.campLog.unshift({ tag, text });
   const el = $('camp-log');
@@ -117,6 +102,19 @@ export function toast(msg, ms = 2600) {
 
 export function showThinking(on) {
   $('thinking').classList.toggle('hidden', !on);
+  const el = $('thinking-elapsed');
+  clearInterval(showThinking._t);
+  if (!on) {
+    if (el) el.textContent = '';
+    return;
+  }
+  // 真调偶发 10s+，给个秒数，避免玩家以为卡死
+  const t0 = Date.now();
+  if (el) el.textContent = '';
+  showThinking._t = setInterval(() => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    if (el) el.textContent = s >= 3 ? ` · ${s}s` : '';
+  }, 1000);
 }
 
 export function typeText(el, text, speed = 18) {
