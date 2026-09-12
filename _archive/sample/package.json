@@ -1,0 +1,14 @@
+{
+  "name": "spark-glimmer-long-march",
+  "version": "1.0.0",
+  "description": "星火微光 · 我路过他们的长征 - AI 情景互动游戏",
+  "main": "server/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

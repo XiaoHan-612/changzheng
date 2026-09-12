@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>长征·抉择 — 草地章节 Demo</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="topbar" class="hidden">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span>长征·抉择</span>
+        <span class="chapter-tag">草地 · 金色的鱼钩</span>
+      </div>
+      <div id="stats" class="stats"></div>
+      <div class="top-actions">
+        <button type="button" id="btn-facts" class="btn ghost sm">史实档案</button>
+        <button type="button" id="btn-logs" class="btn ghost sm">行军记录 <span id="ai-count" class="pill">0</span></button>
+        <span id="ai-mode" class="mode-tag">—</span>
+      </div>
+    </header>
+
+    <!-- 标题 -->
+    <section id="screen-title" class="screen">
+      <div class="title-bg" style="background-image:url('/assets/scenes/camp_evening.jpg')"></div>
+      <div class="title-card">
+        <p class="eyebrow">1935 · 松潘草地</p>
+        <h1>长征<span>·</span>抉择</h1>
+        <p class="subtitle">第二幕 · 金色的鱼钩</p>
+        <p class="tagline">
+          你是刚走出湘江的一名年轻战士。<br/>
+          营地是一幅活着的画——走近谁，就替他做完那件事。<br/>
+          做完之后，会看见<strong>真实发生过的</strong>。
+        </p>
+        <div class="title-actions">
+          <button type="button" id="btn-start" class="btn primary lg">进入草地</button>
+          <button type="button" id="btn-how" class="btn ghost lg">怎么玩</button>
+        </div>
+        <p class="foot-note">赛道二 · AI游戏开发 · 全景探索 + 史实回响</p>
+      </div>
+    </section>
+
+    <!-- 怎么玩 -->
+    <section id="screen-how" class="screen overlay hidden">
+      <div class="panel wide glass">
+        <h2>怎么玩</h2>
+        <ol class="how-list">
+          <li><strong>看全景</strong> — 光点在呼吸，那是可走近的人和事。</li>
+          <li><strong>点热点</strong> — 池塘钓鱼、夜校认字、篝火交谈、背囊休息、东边小路行军。</li>
+          <li><strong>做完就对照</strong> — 操作结果交 GLM-5.1 裁决后，立刻弹出「史实回响」：你刚经历的 / 真实发生过的。</li>
+          <li><strong>有限行动</strong> — 每日 2 点；用尽或点小路即可行军。</li>
+        </ol>
+        <p class="muted">目的不是做题，而是先入戏，再看见史实。</p>
+        <button type="button" class="btn primary" id="btn-how-back">返回</button>
+      </div>
+    </section>
+
+    <!-- 章节过场 -->
+    <section id="screen-cutscene" class="screen hidden">
+      <div class="cut-stage" id="cut-stage"></div>
+      <div class="cut-caption-wrap">
+        <div class="cut-caption" id="cut-caption"></div>
+        <div class="cut-actions">
+          <button type="button" id="btn-cut-next" class="btn primary">下一句 ▸</button>
+          <button type="button" id="btn-cut-skip" class="btn ghost">跳过</button>
+        </div>
+        <p class="cut-hint muted sm">点击「下一句」或画面任意处继续</p>
+      </div>
+    </section>
+
+    <!-- 全景营地 -->
+    <section id="screen-camp" class="screen hidden">
+      <div class="pano-wrap" id="pano-wrap">
+        <div class="pano-img" id="pano-img" style="background-image:url('/assets/scenes/camp_pano.jpg')"></div>
+        <div class="pano-grade"></div>
+        <div id="hotspots" class="hotspots"></div>
+        <div class="pano-top glass">
+          <div class="pano-title">
+            <span class="day-badge">营地日 <b id="day-num">1</b> / 2</span>
+            <span class="ap-inline">行动点 <span id="ap-dots" class="ap-dots"></span></span>
+          </div>
+          <p id="camp-hint" class="muted sm">光点在呼吸。走近一处，替他把事做完。</p>
+        </div>
+        <div class="pano-bottom">
+          <div class="pano-comps" id="companion-list"></div>
+          <div id="camp-log" class="camp-log"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 篝火子菜单 -->
+    <section id="screen-fire" class="screen overlay hidden">
+      <div class="panel glass">
+        <h2>篝火旁</h2>
+        <p class="muted sm">火光照着几个人。你想——</p>
+        <div id="fire-opts" class="choices"></div>
+        <button type="button" class="btn ghost" id="btn-fire-back" style="margin-top:12px">退回营地</button>
+      </div>
+    </section>
+
+    <!-- 史实回响 -->
+    <section id="screen-echo" class="screen overlay hidden">
+      <div class="panel wide glass echo-panel">
+        <div class="echo-head">
+          <span class="echo-tag">史实回响</span>
+          <span id="echo-title" class="echo-title">—</span>
+        </div>
+        <div class="echo-grid">
+          <div class="echo-col play">
+            <h3>你刚经历的</h3>
+            <p id="echo-play"></p>
+          </div>
+          <div class="echo-col real">
+            <h3>真实发生过的</h3>
+            <p id="echo-real"></p>
+          </div>
+        </div>
+        <p id="echo-fic" class="echo-fic"></p>
+        <button type="button" class="btn primary" id="btn-echo-ok">明白了，继续</button>
+      </div>
+    </section>
+
+    <!-- 路线选择 -->
+    <section id="screen-path" class="screen hidden">
+      <div class="path-bg" style="background-image:url('/assets/scenes/path_choice.jpg')"></div>
+      <div class="path-ui">
+        <h2>前面岔开了三条路</h2>
+        <p class="muted sm">点画面上的区域。没有标准答案，只有代价。</p>
+        <div id="path-zones" class="path-zones"></div>
+      </div>
+    </section>
+
+    <!-- 话剧/小游戏舞台 -->
+    <section id="screen-stage" class="screen hidden">
+      <div class="stage-bg" id="stage-bg"></div>
+      <div class="stage-layout">
+        <aside class="stage-portrait">
+          <div class="portrait-frame">
+            <div class="portrait-art" id="portrait-art">班</div>
+            <div>
+              <div class="portrait-name" id="portrait-name">老班长</div>
+              <div class="portrait-role" id="portrait-role">炊事班长</div>
+            </div>
+          </div>
+          <div class="portrait-mood" id="portrait-mood">平静</div>
+        </aside>
+        <main class="stage-main">
+          <div class="stage-banner" id="stage-banner"></div>
+          <div class="stage-panel glass" id="stage-panel"></div>
+          <div class="dialogue glass" id="dialogue">
+            <div class="dialogue-speaker" id="dlg-speaker"></div>
+            <div class="dialogue-body" id="dlg-body"></div>
+          </div>
+        </main>
+      </div>
+    </section>
+
+    <!-- 对决 -->
+    <section id="screen-quiz" class="screen hidden">
+      <div class="quiz-bg" style="background-image:url('/assets/scenes/marsh.jpg')"></div>
+      <div class="panel wide glass quiz-panel">
+        <div class="panel-head">
+          <h2>知识对决 · 草地</h2>
+          <span id="quiz-score" class="pill">0 : 0</span>
+        </div>
+        <div id="quiz-body"></div>
+      </div>
+    </section>
+
+    <!-- 夜间 -->
+    <section id="screen-night" class="screen hidden">
+      <div class="night-bg" style="background-image:url('/assets/scenes/night_fire.jpg')"></div>
+      <div class="panel wide glass night-panel">
+        <h2>篝火 · 深夜</h2>
+        <p id="night-lead" class="muted"></p>
+        <div id="night-stats" class="stats big"></div>
+        <div id="night-body"></div>
+      </div>
+    </section>
+
+    <!-- 结局 -->
+    <section id="screen-end" class="screen hidden">
+      <div class="end-bg" style="background-image:url('/assets/scenes/camp_evening.jpg')"></div>
+      <div class="panel wide glass end-panel">
+        <p class="eyebrow" id="end-eyebrow">章节结算</p>
+        <h2 id="end-title">—</h2>
+        <div id="end-paras"></div>
+        <div class="end-grid">
+          <div>
+            <h3>史实要点</h3>
+            <ul id="end-history"></ul>
+          </div>
+          <div>
+            <h3>本局资源</h3>
+            <div id="end-stats" class="stats big"></div>
+            <h3 style="margin-top:12px">关系</h3>
+            <div id="end-rel"></div>
+          </div>
+        </div>
+        <p id="end-personal" class="personal"></p>
+        <div class="end-actions">
+          <button type="button" id="btn-end-logs" class="btn ghost">查看行军记录</button>
+          <button type="button" id="btn-end-facts" class="btn ghost">史实档案</button>
+          <button type="button" id="btn-restart" class="btn primary">再来一局</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 日志 -->
+    <section id="screen-logs" class="screen overlay hidden">
+      <div class="panel wide glass logs-panel">
+        <div class="panel-head">
+          <h2>行军记录 · AI 调用</h2>
+          <div>
+            <button type="button" id="btn-logs-refresh" class="btn ghost sm">刷新</button>
+            <button type="button" id="btn-logs-close" class="btn primary sm">关闭</button>
+          </div>
+        </div>
+        <p class="muted" id="logs-meta"></p>
+        <div id="logs-list" class="logs-list"></div>
+      </div>
+    </section>
+
+    <!-- 史实档案 -->
+    <section id="screen-facts" class="screen overlay hidden">
+      <div class="panel wide glass">
+        <div class="panel-head">
+          <h2>史实档案</h2>
+          <button type="button" id="btn-facts-close" class="btn primary sm">关闭</button>
+        </div>
+        <div id="facts-list" class="facts-list"></div>
+      </div>
+    </section>
+
+    <div id="toast" class="toast hidden"></div>
+    <div id="thinking" class="thinking hidden"><span class="spin"></span> GLM-5.1 正在书写…</div>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

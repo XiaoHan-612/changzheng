@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>星火微光 · 我路过他们的长征</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="topbar" class="hidden">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span id="brand-title">星火微光</span>
+      </div>
+      <div id="camp-stats" class="stats"></div>
+      <div class="top-actions">
+        <button type="button" id="btn-facts" class="btn ghost sm">史实</button>
+        <button type="button" id="btn-logs" class="btn ghost sm">行军记录 <span id="ai-count" class="pill">0</span></button>
+        <span id="ai-mode" class="mode-tag">—</span>
+      </div>
+    </header>
+
+    <!-- 标题 -->
+    <section id="screen-title" class="screen">
+      <div class="title-bg"></div>
+      <div class="title-card">
+        <p class="eyebrow">1935 · 水草地边缘的一夜</p>
+        <h1>星火微光<span>·</span><br class="sm-only" />我路过他们的长征</h1>
+        <p class="tagline">你的意识落在营地里。走近谁，就能替他走完这一段路。<br/>抉择与叙事由 <strong>glm-5.1</strong> 实时书写，并落入行军记录。</p>
+        <div class="title-actions">
+          <button type="button" id="btn-start" class="btn primary lg">进入营地</button>
+          <button type="button" id="btn-skip-intro" class="btn ghost lg">跳过开场</button>
+          <button type="button" id="btn-how" class="btn ghost lg">怎么玩</button>
+        </div>
+        <p class="foot-note">赛道二 · AI 游戏 · 运行态调用指定大模型</p>
+      </div>
+    </section>
+
+    <!-- 开场运镜 -->
+    <section id="screen-intro" class="screen hidden">
+      <div class="intro-stage">
+        <div class="intro-slide" data-i="0" style="background-image:url('/assets/scenes/snow_intro.png')"></div>
+        <div class="intro-slide" data-i="1" style="background-image:url('/assets/scenes/camp_wide.png')"></div>
+        <div class="intro-slide" data-i="2" style="background-image:url('/assets/scenes/campfire.png')"></div>
+        <div class="intro-veil"></div>
+        <div class="intro-caption" id="intro-caption"></div>
+        <button type="button" id="btn-intro-skip" class="btn ghost sm intro-skip">跳过</button>
+      </div>
+    </section>
+
+    <!-- 玩法 -->
+    <section id="screen-how" class="screen hidden">
+      <div class="panel wide">
+        <h2>怎么玩</h2>
+        <ol class="how-list">
+          <li><strong>活着的营地</strong> — 全景里有人下棋、交谈、钓鱼、看图。</li>
+          <li><strong>附身</strong> — 点击光点（或长按人物区域）进入他的事。</li>
+          <li><strong>两种事</strong> — 对话剧 / 小游戏；关键判定走 glm-5.1。</li>
+          <li><strong>夜间议事</strong> — 完成 ≥3 条线后解锁，选项由模型生成。</li>
+        </ol>
+        <p class="muted">无 API Key 时为演示模式（MOCK），配置 Key 后为真实调用。</p>
+        <button type="button" class="btn primary" id="btn-how-back">返回</button>
+      </div>
+    </section>
+
+    <!-- 活着的营地全景 -->
+    <section id="screen-hub" class="screen hidden">
+      <div class="camp-pano" id="camp-pano">
+        <div class="pano-img" id="pano-img"></div>
+        <div class="pano-grade"></div>
+        <div id="hotspots"></div>
+      </div>
+      <div class="hub-overlay-top">
+        <h2>活着的营地</h2>
+        <p id="hub-hint" class="muted">光点在呼吸。点一下，或按住不放，灵魂就会落到他身上。</p>
+      </div>
+      <div class="hub-footer glass">
+        <div id="hub-progress" class="progress-text">已完成 0 / 5 条附身线</div>
+        <div id="hub-legend" class="hub-legend"></div>
+        <div class="hub-actions">
+          <button type="button" id="btn-night" class="btn primary hidden">进入夜间议事</button>
+          <button type="button" id="btn-chat" class="btn ghost">火边闲谈</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 话剧 / 小游戏 -->
+    <section id="screen-stage" class="screen hidden">
+      <div class="stage-bg" id="stage-bg"></div>
+      <div class="stage-layout">
+        <div class="stage-portrait">
+          <div class="portrait-frame">
+            <div class="portrait-art" id="portrait-art"></div>
+            <div class="portrait-meta">
+              <div class="portrait-name" id="portrait-name">—</div>
+              <div class="portrait-role" id="portrait-role"></div>
+            </div>
+          </div>
+          <div class="portrait-mood" id="portrait-mood">平静</div>
+        </div>
+        <div class="stage-main">
+          <div class="stage-banner" id="stage-banner"></div>
+          <div class="stage-panel glass" id="stage-panel"></div>
+          <div class="dialogue glass" id="dialogue">
+            <div class="dialogue-speaker" id="dlg-speaker"></div>
+            <div class="dialogue-body" id="dlg-body"></div>
+            <div class="dialogue-next" id="dlg-next"></div>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="btn-exit-stage" class="btn ghost sm stage-exit">回营地</button>
+    </section>
+
+    <!-- 夜间 -->
+    <section id="screen-night" class="screen hidden">
+      <div class="night-bg"></div>
+      <div class="panel wide night-panel glass">
+        <h2 id="night-title">篝火 · 深夜</h2>
+        <p id="night-lead" class="muted"></p>
+        <div id="night-stats" class="stats big"></div>
+        <div id="night-body"></div>
+      </div>
+    </section>
+
+    <!-- 日志 / 史实 / 闲谈 -->
+    <section id="screen-logs" class="screen overlay hidden">
+      <div class="panel wide logs-panel glass">
+        <div class="panel-head">
+          <h2>行军记录 · AI 调用</h2>
+          <div>
+            <button type="button" id="btn-logs-refresh" class="btn ghost sm">刷新</button>
+            <button type="button" id="btn-logs-close" class="btn primary sm">关闭</button>
+          </div>
+        </div>
+        <p class="muted" id="logs-meta"></p>
+        <div id="logs-list" class="logs-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-facts" class="screen overlay hidden">
+      <div class="panel wide glass">
+        <div class="panel-head">
+          <h2>史实档案</h2>
+          <button type="button" id="btn-facts-close" class="btn primary sm">关闭</button>
+        </div>
+        <div id="facts-list" class="facts-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-chat" class="screen overlay hidden">
+      <div class="panel chat-panel glass">
+        <div class="panel-head">
+          <h2>火边闲谈</h2>
+          <button type="button" id="btn-chat-close" class="btn primary sm">收声</button>
+        </div>
+        <div id="chat-log" class="chat-log"></div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" type="text" placeholder="问点什么…（例：老班长为什么不吃鱼？）" autocomplete="off" />
+          <button type="submit" class="btn primary">说</button>
+        </form>
+      </div>
+    </section>
+
+    <div id="toast" class="toast hidden"></div>
+    <div id="thinking" class="thinking hidden"><span class="spin"></span> glm-5.1 正在书写…</div>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+/** 史实档案（游戏剧情 vs 真实史实分栏） */
+export const FACTS = {
+  h_fishhook: {
+    title: '金色的鱼钩',
+    date: '1935年 · 松潘草地',
+    real: '长征过草地期间，粮食极度匮乏。许多老班长、炊事员把仅有的食物让给伤员和年轻战士，自己挖草根、嚼皮带。教材《金色的鱼钩》记述了一位老班长用缝衣针弯成鱼钩钓鱼，把鱼汤全让给伤员，最后牺牲在草地上的故事（文学化记述，人物为典型形象）。',
+    fiction: '本关卡中的弯针、咬钩、分汤为互动重演，不是对某一具体历史人物的复原。',
+  },
+  h_share: {
+    title: '行军中的分享',
+    date: '1934–1936',
+    real: '长征途中口粮奇缺，一把炒面、一块干粮、一颗糖都弥足珍贵。战友之间互相推让食物，把吃的留给伤病员，是大量回忆录中的共同记忆。',
+    fiction: '「兜里的糖」为虚构道具，用于体验分享与抉择。',
+  },
+  h_sentry: {
+    title: '夜岗与口令',
+    date: '长征途中',
+    real: '部队夜间宿营必设岗哨，使用口令识别敌我。口令常每日更换，有时用驻地名、用具名或简单词句，便于战士记忆。误报会消耗体力与警惕，漏报则可能造成严重后果。',
+    fiction: '本关卡信号序列为玩法设计，不是某一真实夜岗记录。',
+  },
+  h_nightschool: {
+    title: '行军中的文化学习',
+    date: '长征途中',
+    real: '红军强调「官兵识字」，行军休息时以树枝当笔、大地当纸，用具名、人名、地名、口令作课本，开展「一天学几个字」的群众性学习。许多战士在长征中完成了扫盲。',
+    fiction: '识字关卡与口令拼句为互动化设计。',
+  },
+  h_campfire: {
+    title: '草地之夜',
+    date: '1935年8月',
+    real: '红一、红四方面军走过松潘草地。草地气候恶劣、沼泽遍布、补给断绝，部队以野菜、草根甚至皮带充饥，仍坚持北上。',
+    fiction: '篝火议事与多结局为叙事框架，不代表具体历史会议。',
+  },
+  h_beacon: {
+    title: '丰碑（军需处长）',
+    date: '长征途中 · 文学记述',
+    real: '《丰碑》记述一位军需处长把棉衣让给战士，自己冻死在雪山上，成为队伍面前的一座「丰碑」。此类把生的希望让给别人的事迹，在长征回忆中多有出现。',
+    fiction: '若后续扩展「让棉衣」线，将以文学典型为据，不指认具体姓名。',
+  },
+};
+
+/**
+ * 全景热点：x/y 为画面百分比（0-100），kind: game | talk
+ */
+export const HUB_LINES = [
+  {
+    id: 'wuziqi',
+    name: '两个小鬼',
+    role: '石子五子棋',
+    icon: '棋',
+    desc: '泥地上画了格，石子当棋。赢的人可以少站一班岗。',
+    tag: '五子棋',
+    kind: 'game',
+    sceneClass: 'camp',
+    sceneImg: '/assets/scenes/camp_wide.png',
+    hx: 16, hy: 62,
+  },
+  {
+    id: 'tanxin',
+    name: '交谈的战士',
+    role: '火边说话',
+    icon: '谈',
+    desc: '两个人压低声音。一个在说家，一个在说路。',
+    tag: '对话剧',
+    kind: 'talk',
+    sceneClass: 'camp',
+    sceneImg: '/assets/scenes/campfire.png',
+    hx: 38, hy: 54,
+  },
+  {
+    id: 'laoban',
+    name: '老班长',
+    role: '炊事班长',
+    icon: '钩',
+    desc: '池塘边，正用缝衣针弯鱼钩。今晚能不能喝上汤，看它。',
+    tag: '金色的鱼钩',
+    kind: 'game',
+    sceneClass: 'river',
+    sceneImg: '/assets/scenes/river.png',
+    hx: 74, hy: 58,
+  },
+  {
+    id: 'zhidao',
+    name: '指导员',
+    role: '看地图',
+    icon: '图',
+    desc: '就着灯看行军图。哪条近，哪条稳，他还没说。',
+    tag: '对话 · 选路',
+    kind: 'talk',
+    sceneClass: 'school',
+    sceneImg: '/assets/scenes/school.png',
+    hx: 55, hy: 40,
+  },
+  {
+    id: 'shaobing',
+    name: '夜岗战士',
+    role: '哨兵',
+    icon: '哨',
+    desc: '远处树线旁的影子。换岗了，这一夜营地交给你。',
+    tag: '放哨',
+    kind: 'game',
+    sceneClass: 'night',
+    sceneImg: '/assets/scenes/sentry.png',
+    hx: 88, hy: 36,
+  },
+];

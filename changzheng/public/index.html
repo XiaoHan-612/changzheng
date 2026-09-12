@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>长征·抉择</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/cinema.css" />
+  <link rel="stylesheet" href="/css/sandbox.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 行程缎带 -->
+    <header id="topbar" class="hidden">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span>长征·抉择</span>
+      </div>
+      <nav id="journey" class="journey" aria-label="行程"></nav>
+      <div class="top-actions">
+        <div id="stats" class="stats compact"></div>
+        <button type="button" id="btn-facts" class="btn ghost sm">史实</button>
+        <button type="button" id="btn-logs" class="btn ghost sm">记录 <span id="ai-count" class="pill">0</span></button>
+        <button type="button" id="btn-settings" class="btn ghost sm">设置</button>
+        <button type="button" id="btn-mute" class="btn ghost sm" title="开关声音">🔊</button>
+        <button type="button" id="btn-journal" class="btn ghost sm" title="手记">手记</button>
+        <button type="button" id="btn-defense" class="btn ghost sm" title="答辩数据">答辩</button>
+        <span id="ai-mode" class="mode-tag">—</span>
+      </div>
+    </header>
+
+    <section id="screen-title" class="screen">
+      <div class="title-bg" style="background-image:url('/assets/scenes/depart_pano.jpg')"></div>
+      <div class="title-card">
+        <p class="eyebrow">1934–1936 · 两万五千里</p>
+        <h1>长征<span>·</span>抉择</h1>
+        <p class="subtitle">你将走进暮色里的营地，替他们做完手头那件事</p>
+        <p class="tagline">
+          每一个光点，是一个人的一夜。<br/>
+          每一次抉择，会被史书轻轻接住。
+        </p>
+        <div class="mode-pick">
+          <button type="button" class="mode-card" id="btn-mode-study">
+            <b>研学模式</b>
+            <span>不会失去战友。适合课堂、展馆与路演。</span>
+          </button>
+          <button type="button" class="mode-card" id="btn-mode-march">
+            <b>行军模式</b>
+            <span>资源见底会掉队，错误抉择会有人留下。</span>
+          </button>
+          <button type="button" class="mode-card sandbox" id="btn-mode-sandbox">
+            <b>自由行军</b>
+            <span>不选选项——写下或说出你要做什么，模型当世界裁判。</span>
+          </button>
+        </div>
+        <div class="title-actions">
+          <button type="button" id="btn-judge" class="btn gold lg">评委演示</button>
+          <button type="button" id="btn-how" class="btn ghost lg">怎么玩</button>
+          <button type="button" id="btn-settings2" class="btn ghost lg">设置</button>
+        </div>
+        <p class="foot-note">模型 <strong id="title-model">—</strong> · 赛道二 AI 游戏 · 可演示真调日志</p>
+      </div>
+    </section>
+
+    <section id="screen-how" class="screen overlay hidden">
+      <div class="panel wide glass">
+        <h2>怎么玩</h2>
+        <ol class="how-list">
+          <li><strong>提灯看营地</strong> — 光会跟着你；照到哪里，哪里的故事醒来。</li>
+          <li><strong>有限的暮色</strong> — 行动点用尽，天就黑透，只能启程。</li>
+          <li><strong>做完一件事</strong> — 抉择交给大模型，立刻对照真实史实。</li>
+          <li><strong>走完五幕</strong> — 于都河到会宁，终点会记住你成为谁。</li>
+        </ol>
+        <button type="button" class="btn primary" id="btn-how-back">返回</button>
+      </div>
+    </section>
+
+    <section id="screen-settings" class="screen overlay hidden">
+      <div class="panel wide glass">
+        <div class="panel-head">
+          <h2>设置 · 模型与日志</h2>
+          <button type="button" id="btn-settings-close" class="btn primary sm">关闭</button>
+        </div>
+        <div class="settings-grid">
+          <div>
+            <h3>模型</h3>
+            <select id="set-model" class="set-input"></select>
+          </div>
+          <div>
+            <h3>API Key</h3>
+            <input id="set-key" class="set-input" type="password" placeholder="留空则 MOCK" autocomplete="off" />
+            <p class="muted sm" id="set-key-mask">当前：—</p>
+          </div>
+          <div>
+            <h3>接口</h3>
+            <input id="set-url" class="set-input" type="text" />
+          </div>
+        </div>
+        <div class="set-actions">
+          <button type="button" id="btn-set-save" class="btn primary">保存</button>
+          <button type="button" id="btn-set-test" class="btn">测试连通</button>
+          <button type="button" id="btn-set-clear-logs" class="btn ghost">重置日志</button>
+          <button type="button" id="btn-set-mock" class="btn ghost">MOCK 模式</button>
+        </div>
+        <p id="set-status" class="muted sm" style="margin-top:10px"></p>
+        <div id="set-test-result" class="set-test"></div>
+      </div>
+    </section>
+
+    <section id="screen-cutscene" class="screen hidden">
+      <div class="cut-stage" id="cut-stage"></div>
+      <div class="cut-caption-wrap">
+        <div class="cut-caption" id="cut-caption"></div>
+        <div class="cut-actions">
+          <button type="button" id="btn-cut-next" class="btn primary">下一句 ▸</button>
+          <button type="button" id="btn-cut-skip" class="btn ghost">跳过</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 暮色营地 -->
+    <section id="screen-camp" class="screen hidden">
+      <div class="dusk" id="dusk">
+        <div class="pano-img" id="pano-img"></div>
+        <div class="dusk-grade" id="dusk-grade"></div>
+        <div class="lantern" id="lantern"></div>
+        <div class="hotspots" id="hotspots"></div>
+      </div>
+
+      <aside class="hud-left glass">
+        <div class="hud-day">
+          <span class="hud-label" id="act-title">—</span>
+          <span class="hud-sub">日 <b id="day-num">1</b>/<span id="day-max">1</span></span>
+        </div>
+        <div class="ap-runes" id="ap-dots" title="行动点"></div>
+        <p id="camp-hint" class="hud-hint">用光照亮他们。</p>
+        <div id="companion-list" class="companion-rail"></div>
+      </aside>
+
+      <div class="hud-bottom">
+        <div id="camp-log" class="camp-log"></div>
+        <button type="button" id="btn-march-fixed" class="btn primary march-cta">启程 · 前往下一处 ▸</button>
+      </div>
+    </section>
+
+    <!-- 电影事件层 -->
+    <section id="screen-stage" class="screen hidden">
+      <div class="sheet-backdrop" id="sheet-backdrop"></div>
+      <article class="sheet" id="sheet">
+        <header class="sheet-head">
+          <div class="sheet-kicker" id="stage-banner">—</div>
+          <div class="sheet-portrait" id="portrait-art"></div>
+          <div>
+            <h2 id="portrait-name">—</h2>
+            <p id="portrait-role" class="muted sm"></p>
+            <span id="portrait-mood" class="mood-chip">平静</span>
+          </div>
+        </header>
+        <div class="sheet-body glass" id="stage-panel"></div>
+        <div class="sheet-actions" id="sheet-actions"></div>
+        <footer class="sheet-dialogue" id="dialogue">
+          <div class="dialogue-speaker" id="dlg-speaker"></div>
+          <div class="dialogue-body" id="dlg-body"></div>
+        </footer>
+      </article>
+    </section>
+
+    <section id="screen-fire" class="screen overlay hidden">
+      <div class="panel glass">
+        <h2>篝火旁</h2>
+        <div id="fire-opts" class="choices"></div>
+        <button type="button" class="btn ghost" id="btn-fire-back" style="margin-top:12px">退回</button>
+      </div>
+    </section>
+
+    <!-- 史实回响：盖章仪式 -->
+    <section id="screen-echo" class="screen overlay hidden">
+      <div class="echo-cinema">
+        <div class="echo-seal" aria-hidden="true">史实</div>
+        <div class="echo-head">
+          <span class="echo-tag">回响</span>
+          <h2 id="echo-title">—</h2>
+        </div>
+        <div class="echo-grid">
+          <div class="echo-col play">
+            <h3>你刚经历的</h3>
+            <p id="echo-play"></p>
+          </div>
+          <div class="echo-col real">
+            <h3>真实发生过的</h3>
+            <p id="echo-real"></p>
+          </div>
+        </div>
+        <p id="echo-fic" class="echo-fic"></p>
+        <button type="button" class="btn primary lg" id="btn-echo-ok">明白了，继续</button>
+      </div>
+    </section>
+
+    <section id="screen-path" class="screen hidden">
+      <div class="path-bg" style="background-image:url('/assets/scenes/path_choice.jpg')"></div>
+      <div class="path-ui">
+        <h2>前面岔开了三条路</h2>
+        <p class="muted sm">没有标准答案，只有代价。</p>
+        <div id="path-zones" class="path-zones"></div>
+      </div>
+    </section>
+
+    <section id="screen-quiz" class="screen hidden">
+      <div class="quiz-bg" id="quiz-bg"></div>
+      <div class="panel wide glass quiz-panel">
+        <div class="panel-head">
+          <h2>知识对决</h2>
+          <span id="quiz-score" class="pill">0 : 0</span>
+        </div>
+        <div id="quiz-body"></div>
+      </div>
+    </section>
+
+    <section id="screen-end" class="screen hidden">
+      <div class="end-bg" style="background-image:url('/assets/scenes/huining_pano.jpg')"></div>
+      <div class="panel wide glass end-panel">
+        <p class="eyebrow" id="end-eyebrow">终局</p>
+        <h2 id="end-title">—</h2>
+        <div id="end-paras"></div>
+        <div class="end-grid">
+          <div>
+            <h3>史实要点</h3>
+            <ul id="end-history"></ul>
+          </div>
+          <div>
+            <h3>本局资源</h3>
+            <div id="end-stats" class="stats big"></div>
+            <h3 style="margin-top:12px">关系</h3>
+            <div id="end-rel"></div>
+          </div>
+        </div>
+        <p id="end-personal" class="personal"></p>
+        <div id="end-report" class="end-report hidden">
+          <h3>研学报告（教育/党建场景）</h3>
+          <p id="report-summary" class="muted"></p>
+          <div class="report-cols">
+            <div>
+              <h4>史实要点</h4>
+              <ul id="report-knowledge"></ul>
+            </div>
+            <div>
+              <h4>精神价值</h4>
+              <ul id="report-values"></ul>
+            </div>
+          </div>
+          <p id="report-suggest" class="muted sm"></p>
+        </div>
+        <div class="biz-strip">
+          <span>天津移动结合点</span>
+          <b>5G+红色研学</b><b>党建数字课堂</b><b>校园思政互动</b><b>展馆触屏一体机</b>
+        </div>
+        <div class="end-actions">
+          <button type="button" id="btn-end-logs" class="btn ghost">行军记录</button>
+          <button type="button" id="btn-end-facts" class="btn ghost">史实档案</button>
+          <button type="button" id="btn-copy-report" class="btn">复制报告</button>
+          <button type="button" id="btn-restart" class="btn primary">再来一局</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-logs" class="screen overlay hidden">
+      <div class="panel wide glass logs-panel">
+        <div class="panel-head">
+          <h2>行军记录</h2>
+          <div>
+            <button type="button" id="btn-logs-refresh" class="btn ghost sm">刷新</button>
+            <button type="button" id="btn-logs-close" class="btn primary sm">关闭</button>
+          </div>
+        </div>
+        <p class="muted" id="logs-meta"></p>
+        <div id="logs-list" class="logs-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-facts" class="screen overlay hidden">
+      <div class="panel wide glass">
+        <div class="panel-head">
+          <h2>史实档案</h2>
+          <button type="button" id="btn-facts-close" class="btn primary sm">关闭</button>
+        </div>
+        <div id="facts-list" class="facts-list"></div>
+      </div>
+    </section>
+
+    <!-- 手记（回望） -->
+    <section id="screen-journal" class="screen overlay hidden">
+      <div class="journal">
+        <header class="journal-head">
+          <div>
+            <p class="eyebrow">回望</p>
+            <h2>这一路，你做过什么</h2>
+          </div>
+          <button type="button" id="btn-journal-close" class="btn primary sm">合上手记</button>
+        </header>
+        <div class="journal-route" id="journal-route"></div>
+        <div class="journal-cols">
+          <div>
+            <h3>抉择</h3>
+            <ol id="journal-choices" class="journal-list"></ol>
+          </div>
+          <div>
+            <h3>史实</h3>
+            <ul id="journal-facts" class="journal-list"></ul>
+          </div>
+        </div>
+        <p class="muted sm" id="journal-foot"></p>
+      </div>
+    </section>
+
+    <!-- 答辩面板 -->
+    <section id="screen-defense" class="screen overlay hidden">
+      <div class="panel wide glass">
+        <div class="panel-head">
+          <h2>答辩面板 · 大模型调用深度</h2>
+          <button type="button" id="btn-defense-close" class="btn primary sm">关闭</button>
+        </div>
+        <div id="defense-body" class="defense-grid"></div>
+        <p class="muted sm" style="margin-top:12px">
+          业务场景：天津移动智慧文旅 / 党建研学 / 校园思政 —— 同一套「全景探索 + 指定大模型裁决 + 可审计日志」可复制到任意史实节点。
+        </p>
+      </div>
+    </section>
+
+    <!-- 自由行军沙盘 -->
+    <section id="screen-sandbox" class="screen hidden">
+      <div class="sandbox-bg" id="sb-scene" style="background-image:url('/assets/scenes/marsh.jpg')"></div>
+      <div class="sandbox-grade"></div>
+      <div class="sb-scene-tag" id="sb-scene-tag">草地行军</div>
+
+      <aside class="sb-world glass">
+        <div class="sb-place">
+          <span class="sb-day">第 <b id="sb-day">1</b> 天</span>
+          <span id="sb-place" class="sb-place-name">草地边缘</span>
+        </div>
+        <div class="sb-bars">
+          <div class="sb-bar"><span>粮食</span><div class="track"><i id="sb-food"></i></div><em id="sb-food-n">0</em></div>
+          <div class="sb-bar"><span>士气</span><div class="track"><i id="sb-morale"></i></div><em id="sb-morale-n">60</em></div>
+          <div class="sb-bar"><span>体力</span><div class="track"><i id="sb-stamina"></i></div><em id="sb-stamina-n">70</em></div>
+        </div>
+        <h4>队伍</h4>
+        <div id="sb-people" class="sb-people"></div>
+        <h4>情报</h4>
+        <ul id="sb-intel" class="sb-intel"></ul>
+        <button type="button" id="btn-sb-logs" class="btn ghost sm block">行军记录</button>
+        <button type="button" id="btn-sb-reset" class="btn ghost sm block">重开沙盘</button>
+      </aside>
+
+      <main class="sb-main">
+        <div id="sb-feed" class="sb-feed"></div>
+        <div id="sb-suggest" class="sb-suggest"></div>
+        <form id="sb-form" class="sb-form">
+          <button type="button" id="sb-mic" class="btn ghost" title="语音说出行动">🎙</button>
+          <input id="sb-input" type="text" placeholder="你要做什么？（例：用绳子把队伍串起来）" autocomplete="off" />
+          <button type="submit" class="btn primary" id="sb-send">行动</button>
+        </form>
+        <p class="sb-hint muted sm">写下任意行动，模型会判定可行性、推进世界，并让同伴回应。你也可以按住说话。世界会自动存档，刷新可续上。</p>
+      </main>
+    </section>
+
+    <div id="toast" class="toast hidden"></div>
+    <div id="thinking" class="thinking hidden"><span class="spin"></span> <span id="thinking-label">模型在书写…</span></div>
+    <aside id="ai-inspector" class="ai-inspector hidden" aria-live="polite">
+      <div class="ai-ins-head">AI 决策监视器 <button type="button" id="btn-inspect-close" class="btn ghost sm">收起</button></div>
+      <div id="ai-ins-body" class="ai-ins-body"></div>
+    </aside>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

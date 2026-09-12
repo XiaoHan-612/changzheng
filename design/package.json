@@ -1,0 +1,12 @@
+{
+  "name": "changzheng-design-docs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "《长征·抉择》策划文档（.docx）生成脚本",
+  "scripts": {
+    "docx": "node make-docx.js"
+  },
+  "dependencies": {
+    "docx": "^9.7.1"
+  }
+}

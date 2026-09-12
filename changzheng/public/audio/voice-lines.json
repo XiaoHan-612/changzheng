@@ -1,0 +1,25 @@
+{
+  "lines": [
+    { "id": "narr_act_open", "actor": "叙事", "match": ["营地在暮色", "光点在呼吸"], "file": "/audio/voices/narr_act_open.wav" },
+    { "id": "narr_echo", "actor": "叙事", "match": ["你刚经历的", "真实发生过的"], "file": "/audio/voices/narr_echo.wav" },
+    { "id": "narr_quiz", "actor": "叙事", "match": ["停一停", "刚才走过的路"], "file": "/audio/voices/narr_quiz.wav" },
+    { "id": "narr_night", "actor": "叙事", "match": ["火压低了", "明天的路"], "file": "/audio/voices/narr_night.wav" },
+    { "id": "narr_rally", "actor": "叙事", "match": ["旗子插稳", "站到了一起"], "file": "/audio/voices/narr_rally.wav" },
+    { "id": "narr_snow", "actor": "叙事", "match": ["他接过外衣", "递了水壶"], "file": "/audio/voices/narr_snow.wav" },
+    { "id": "laoban_hook", "actor": "老班长", "match": ["漂相看真", "沉才是口"], "file": "/audio/voices/laoban_hook.wav" },
+    { "id": "laoban_hello", "actor": "老班长", "match": ["来了。坐下", "别踩了水花"], "file": "/audio/voices/laoban_hello.wav" },
+    { "id": "laoban_soup", "actor": "老班长", "match": ["汤要分匀", "伤员先喝"], "file": "/audio/voices/laoban_soup.wav" },
+    { "id": "zhiyuan_hello", "actor": "指导员", "match": ["坐。有话慢慢说"], "file": "/audio/voices/zhiyuan_hello.wav" },
+    { "id": "zhiyuan_path", "actor": "指导员", "match": ["草地看着平", "宁可多走十里"], "file": "/audio/voices/zhiyuan_path.wav" },
+    { "id": "zhiyuan_grass", "actor": "指导员", "match": ["前面岔开了三条路", "你定"], "file": "/audio/voices/zhiyuan_grass.wav" },
+    { "id": "xiaogui_hello", "actor": "红小鬼", "match": ["你也睡不着", "火边还有位置"], "file": "/audio/voices/xiaogui_hello.wav" },
+    { "id": "xiaogui_home", "actor": "红小鬼", "match": ["我腿不软", "想家的时候数干粮"], "file": "/audio/voices/xiaogui_home.wav" },
+    { "id": "weisheng_care", "actor": "卫生员", "match": ["先按住伤口", "有我在"], "file": "/audio/voices/weisheng_care.wav" },
+    { "id": "jiaoyuan_school", "actor": "文化教员", "match": ["跟着念", "传给下一个人"], "file": "/audio/voices/jiaoyuan_school.wav" },
+    { "id": "boatman_night", "actor": "船工", "match": ["夜里能渡", "桨声"], "file": "/audio/voices/boatman_night.wav" },
+    { "id": "mother_bye", "actor": "母亲", "match": ["去吧。把草鞋", "脚别磨破"], "file": "/audio/voices/mother_bye.wav" },
+    { "id": "recruit_msg", "actor": "叙事", "match": ["前面还长", "记住今天"], "file": "/audio/voices/recruit_msg.wav" },
+    { "id": "veteran_xj", "actor": "湘江老兵", "match": ["江水腥", "少说话"], "file": "/audio/voices/veteran_xj.wav" },
+    { "id": "guide_lazikou", "actor": "向导", "match": ["侧边有崖", "能爬"], "file": "/audio/voices/guide_lazikou.wav" }
+  ]
+}

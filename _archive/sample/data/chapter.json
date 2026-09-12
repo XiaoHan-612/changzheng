@@ -1,0 +1,148 @@
+{
+  "id": "grassland_fishhook",
+  "title": "松潘草地 · 鱼钩",
+  "subtitle": "把生的希望让给别人",
+  "date": "1935年8月",
+  "location": "松潘草地（川西北）",
+  "theme": "牺牲与守望",
+  "difficulty": { "operation": 2, "emotion": 5 },
+  "brief": "你附身一名负责照顾伤员的小战士，在草地行军中经历探路、觅食、分配、救助与最终抉择。",
+  "soldiers": [
+    {
+      "id": "liu_wen",
+      "name": "刘文",
+      "role": "卫生员",
+      "age": 19,
+      "keepsake": "一只旧药盒",
+      "clue": "总是把最后一块纱布留给伤员",
+      "personality": "细心、话少、责任心强",
+      "startState": { "体力": 70, "食物": 3, "药品": 3, "士气": 65, "信念": 70 }
+    },
+    {
+      "id": "chen_xiaochuan",
+      "name": "陈小川",
+      "role": "红小鬼",
+      "age": 16,
+      "keepsake": "半截铅笔",
+      "clue": "夜里会偷偷数干粮还剩几块",
+      "personality": "倔强、要强、心软",
+      "startState": { "体力": 80, "食物": 2, "药品": 1, "士气": 70, "信念": 75 }
+    },
+    {
+      "id": "wang_laoban",
+      "name": "老班长",
+      "role": "炊事班长",
+      "age": 42,
+      "keepsake": "一枚磨亮的鱼钩",
+      "clue": "从不在人前吃东西",
+      "personality": "沉默、坚定、把一切让给别人",
+      "startState": { "体力": 55, "食物": 4, "药品": 2, "士气": 80, "信念": 90 }
+    }
+  ],
+  "comrades": [
+    { "id": "xiaosi", "name": "小四川", "role": "伤员", "condition": "腿部感染，低烧", "alive": true },
+    { "id": "azhen", "name": "阿珍", "role": "看护员", "condition": "轻度脱水", "alive": true },
+    { "id": "laozhou", "name": "老周", "role": "后卫战士", "condition": "右臂负伤", "alive": true }
+  ],
+  "stages": [
+    {
+      "id": "enter_grassland",
+      "title": "进入草地",
+      "type": "narrative_cutscene",
+      "description": "黑场渐亮。水汽贴着地面漫上来，脚下的草甸一踩一颤。老班长走在前面，一句话也不说。",
+      "duration": 6
+    },
+    {
+      "id": "march",
+      "title": "顶风前进",
+      "type": "operation_walk",
+      "description": "控制角色沿草甸前进。体力持续消耗，注意避开深色泥潭。",
+      "targetDistance": 180,
+      "staminaDrain": 0.35,
+      "AIInterval": 30
+    },
+    {
+      "id": "pathfind",
+      "title": "探路",
+      "type": "operation_pathfind",
+      "description": "沼泽区。选择安全落脚点，踩错会陷入，需快速挣脱。",
+      "tileCount": 12,
+      "trapCount": 4
+    },
+    {
+      "id": "forage",
+      "title": "寻找食物",
+      "type": "operation_forage",
+      "description": "鱼没有上钩。在营地周边寻找草根与野菜。",
+      "searchSpots": 8,
+      "timeLimit": 45
+    },
+    {
+      "id": "fishing",
+      "title": "钓鱼",
+      "type": "operation_fishing",
+      "description": "鱼漂下沉的瞬间起竿。成功次数影响伤员状态。",
+      "casts": 5,
+      "biteWindow": 900
+    },
+    {
+      "id": "soup",
+      "title": "煮汤与分配",
+      "type": "decision_food",
+      "description": "锅里只有几条小鱼。分给伤员、老班长、战友和自己。",
+      "AIRequired": true,
+      "scene": "食物分配"
+    },
+    {
+      "id": "night_discovery",
+      "title": "夜里的发现",
+      "type": "narrative_cutscene",
+      "description": "夜里你起来解手，看见老班长蹲在远处，正把草根往嘴里塞。他没有回头。",
+      "duration": 8
+    },
+    {
+      "id": "final_choice",
+      "title": "最终抉择",
+      "type": "decision_final",
+      "description": "你要不要揭穿他？最后一口食物怎么处理？",
+      "AIRequired": true,
+      "scene": "最终抉择",
+      "options": [
+        "当面揭穿并要求他吃鱼",
+        "假装没看见，把鱼留给他",
+        "告诉伤员真相",
+        "自己想办法，把鱼煮进汤里"
+      ]
+    },
+    {
+      "id": "ending",
+      "title": "结局",
+      "type": "ending",
+      "AIRequired": true,
+      "scene": "结局生成"
+    }
+  ],
+  "endings": {
+    "A": {
+      "title": "火种",
+      "text": "队伍在黎明前走出了草地。小四川活了下来。老班长的鱼钩被你收在贴身口袋里，像一枚小小的太阳。多年以后，你才明白：他把生的希望，全部让给了别人。",
+      "tone": "悲壮而温暖"
+    },
+    "B": {
+      "title": "代价",
+      "text": "大部分人走出了草地。有人永远留在了泥泞里。你记得他们的名字，也记得那个从不吃饭的老班长。火种没有熄灭，但路还很长。",
+      "tone": "沉重而坚定"
+    },
+    "C": {
+      "title": "记忆",
+      "text": "你们走出了草地。你活了下来，却再也无法释怀那个夜晚——你明明看见了，却什么也没说。记忆像一根刺，扎在余生的每一天。",
+      "tone": "克制而痛切"
+    }
+  },
+  "historyFacts": [
+    "1935年8月，红军开始穿越松潘草地。草地气候恶劣，沼泽遍布，缺粮少药。",
+    "过草地期间，许多战士因饥饿、寒冷和疾病牺牲。挖野菜、煮皮带、吃草根是常见景象。",
+    "《金色的鱼钩》讲述了老班长用缝衣针做成鱼钩、把鱼留给伤员、自己嚼草根的故事（课文改编，本作为原创改编）。",
+    "红军过草地前后约七天，损失惨重，但队伍没有被打散。"
+  ]
+}
