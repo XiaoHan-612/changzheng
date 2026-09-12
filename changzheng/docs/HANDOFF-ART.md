@@ -57,6 +57,7 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `snow_camp.jpg` | 第四幕第 1 日（雪山日）营地全景 |
 | `snow_let_clothes.jpg` | 幕前「让棉衣」抉择 |
 | `luding_bridge.jpg` | 飞夺泸定桥小游戏 |
+| `luding_run.jpg` | 第三幕过场第二帧（`acts.json` 的 `cutAlt`） |
 | `jinsha_ferry.jpg` | 「今夜能不能渡」抉择 |
 | `map_desk.jpg` | 「往哪里走」抉择 |
 | `depart_bridge.jpg` | 开场「怎么过河」抉择 |
