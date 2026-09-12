@@ -11,7 +11,7 @@ cd changzheng
 npm install
 npm start                 # http://localhost:3001
 npm run test:unit         # 13 项，状态层 + 配置层
-npm run test:e2e          # 五幕 MOCK 通关（含快速模式：node tests/e2e/full-run.mjs --quick）
+npm run test:e2e          # 五幕**真调**通关（含快速模式：node tests/e2e/full-run.mjs --quick）
 npm run qa:smoke          # 标题→营地→一次互动
 npm run qa:sandbox        # 自由行军沙盘
 npm run qa:regress        # 沙盘监听泄漏 / 存档回合错位
@@ -19,7 +19,7 @@ npm run qa:audit          # 日志 schema 审计 → docs/LOG-AUDIT.md
 npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表）
 ```
 
-无 Key 自动进 MOCK，全流程可跑通；`GLM_MODEL` 默认 `glm-5.1`（赛制指定），本机可在 `.env` 覆盖成 `glm-5.3-flash`。
+**没有 MOCK 模式**：所有智能判断都真调。`GLM_MODEL` 默认 `glm-5.1`（赛制指定），本机在 `.env` 用 `glm-5.3-flash` 替代；`GLM_REASONING_EFFORT` 默认 `low`（必须设，否则「始终思考」的模型会把 token 用在推理上、`content` 返回空）。
 
 ## 二、模块地图
 
@@ -31,7 +31,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 | `public/js/sandbox.js` | 自由行军沙盘（世界裁判 + 存档） | 表单监听只绑一次（`bindSandboxFormOnce`），别改回 `addEventListener` |
 | `public/js/audio.js` | 环境床/SFX 合成 + 预录 wav + TTS 缓存 | `speak()` 命中顺序：预录 → TTS 缓存 → 静默 |
 | `public/js/ui.js` | DOM 渲染与浮层 | 模型返回的文本一律走 `escapeHtml` |
-| `server/ai.js` | VN 侧提示词 + MOCK + FALLBACK | 每个 callType 的返回 schema 必须与前端读取字段一致 |
+| `server/ai.js` | VN 侧提示词 + 真调 + 重试 | 每个 callType 的返回 schema 必须与前端读取字段一致 |
 | `server/sim.js` | 沙盘世界裁判 | 同上 |
 | `server/index.js` | 路由 + 静态 + gzip + 缓存头 | 新增数据文件记得加 `/api/data/*` 路由 |
 | `data/acts.json` | 五幕定义：热点、`dayScenes`、强制链、对决 | 改热点等于改玩法入口 |
@@ -60,7 +60,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 
 ## 四、AI 契约（每个 callType 的必需字段）
 
-`source ∈ {GLM, MOCK_AI, FALLBACK}`，具体模型看日志 `model` 字段。校验脚本：`npm run qa:audit`。
+`source ∈ {GLM, ERROR}`，具体模型看日志 `model` 字段。校验脚本：`npm run qa:audit`。
 
 | callType | 前端读取 | 必需字段 |
 |---|---|---|
@@ -90,15 +90,15 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 3. **`applyEffects` 键必须存在于 state** —— 例如旧的 `安全感` 字段会被静默丢弃；新增维度要同步改钳制表。
 4. **模型返回下标/字段不可信** —— 答题下标用 `normIdx()` 夹取，夜间选项不足 2 个用兜底。
 5. **沙盘表单监听只绑一次** —— 反复进出沙盘会叠加处理器（`bindSandboxFormOnce`）。
-6. **测试别污染用户配置** —— e2e 会切 MOCK，跑完要还原 `runtime-config.json`（已内置）。
+6. **测试别污染用户配置** —— e2e 会写 `runtime-config.json`，跑完要还原（已内置 snapshot/restore）。
 7. **改台词文本会让 TTS 哈希文件名变化** —— 重跑 `npm run tts:manifest`。
-8. **真调会偶发空 JSON** —— 实测 54 次真调里 8 次返回 `{}`，且耗时都在 9.6–12.3 秒（token 上限被推理占满）。现已把 `max_tokens` 提到 2000（sim 2400），并把空对象当失败处理：重试一次，仍失败就走 FALLBACK，玩家不会再看到空白叙事。真调后跑 `npm run qa:audit` 复查 `docs/LOG-AUDIT.md` 的「字段缺失明细」。
-9. **真调可能等 10 秒以上** —— 点「思考中」的指示器会显示已等待秒数；若现场网络差，直接切 MOCK 演示。
+8. **空 JSON 的根因是推理吃 token** —— 实测 54 次真调里 8 次返回 `{}`，耗时 9.6–12.3 秒。根因是 glm-5.3-flash「始终思考」：不设 `reasoning_effort` 时 token 全用在推理上。现在默认 `reasoning_effort=low` + `max_tokens` 2000（sim 2400），实测 1.2 秒、21 tokens 就返回合规 JSON；空对象仍按失败处理。
+9. **真调可能等 10 秒以上** —— 「思考中」指示器会显示秒数；失败会弹出原因与「重试」键（不再有兜底文案）。
 10. **日志审计要按 id 去重** —— 同一条调用会同时写进「按日文件」和 `session-full.jsonl`；`audit-logs.mjs` 已去重。`docs/LOG-AUDIT.md` 里的「字段缺失」混有旧版本历史记录；想只看当前版本，用 `LOG_DIR=<临时目录>` 单独跑一局再审计（当前版本 MOCK 全流程字段缺失为 0）。
 
 ## 六、下一步建议（按价值排序）
 
-1. **真调验证**：本轮新增/补齐的 8 条契约（`share_judge(sugar)`、`minigame_review(sentry/gomoku/luding/grab)`、`night_options`、`night_resolve`、`ending_review`、`study_report`、`failure_review`、`sim_turn`）只在 MOCK 下跑过；真调一局后跑 `npm run qa:audit` 看缺失与 FALLBACK。
+1. **真调验证**：标准模式真调一局已跑通（57 次调用、`source=GLM`、无 ERROR）；`npm run qa:audit` 显示 15 类 callType 全部有真调记录。**只剩 `failure_review`（行军模式掉队结算）未验证** —— 需要故意把体力耗到 0 跑一次失败线。
 2. **数值平衡**：行军模式的失败条件现在是「体力≤0」或「粮食=0 且体力≤30」；建议真人试 3 局记录曲线。
 3. **场景图补齐**：按 `HANDOFF-ART.md` 生成 3 张本轮必需 + 18 张后续，落盘后热点背景即可升级。
 4. **音频升级**：环境床从 WebAudio 合成换成 ogg，TTS 缓存按 `TTS-MANIFEST.md` 产出。
@@ -114,4 +114,4 @@ npm run test:unit && npm run test:e2e && npm run qa:sandbox && npm run qa:regres
 - [ ] 标准模式与 `--quick` 均 E2E FULL PASS，无 pageerror
 - [ ] 日志里 candy/sentry/gomoku/luding 各恰好 1 次，夜间 `night_options`+`night_resolve` 各 1 次
 - [ ] `style.css` 无死类残留，全站无乱码注释
-- [ ] 断网/无 Key 可完整演示（日志 `source=MOCK_AI`）
+- [ ] 无 Key 时给出明确错误提示（不再静默、不编造内容）

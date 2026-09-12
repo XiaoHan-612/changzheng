@@ -70,7 +70,7 @@
 POST /api/tts
   body: { text, voiceId, actorId }
   resp: { ok:true, url:"/audio/cache/<hash>_<voiceId>.wav", source:"CACHE" }
-      | { ok:true, url:null, source:"MOCK", reason:"no-cached-voice" }   ← 没生成就静默降级
+      | { ok:true, url:null, source:"NONE", reason:"no-cached-voice" }   ← 没生成就静默降级
 ```
 
 ```js

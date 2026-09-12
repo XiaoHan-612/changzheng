@@ -4,6 +4,77 @@ import { logAiCall } from './logger.js';
 /**
  * 所有运行态智能决策必须走这里。禁止用独立算法替代模型判断。
  */
+/**
+ * 设置页「测试连通」专用：单次探测，不写日志、不重试。
+ * 允许传入未保存的表单值（model / apiKey / apiUrl / reasoningEffort）。
+ */
+export async function probeGlm({ model, apiKey, apiUrl, reasoningEffort, timeoutMs = 25000 } = {}) {
+  const cfg = {
+    model: (model || '').trim() || CONFIG.GLM_MODEL,
+    key: (apiKey || '').trim() || CONFIG.GLM_API_KEY,
+    url: (apiUrl || '').trim() || CONFIG.GLM_API_URL,
+    effort: reasoningEffort === undefined ? CONFIG.GLM_REASONING_EFFORT : reasoningEffort,
+  };
+  if (!cfg.key) return { ok: false, latencyMs: 0, model: cfg.model, error: '未配置 API Key' };
+
+  const t0 = Date.now();
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const body = {
+      model: cfg.model,
+      messages: [
+        { role: 'system', content: '只返回 JSON，不要其他文字。' },
+        { role: 'user', content: '返回：{"ok":true,"echo":"长征·抉择"}' },
+      ],
+      temperature: 0,
+      max_tokens: 1500,
+      response_format: { type: 'json_object' },
+    };
+    if (cfg.effort) body.reasoning_effort = cfg.effort;
+    const res = await fetch(cfg.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    });
+    const text = await res.text();
+    const latencyMs = Date.now() - t0;
+    const base = { model: cfg.model, reasoningEffort: cfg.effort || '', latencyMs };
+    if (!res.ok) {
+      return { ...base, ok: false, httpStatus: res.status, error: text.slice(0, 300) };
+    }
+    let data = null;
+    try { data = JSON.parse(text); } catch { /* 保持 null */ }
+    const content = data?.choices?.[0]?.message?.content ?? '';
+    let parsed = null;
+    try { parsed = JSON.parse(content); } catch { /* 不是 JSON */ }
+    return {
+      ...base,
+      ok: true,
+      source: 'GLM',
+      reply: String(content).slice(0, 120),
+      jsonOk: !!parsed,
+      finishReason: data?.choices?.[0]?.finish_reason || '',
+      usage: data?.usage || null,
+      emptyContent: String(content).trim().length === 0,
+    };
+  } catch (err) {
+    // Node 的 fetch 只给 "fetch failed"，真正的原因在 err.cause
+    const cause = err?.cause?.code || err?.cause?.message || '';
+    const reason = err?.name === 'AbortError' ? `请求超时（>${Math.round(timeoutMs / 1000)}s）` : String(err.message || err);
+    return {
+      model: cfg.model,
+      reasoningEffort: cfg.effort || '',
+      latencyMs: Date.now() - t0,
+      ok: false,
+      error: cause ? `${reason}（${cause}）` : reason,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function callGlm51(payload) {
   const {
     scene,
@@ -21,25 +92,17 @@ export async function callGlm51(payload) {
   const system = systemPrompt || buildSystemPrompt(callType, scene, operation);
   const userMessage = buildUserMessage({ scene, situation, state, options, extraContext, operation, callType, agent });
 
-  if (CONFIG.MOCK_AI) {
-    const result = mockDecision({ scene, callType, options, state, operation, agent });
+  // 没有 Key 就直接报错：不做任何"假演示"
+  if (!CONFIG.GLM_API_KEY) {
     logAiCall({
-      scene,
-      callType,
-      agent,
-      situation,
-      stateSnapshot: { ...state },
-      options,
-      operation,
+      scene, callType, agent, situation,
+      stateSnapshot: { ...state }, options, operation,
       prompt: { system, user: userMessage },
-      rawResponse: JSON.stringify(result),
-      response: result,
-      appliedEffects: result.effects || {},
       durationMs: Date.now() - startTime,
-      source: 'MOCK_AI',
-      note: '未配置 GLM_API_KEY 或强制 MOCK',
+      source: 'ERROR',
+      error: '未配置 GLM_API_KEY',
     });
-    return result;
+    return { _error: true, message: '未配置 GLM_API_KEY，请到「设置」里填入 Key 与接口地址' };
   }
 
   let lastError = null;
@@ -60,6 +123,7 @@ export async function callGlm51(payload) {
             { role: 'user', content: userMessage },
           ],
           temperature: 0.75,
+          ...(CONFIG.GLM_REASONING_EFFORT ? { reasoning_effort: CONFIG.GLM_REASONING_EFFORT } : {}),
           // 留足 token：实测 max_tokens=1000 时模型偶发返回空 JSON（内容被推理占满）
           max_tokens: 2000,
           response_format: { type: 'json_object' },
@@ -114,25 +178,18 @@ export async function callGlm51(payload) {
     }
   }
 
-  const fallback = mockDecision({ scene, callType, options, state, operation, agent });
-  fallback._fallback = true;
-  fallback._fallbackReason = String(lastError?.message || 'unknown');
+  // 重试用尽：不再编造叙事，返回结构化错误，由前端提示原因并让玩家重试
+  const message = String(lastError?.message || lastError || 'unknown');
   logAiCall({
-    scene,
-    callType,
-    agent,
-    situation,
-    stateSnapshot: { ...state },
-    options,
-    operation,
+    scene, callType, agent, situation,
+    stateSnapshot: { ...state }, options, operation,
     prompt: { system, user: userMessage },
-    response: fallback,
-    appliedEffects: fallback.effects || {},
     durationMs: Date.now() - startTime,
-    source: 'FALLBACK',
-    error: String(lastError?.message || lastError),
+    source: 'ERROR',
+    attempts: CONFIG.MAX_RETRIES,
+    error: message,
   });
-  return fallback;
+  return { _error: true, message, attempts: CONFIG.MAX_RETRIES };
 }
 
 function buildSystemPrompt(callType, scene, operation) {
@@ -263,367 +320,3 @@ function buildUserMessage({ scene, situation, state, options, extraContext, oper
   parts.push('请以严格 JSON 返回。');
   return parts.join('\n');
 }
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function mockDecision({ scene, callType, options, state, operation, agent }) {
-  const s = String(scene || '');
-  const score = operation?.score ?? 0.65;
-  const band = score >= 0.85 ? 'excellent' : score >= 0.5 ? 'good' : 'poor';
-
-  if (callType === 'scene_gen') {
-    return {
-      title: s.split('·').pop() || '营地',
-      atmosphere: '风把水汽压得很低。火堆旁有人在补鞋，有人把最后一点炒面推来推去。你听见自己的呼吸，也听见整支队伍的呼吸。',
-      whisper: '「明天……还走吗？」',
-      focus_hint: '光先照向火堆与水边',
-    };
-  }
-  if (callType === 'failure_review') {
-    return {
-      title: '掉队',
-      paragraphs: [
-        '你没能在天黑前跟上队伍。风声盖过了脚步声，路迹被雪盖住。',
-        '但队伍没有停。他们把你没走完的那一段，接了过去。',
-      ],
-      history_points: [
-        '长征中的减员，多发生在掉队、伤病与断粮之间。',
-        '许多名字没有留在名册上，只留在走过的人的记忆里。',
-      ],
-      personal: '这一局你没能走到终点。换一种选择，或许能。',
-    };
-  }
-  if (callType === 'choice_hint') {
-    const labels = options?.length ? options : ['A', 'B', 'C'];
-    return {
-      hints: labels.map((o, i) => ({
-        label: typeof o === 'string' ? o : o?.label || String(i),
-        trend: i === 0 ? '体力↓ 信念↑' : i === 1 ? '稳妥 士气≈' : '风险 粮食↓',
-        risk: i === 0 ? '中' : i === 1 ? '低' : '高',
-        blurb: i === 0 ? '向前一步' : i === 1 ? '稳住队伍' : '另辟蹊径',
-      })),
-    };
-  }
-
-  if (callType === 'npc_chat') {
-    if (/老班长|鱼|汤/.test(s)) {
-      return {
-        reply: '鱼钩是缝衣针弯的。能喝上一口汤，伤员就能多走十里。你先把漂看好，别的不用想。',
-        affinity_delta: 1,
-        mood: '温和',
-        topic_hint: '为什么不自己喝？',
-      };
-    }
-    if (/指导员|路|图/.test(s)) {
-      return {
-        reply: '草地看着平，踩下去才知道深。宁可绕远，也别把人陷进去。你探路时多喊一声。',
-        affinity_delta: 1,
-        mood: '平静',
-      };
-    }
-    if (/红小鬼|小鬼/.test(s)) {
-      return {
-        reply: '我腿不软。就是夜里冷，想家的时候数干粮。你别把这事说出去。',
-        affinity_delta: 2,
-        mood: '感伤',
-      };
-    }
-    return {
-      reply: '火边坐会儿吧。明天还得走。有话慢慢说，风大。',
-      affinity_delta: 1,
-      mood: '平静',
-    };
-  }
-
-  if (callType === 'minigame_review' || callType === 'share_judge') {
-    // 分糖：逐颗判定（一次调用返回数组）
-    if (operation?.type === 'sugar' || /分糖|三颗糖/.test(s)) {
-      const a = operation || {};
-      const n = (k) => Number(a[k] || 0);
-      const gave = n('shangyuan') + n('xinbing') + n('xiaohaoshou');
-      const self = n('self');
-      const items = [
-        { who: '伤员', accepted: n('shangyuan') > 0, reaction: n('shangyuan') > 0 ? '他先把糖推回来，被按住了手' : '他摆手：给小鬼吃' },
-        { who: '倔强的新兵', accepted: n('xinbing') > 0, reaction: n('xinbing') > 0 ? '他嘴上说谁稀罕，糖纸却没有丢' : '他把脸别过去，说你留着' },
-        { who: '小号手', accepted: n('xiaohaoshou') > 0, reaction: n('xiaohaoshou') > 0 ? '他先说只舔一口，后来舔了三口' : '他说自己牙疼，其实没有' },
-      ];
-      if (self > 0) items.push({ who: '自留', accepted: true, reaction: '夜里你把糖纸攥皱了，又抚平' });
-      return {
-        items,
-        choice: self === 0 ? '三颗都递了出去' : self >= 2 ? '大半留给了自己' : '留了一颗给自己',
-        reason: self === 0 ? '先顾伤员和新兵' : self >= 2 ? '先顾自己' : '留一点给自己扛夜路',
-        effects: self === 0
-          ? { 士气: 4, 信念: 7, 好感_红小鬼: 3, 好感_卫生员: 2 }
-          : self >= 2
-            ? { 士气: -2, 信念: -3, 粮食: 1, 好感_红小鬼: -1 }
-            : { 士气: 2, 信念: 3, 粮食: 1, 好感_红小鬼: 1 },
-        narrative: self === 0
-          ? '糖一颗颗递出去。小号手把糖含在腮边，舍不得嚼。没人说谢谢，火光照着几张年轻的脸。'
-          : self >= 2
-            ? '你把糖收进贴身口袋。夜里很静，你摸到糖纸的棱角，忽然想不起上一次吃甜是什么时候。'
-            : '你留了一颗，其余分了出去。没人多问，只是有人把自己的干粮袋往你这边挪了挪。',
-        factId: 'h_share',
-      };
-    }
-    // 夜岗：五信号处置
-    if (operation?.type === 'sentry' || /夜岗|口令|哨位/.test(s)) {
-      const hits = Number(operation?.hits ?? 0);
-      const total = Number(operation?.total || 5);
-      const ok = hits / total;
-      return {
-        choice: ok >= 0.8 ? '一夜无事' : ok >= 0.5 ? '有惊无险' : '出了纰漏',
-        reason: ok >= 0.8 ? '该报的报了，不该报的忍住了' : ok >= 0.5 ? '漏了一次，队伍补上了' : '误报与漏报都出现了',
-        effects: ok >= 0.8
-          ? { 士气: 5, 信念: 4, 体力: -3 }
-          : ok >= 0.5
-            ? { 士气: 1, 体力: -5 }
-            : { 士气: -4, 信念: -3, 体力: -6 },
-        narrative: ok >= 0.8
-          ? '后半夜风停了。你把听到的都记住了，该喊的时候才喊。天快亮时，前哨换班，拍了拍你的肩。'
-          : ok >= 0.5
-            ? '有一回你举棋不定，延误了片刻。好在班里的人醒了，枪口一致朝外，什么都没发生，也什么都差点发生。'
-            : '你喊早了一次，又沉默得太久。全班被折腾起来，冻着挨到天亮。没人骂你，只是再没人提让你站后半夜。',
-        factId: 'h_sentry',
-      };
-    }
-    // 五子棋 / 泸定桥：只写整体后果
-    if (operation?.type === 'gomoku') {
-      const r = operation?.result;
-      return {
-        choice: r === 'win' ? '你赢了' : r === 'draw' ? '平手' : '小鬼赢了',
-        reason: '按棋局结果结算',
-        effects: r === 'win' ? { 士气: 3, 好感_红小鬼: 2 } : r === 'draw' ? { 士气: 2, 好感_红小鬼: 1 } : { 士气: 1, 好感_红小鬼: 2 },
-        narrative: r === 'win'
-          ? '你把最后一颗石子按下去的时候，小鬼盯着泥地看了很久，然后说：再来一盘。'
-          : '小鬼从泥地上跳起来，围着火堆跑了半圈才想起来不能出声。你看着他的背影，也跟着笑了一下。',
-      };
-    }
-    if (operation?.type === 'luding') {
-      const cleared = !!operation?.cleared;
-      const falls = Number(operation?.falls || 0);
-      return {
-        choice: cleared ? (falls ? '过桥了，代价不小' : '过桥了') : '没能过去',
-        reason: '按过桥表现结算',
-        effects: cleared
-          ? (falls ? { 体力: -8, 士气: 4, 信念: 6 } : { 体力: -5, 士气: 6, 信念: 8 })
-          : { 体力: -10, 士气: -4, 信念: 2 },
-        narrative: cleared
-          ? '铁索在手里发烫。你爬到对岸时，身后的火还没停。有人把你从桥头拖进来，一句话没说，先递了水。'
-          : '你没能在火力停歇前过去。后来是第二拨人把桥板一块块铺上，队伍从上面走了过去——只是走得比原计划晚了半天。',
-        factId: 'h_luding',
-      };
-    }
-    // 先认 operation.type / 明确钓鱼场景，避免「鱼钩」被误判成分汤
-    if (operation?.type === 'fishing' || /钓鱼|咬钩|起竿|鱼钩/.test(s)) {
-      const n =
-        band === 'excellent'
-          ? '漂一顿，你腕上一沉——鱼出水了，在暮色里银亮地跳。老班长笑了笑，把锅架上。'
-          : band === 'good'
-            ? '起竿稍慢，一条小鱼脱了钩。你又下了竿，风把水面吹碎。'
-            : '空了三竿。肚子响，只好去拔草根。老班长没说话，接过你的空钩。';
-      return {
-        choice: band === 'excellent' ? '钓到了鱼' : band === 'good' ? '勉强有收获' : '没钓到',
-        reason: '按起竿时机结算',
-        effects:
-          band === 'excellent'
-            ? { 粮食: 3, 士气: 5 }
-            : band === 'good'
-              ? { 粮食: 1, 士气: 2 }
-              : { 士气: -1 },
-        narrative: n,
-        factId: 'h_fishhook',
-      };
-    }
-    if (operation?.type === 'soup' || /分汤|分配|煮粥/.test(s) || options?.some?.((o) => /伤员|病号|清汤|平分|自己/.test(String(o)))) {
-      const choice = options?.[0] || operation?.choice || '全班平分';
-      // 「自己喝清汤/自己少一点」是让，不是自私
-      const selfish = /自己/.test(String(choice)) && !/给伤员|给病号|清汤|少一点|平分|忍着/.test(String(choice));
-      return {
-        choice: String(choice),
-        reason: selfish ? '先顾了自己' : '优先伤员与病号',
-        effects: selfish
-          ? { 士气: -3, 信念: -5, 粮食: 1, 好感_老班长: -2 }
-          : { 士气: 6, 信念: 8, 粮食: 1, 好感_老班长: 3, 好感_卫生员: 2 },
-        narrative: selfish
-          ? '你端着碗，看见老班长转过身去，把草根往嘴里塞。锅里还剩一点汤，他推给了伤员。'
-          : '你把稠的拨给伤员，自己舀了清汤。老班长把最后一点鱼肉按进病号碗里，像完成一件大事。',
-        factId: 'h_fishhook',
-      };
-    }
-    if (/识字|夜校|口令/.test(s)) {
-      return {
-        choice: '完成今晚识字',
-        reason: '按答题表现',
-        effects: { 信念: 5, 士气: 4 },
-        narrative: '沙地上留下歪歪扭扭的字。有人念出声，又赶紧捂住嘴。今晚的口令，他们记住了。',
-        factId: 'h_nightschool',
-        nextBeat: '口令写入营地记忆。',
-      };
-    }
-    if (/休息/.test(s)) {
-      return {
-        choice: '歇了一会儿',
-        reason: '恢复体力',
-        effects: { 体力: 12, 粮食: -1, 士气: 2 },
-        narrative: '你靠着背囊眯了一阵。风把火堆吹低，有人把最后一点炒面推到你手边。',
-      };
-    }
-    return {
-      choice: band === 'excellent' ? '做得漂亮' : band === 'good' ? '还行' : '吃了亏',
-      reason: '按操作结算',
-      effects: band === 'excellent' ? { 士气: 5 } : band === 'good' ? { 士气: 2 } : { 体力: -4, 士气: -2 },
-      narrative: '队伍沉默地继续，脚步声被风声吞没。有人把水壶递过来，你喝了一口，又传下去。',
-    };
-  }
-
-  if (callType === 'branch_judge') {
-    const pick = options?.[0] || '稳一点绕远';
-    return {
-      result: /稳|绕远/.test(String(pick)) ? 'success' : /近|冲/.test(String(pick)) ? 'partial' : 'success',
-      effects: /稳|绕远/.test(String(pick))
-        ? { 体力: -6, 粮食: -1, 士气: 3 }
-        : { 体力: -12, 粮食: -1, 士气: -2, 信念: 2 },
-      scene_text:
-        /稳|绕远/.test(String(pick))
-          ? '你们绕开亮闪闪的水洼，多走了七里。有人说腿软，没人掉队。天黑前找着一块硬地。'
-          : '你们抄了近路。有人陷到膝盖，几个人七手八脚拽出来。鞋全湿了，心却热着。',
-      factId: 'h_grassland',
-    };
-  }
-
-  if (callType === 'quiz_generate') {
-    return {
-      question: '红军过松潘草地时，部队最紧缺、也最常被战友相互推让的是什么？',
-      options: ['弹药', '口粮', '地图', '电台'],
-      answer_index: 1,
-      explain: '草地补给断绝，一把炒面、一碗鱼汤都能救命，互相让粮是大量回忆录里的共同记忆。',
-      difficulty: 'easy',
-    };
-  }
-
-  if (callType === 'quiz_answer_ai') {
-    return {
-      answer_index: 1,
-      confidence: 0.78,
-      reason: agent ? '见习宣传员：草地缺粮印象最深' : '口粮',
-    };
-  }
-
-  if (callType === 'quiz_judge') {
-    return {
-      human_score: 1,
-      ai_score: 1,
-      winner: 'draw',
-      explain: '双方都抓住「口粮」这一关键。草地行军中，食物就是生命线。',
-      effects: { 士气: 3 },
-    };
-  }
-
-  if (callType === 'night_options') {
-    return {
-      lead: '火压低了。有人说明天还要赶路，有人盯着伤员的担架。',
-      options: [
-        { label: '加岗并匀出口粮', sub: '安全优先，明天更苦', key: 'a' },
-        { label: '原编制休息', sub: '保留体力，伤员优先', key: 'b' },
-        { label: '连夜探出一段路', sub: '赌明天少走弯路', key: 'c' },
-      ],
-    };
-  }
-
-  if (callType === 'night_resolve') {
-    return {
-      // 只回状态里真实存在的维度（曾经的「安全感」会被 applyEffects 静默丢弃）
-      effects: { 体力: -5, 粮食: -1, 士气: 4, 信念: 3, 民心: 2 },
-      narrative: '你们把岗排密了。后半夜有人咳嗽，又被轻轻拍背止住。天快亮时，火堆只剩一点红。',
-      nextBeat: '队伍在微光里收拢背囊。',
-    };
-  }
-
-  if (callType === 'ending_review') {
-    const faith = state?.信念 ?? 70;
-    const ending_id = faith >= 80 ? '星火' : faith >= 65 ? '同行' : faith >= 45 ? '守望' : '未竟';
-    const map = {
-      星火: {
-        title: '星火不熄',
-        paragraphs: [
-          '走出草地那天，你回头看了很久。泥水、草根、被让来让去的半碗汤，都沉在身后。',
-          '有人问你怕不怕。你说怕。但脚步没停——因为前面有人，后面也有人。',
-        ],
-      },
-      同行: {
-        title: '同行',
-        paragraphs: [
-          '路还长，但脚步声叠在了一起。你忽然明白：同行本身就是路。',
-          '老班长把空鱼钩塞进你手心。「拿着，」他说，「下一口汤，该你让人了。」',
-        ],
-      },
-      守望: {
-        title: '守望',
-        paragraphs: [
-          '天亮前你们把伤员抬上肩。有人回头看了一眼火堆的灰，然后跟上。',
-          '你活了下来，并且记住了他们怎样把生的希望递出去。',
-        ],
-      },
-      未竟: {
-        title: '未竟',
-        paragraphs: [
-          '你们走出了这一夜。有些名字没来得及问，有些糖纸被收进了最贴身的口袋。',
-          '路还长。火种还在——只要还有人肯把汤让出去。',
-        ],
-      },
-    };
-    const m = map[ending_id];
-    return {
-      ending_id,
-      title: m.title,
-      paragraphs: m.paragraphs,
-      history_points: [
-        '1935年8月，红一、红四方面军走过松潘草地。',
-        '草地气候恶劣、沼泽遍布、补给断绝，部队以野菜、草根甚至皮带充饥。',
-        '战友之间互相推让食物、把口粮留给伤员，是大量回忆录中的共同记忆。',
-        '《金色的鱼钩》为文学化记述，人物是典型形象，不是对某一具体历史人物的复原。',
-      ],
-      personal: '你曾路过他们的长征——愿你把「让一口汤」的勇气带回自己的时代。',
-    };
-  }
-
-  if (callType === 'act_review') {
-    return {
-      title: '本幕小结',
-      lines: [
-        '你把有限的暮色用在了该用的地方。',
-        '有人记得你问过的那句话。',
-      ],
-      style_hint: '玩家风格：重情',
-      points: 3,
-    };
-  }
-
-  if (callType === 'study_report') {
-    const faith = state?.信念 ?? 70;
-    return {
-      summary: `本局信念 ${faith}，走完五幕关键节点。玩家在营地日中完成抉择、小游戏与知识对决，史实回响已对照真实发生过的长征记忆。`,
-      knowledge: [
-        '于都河出发与群众支援浮桥',
-        '湘江战役的巨大代价',
-        '遵义会议与方向转折',
-        '过草地缺粮与战友互助',
-        '会宁会师与长征胜利',
-      ],
-      values: ['顾全大局', '把生的希望递出去', '实事求是'],
-      suggest: '可延伸阅读回忆录中的草地篇章，并讨论「今天如何让一口汤」。',
-    };
-  }
-
-  return {
-    choice: options?.[0] || '继续',
-    reason: '默认',
-    effects: { 体力: -2, 士气: 1 },
-    narrative: '队伍沉默地继续。',
-  };
-}
-
-// 避免未使用告警
-void clamp;

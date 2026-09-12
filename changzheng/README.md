@@ -20,7 +20,7 @@ npm start
 ```powershell
 npm run test:unit     # 状态层 + 配置层（13 项）
 npm run qa:smoke      # UI 冒烟
-npm run test:e2e      # 五幕 MOCK 通关（加 --quick 跑快速模式）
+npm run test:e2e      # 五幕**真调**通关（需配好 Key；加 --quick 跑快速模式）
 npm run qa:sandbox    # 自由行军沙盘
 npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
 npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md
@@ -43,7 +43,8 @@ npm run tts:manifest  # 生成语音清单 → docs/TTS-MANIFEST.md
 
 ## 设置
 
-游戏内「设置」：切换模型 / API Key / 测试连通 / 重置日志 / MOCK。
+游戏内「设置」：模型（下拉 + 自定义输入）/ **推理档位**（low·high·max）/ API Key / 接口地址 / **测试连通**（用未保存的值直接测一次真调）/ 重置日志。
+本项目**没有 MOCK 演示模式**：所有智能判断都走真实模型调用；调用失败会在界面提示原因并给「重试」键，同时写入 `source=ERROR` 日志。
 
 ## 文档
 

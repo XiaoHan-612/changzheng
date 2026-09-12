@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOG_DIR = process.env.LOG_DIR || path.join(ROOT, 'logs');
 const OUT = path.join(ROOT, 'docs', 'LOG-AUDIT.md');
+// 本项目已移除 MOCK：默认只审计真调记录；加 --all 可连历史 MOCK 记录一起看
+const INCLUDE_LEGACY_MOCK = process.argv.includes('--all');
 
 // 每个 callType 的响应必需字段；用 | 表示"任一命中即可"
 const REQUIRED = {
@@ -68,9 +70,11 @@ function pct(arr, p) {
 }
 
 function main() {
-  const logs = readLogs();
+  const all = readLogs();
+  const legacyMock = all.filter((l) => l.source === 'MOCK_AI').length;
+  const logs = INCLUDE_LEGACY_MOCK ? all : all.filter((l) => l.source !== 'MOCK_AI');
   if (!logs.length) {
-    console.error(`没有读到日志：${LOG_DIR}`);
+    console.error(`没有读到真调记录：${LOG_DIR}（本版本已移除 MOCK，加 --all 可看历史 MOCK 记录）`);
     process.exit(1);
   }
 
@@ -113,6 +117,9 @@ function main() {
   lines.push(`- model 分布：${Object.entries(byModel).map(([k, v]) => `${k}=${v}`).join('　')}`);
   lines.push(`- 字段缺失：**${violations.length}** 条　·　FALLBACK：**${fallbacks.length}** 条`);
   lines.push('- 说明：日志按日累积，可能混入旧版本产生的记录；判断当前版本是否合规，以本轮之后新增的记录为准。');
+  if (legacyMock && !INCLUDE_LEGACY_MOCK) {
+    lines.push(`- 已忽略历史 MOCK_AI 记录 **${legacyMock}** 条（本版本已移除 MOCK，如需查看加 \`--all\`）`);
+  }
   lines.push('');
   lines.push('## 按 callType');
   lines.push('');

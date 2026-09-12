@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3001;
 const BASE = `http://localhost:${PORT}`;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-// 用例会把服务切到 MOCK；跑完把 runtime-config.json 原样还原
+// 用例会写 runtime-config.json；跑完原样还原
 const RUNTIME = path.join(ROOT, 'runtime-config.json');
 function snapshotRuntime() {
   try { return fs.readFileSync(RUNTIME, 'utf8'); } catch { return null; }
@@ -56,11 +56,9 @@ async function main() {
 
 async function run() {
   await ensureServer();
-  await fetch(`${BASE}/api/config`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mock: true }),
-  });
+  // 只走真调（本项目已移除 MOCK）
+  const cfg = await (await fetch(`${BASE}/api/config`)).json();
+  if (!cfg.hasKey) throw new Error('本用例只走真调：请配置 GLM_API_KEY');
 
   const browser = await chromium.launch({ headless: true, channel: 'chrome' });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -77,12 +75,14 @@ async function run() {
   assert((await page.locator('.j-node').count()) >= 5, 'journey nodes');
 
   await page.locator('.hotspot:not(.march)').first().click({ force: true });
-  await page.waitForTimeout(400);
-  // complete or exit stage
-  for (let i = 0; i < 12; i++) {
-    if (await page.locator('#screen-camp').isVisible().catch(() => false)) break;
+  // 真调一次要 1.5–6s，轮询等回到营地（最多 120s）
+  const deadline = Date.now() + 120000;
+  let talkAsked = false;
+  let backToCamp = false;
+  while (Date.now() < deadline) {
+    if (await page.locator('#screen-camp').isVisible().catch(() => false)) { backToCamp = true; break; }
     if (await page.locator('#btn-echo-ok').isVisible().catch(() => false)) {
-      await page.click('#btn-echo-ok');
+      await page.click('#btn-echo-ok').catch(() => {});
       continue;
     }
     if (await page.locator('#btn-continue').count()) {
@@ -91,11 +91,22 @@ async function run() {
     }
     const ch = page.locator('#ch-opts .btn.choice:not([disabled])');
     if (await ch.count()) {
-      await ch.first().click({ force: true });
+      await ch.first().click({ force: true }).catch(() => {});
       continue;
     }
-    await page.waitForTimeout(150);
+    if (await page.locator('#talk-quick').isVisible().catch(() => false)) {
+      if (!talkAsked) {
+        await page.locator('#talk-quick .btn.choice').first().click({ force: true }).catch(() => {});
+        talkAsked = true;
+      } else {
+        await page.locator('#talk-end').click({ force: true }).catch(() => {});
+      }
+      await page.waitForTimeout(300);
+      continue;
+    }
+    await page.waitForTimeout(200);
   }
+  if (!backToCamp) throw new Error('一次互动未在 120s 内回到营地（真调可能超时）');
 
   await page.screenshot({ path: 'tests/e2e/artifacts/smoke.png' });
   if (errs.length) throw new Error('page errors: ' + errs.join('; '));

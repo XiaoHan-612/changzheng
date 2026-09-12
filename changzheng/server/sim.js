@@ -10,21 +10,18 @@ export async function callSim({ world, action, intent }) {
   const system = buildSimSystem();
   const user = buildSimUser({ world, action, intent });
 
-  if (CONFIG.MOCK_AI) {
-    const r = mockSim({ world, action });
+  if (!CONFIG.GLM_API_KEY) {
     logAiCall({
       scene: `沙盘·${world?.place || '路上'}`,
       callType: 'sim_turn',
       situation: action,
       stateSnapshot: world || {},
       prompt: { system, user },
-      rawResponse: JSON.stringify(r),
-      response: r,
-      appliedEffects: r.effects || {},
       durationMs: Date.now() - startTime,
-      source: 'MOCK_AI',
+      source: 'ERROR',
+      error: '未配置 GLM_API_KEY',
     });
-    return r;
+    return { _error: true, message: '未配置 GLM_API_KEY，请到「设置」里填入 Key 与接口地址' };
   }
 
   let lastError = null;
@@ -45,6 +42,7 @@ export async function callSim({ world, action, intent }) {
             { role: 'user', content: user },
           ],
           temperature: 0.8,
+          ...(CONFIG.GLM_REASONING_EFFORT ? { reasoning_effort: CONFIG.GLM_REASONING_EFFORT } : {}),
           max_tokens: 2400,
           response_format: { type: 'json_object' },
         }),
@@ -85,20 +83,19 @@ export async function callSim({ world, action, intent }) {
     }
   }
 
-  const fb = mockSim({ world, action });
-  fb._fallback = true;
+  const message = String(lastError?.message || lastError || 'unknown');
   logAiCall({
     scene: `沙盘·${world?.place || '路上'}`,
     callType: 'sim_turn',
     situation: action,
     stateSnapshot: world || {},
     prompt: { system, user },
-    response: fb,
     durationMs: Date.now() - startTime,
-    source: 'FALLBACK',
-    error: String(lastError?.message || lastError),
+    source: 'ERROR',
+    attempts: CONFIG.MAX_RETRIES,
+    error: message,
   });
-  return fb;
+  return { _error: true, message, attempts: CONFIG.MAX_RETRIES };
 }
 
 function buildSimSystem() {
@@ -146,39 +143,4 @@ ${intent ? `【玩家意图】${intent}` : ''}
   "tension": 0.6,
   "ending_hint": "可选：若队伍濒临崩溃，给一句方向"
 }`;
-}
-
-function mockSim({ world, action }) {
-  const a = String(action || '');
-  const risky = /冲|抢|冒险|夜|单独|硬/.test(a);
-  const caring = /救|背|分|让|照顾|伤/.test(a);
-  const visual = /雨/.test(a) ? 'rain' : /夜|趁黑/.test(a) ? 'night_march' : /吃|粮|饿|草根/.test(a) ? 'starve'
-    : /村|老乡|打探|问路/.test(a) ? 'village' : /河|水|渡/.test(a) ? 'river' : risky ? 'night_march' : 'march';
-  return {
-    feasible: risky ? 'hard' : 'yes',
-    verdict: risky ? '可行，但有代价' : '可行',
-    visual,
-    narrative: risky
-      ? `你选择了更急的做法。脚下的泥比想象中深，队伍跟上的时候少了一个呼吸声。有人回头看了一眼，没有停下。`
-      : caring
-        ? '你把自己的那份先递了出去。没人说话，但有人把你的背囊往上提了提。队伍继续向前。'
-        : '你按自己的判断往前走了一段。风把脚印抹浅，队伍跟上了你的节奏。',
-    effects: risky ? { stamina: -12, morale: 3 } : caring ? { stamina: -6, morale: 8, food: -1 } : { stamina: -8, morale: 1 },
-    world_delta: {
-      place: '草地边缘',
-      people_change: risky
-        ? [{ name: '新兵', status: '掉队', note: '体力不支，跟丢了', memory: '有人为抢时间丢了我', goal: '想证明自己能跟上' }]
-        : caring
-          ? [{ name: '卫生员', status: '正常', goal: '把伤员送到底', memory: '你先顾了别人' }]
-          : [],
-      intel_add: /打探|问|探/.test(a) ? ['西南亮水洼可绕行'] : [],
-      day_advance: 1,
-    },
-    npc_reactions: [
-      { name: '老班长', line: risky ? '这样不行。队伍要一起走，谁也不能落下。' : '脚步再匀一点，别让人掉队。', stance: risky ? '反对' : '担忧' },
-      { name: '红小鬼', line: '我能走。别管我。', stance: '支持' },
-    ],
-    suggestions: ['用绳子把队伍串起来', '派人去找吃的东西', '就地休整半小时'],
-    tension: risky ? 0.75 : 0.5,
-  };
 }

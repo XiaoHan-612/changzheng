@@ -40,7 +40,7 @@ body {
   font-size: 11px; padding: 4px 10px; border-radius: 999px;
   border: 1px solid var(--line); color: var(--gold); background: rgba(196,163,90,0.08);
 }
-.mode-tag.mock { color: #e0a050; }
+.mode-tag.nokey { color: #e07a5f; }
 .pill {
   display: inline-block; min-width: 18px; padding: 0 5px; text-align: center;
   background: var(--red); color: #fff; border-radius: 999px; font-size: 11px;

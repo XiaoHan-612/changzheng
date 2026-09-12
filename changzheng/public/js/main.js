@@ -16,13 +16,26 @@ if (typeof window !== 'undefined') window.__pushAiFeed = pushAiFeed;
 
 async function callAI(payload) {
   const t0 = Date.now();
-  const result = await decide(payload);
+  let result;
+  try {
+    result = await decide(payload);
+  } catch (err) {
+    result = { _error: true, message: String(err.message || err) };
+  }
+  // 不再用兜底文案编造叙事：失败就明说，并给一个重试键
+  if (result?._error) {
+    const msg = result.message || '未知错误';
+    toast(`模型调用失败：${msg}`, 6000);
+    appendCampLog(S, '错误', `AI 调用失败：${msg}`);
+    const again = await askAiRetry(result, payload);
+    if (again) return callAI(payload);
+    return { _error: true, message: msg };
+  }
   const entry = {
     callType: payload.callType || 'decide',
     scene: payload.scene || '',
     ms: Date.now() - t0,
     model: config?.model || 'glm',
-    mock: !!config?.mockMode,
     snippet: (result.narrative || result.reply || result.scene_text || result.title || result.question || '').slice(0, 80),
   };
   aiFeed.unshift(entry);
@@ -33,6 +46,45 @@ async function callAI(payload) {
   return result;
 }
 
+/** 当前可见屏里适合挂按钮的容器 */
+function actionHost() {
+  const visible = [...document.querySelectorAll('.screen')].find((s) => !s.classList.contains('hidden'));
+  if (!visible) return document.body;
+  return visible.querySelector('#night-body')
+    || visible.querySelector('#stage-panel')
+    || visible.querySelector('#sheet-actions')
+    || visible;
+}
+
+/** 调用失败时给「重试 / 跳过」两个明确选择（不再自动编造内容） */
+function askAiRetry(info, payload) {
+  return new Promise((resolve) => {
+    const host = actionHost();
+    host.querySelectorAll('#ai-retry-row').forEach((n) => n.remove());
+    const row = document.createElement('div');
+    row.id = 'ai-retry-row';
+    row.className = 'mg-row';
+    row.style.marginTop = '12px';
+    const retryBtn = document.createElement('button');
+    retryBtn.type = 'button';
+    retryBtn.className = 'btn primary';
+    retryBtn.textContent = '重试这一次调用';
+    const skipBtn = document.createElement('button');
+    skipBtn.type = 'button';
+    skipBtn.className = 'btn ghost';
+    skipBtn.textContent = '跳过（本次不留叙事）';
+    const tip = document.createElement('div');
+    tip.className = 'muted sm';
+    tip.style.width = '100%';
+    tip.textContent = `失败原因：${info.message || '未知'}`;
+    retryBtn.onclick = () => { row.remove(); resolve(true); };
+    skipBtn.onclick = () => { row.remove(); resolve(false); };
+    row.append(tip, retryBtn, skipBtn);
+    host.appendChild(row);
+    void payload;
+  });
+}
+
 function renderInspector() {
   const box = $('ai-ins-body');
   if (!box) return;
@@ -40,7 +92,7 @@ function renderInspector() {
     .map(
       (e) => `<div class="ai-item">
         <span class="tag">${escapeHtml(e.callType)}</span>
-        <span class="${e.mock ? 'src-mock' : 'src-glm'}">${e.mock ? 'MOCK' : 'GLM'}</span>
+        <span class="src-glm">${escapeHtml(e.model || 'GLM')}</span>
         <span class="muted">${e.ms}ms</span>
         <div>${escapeHtml(e.snippet || e.scene || '')}</div>
       </div>`
@@ -70,7 +122,7 @@ const { $, showScreen, setTopbar, renderStats, renderAp, renderCompanions,
 let S = null;
 let allFacts = {};
 let actsData = null;
-let config = { mockMode: true, model: 'glm-5.3-flash' };
+let config = { model: 'glm-5.3-flash', hasKey: false };
 let echoResolve = null;
 let talkPending = false;
 
@@ -173,7 +225,7 @@ const CHOICE_SETS = {
 async function boot() {
   config = await fetchConfig();
   setAiMode(config);
-  $('title-model').textContent = config.model + (config.mockMode ? '（MOCK）' : '');
+  $('title-model').textContent = config.model;
   allFacts = (await fetchFacts()) || {};
   actsData = await fetchActs();
   bindChrome();
@@ -310,7 +362,7 @@ function openJournal() {
     `体力 ${S.体力} · 粮食 ${S.粮食} · 士气 ${S.士气} · 信念 ${S.信念} · 民心 ${S.民心}`
     + `　｜　附身线 ${linesDoneCount(S)}/${LINES_TOTAL}`
     + `　｜　对决 ${S.quiz?.human ?? 0}:${S.quiz?.ai ?? 0}`
-    + `　｜　模型 ${config.model}${config.mockMode ? '（MOCK）' : ''}`;
+    + `　｜　模型 ${config.model}`;
 }
 
 function logChoice(act, label, mood) {
@@ -360,10 +412,9 @@ async function openDefense() {
     .reduce((sum, [, n]) => sum + n, 0);
   const cards = [
     { k: '总调用', v: logs.length, n: '每次决策均有 JSONL' },
-    { k: '平均延迟', v: avg + 'ms', n: 'MOCK≈0 · 真调 2–5s' },
+    { k: '平均延迟', v: avg + 'ms', n: '真调 1–8s（推理档位 low）' },
     { k: 'GLM 真调', v: glmCalls, n: `source=GLM · ${config?.model || 'glm'}` },
-    { k: 'MOCK', v: bySource.MOCK_AI || 0, n: '无 Key 演示' },
-    { k: 'FALLBACK', v: bySource.FALLBACK || bySource.FALLBACK_AFTER_ERROR || 0, n: '降级可审计' },
+    { k: 'ERROR', v: bySource.ERROR || 0, n: '失败已记录（可重试）' },
   ];
   Object.entries(byType).forEach(([t, n]) => {
     cards.push({ k: t, v: n, n: '环节调用' });
@@ -420,6 +471,22 @@ function bindEcho() {
 }
 
 // ─── settings ───
+/** 设置页当前表单值（自定义模型名优先于下拉） */
+function settingsForm() {
+  const custom = ($('set-model-custom')?.value || '').trim();
+  return {
+    model: custom || ($('set-model')?.value || ''),
+    apiUrl: ($('set-url')?.value || '').trim(),
+    reasoningEffort: $('set-effort')?.value ?? '',
+  };
+}
+
+function renderSettingsStatus(cfg) {
+  $('set-key-mask').textContent =
+    `当前 Key：${cfg.keyMask || '（无）'}　模型：${cfg.model}`
+    + `　推理档位：${cfg.reasoningEffort || '（默认）'}`;
+}
+
 async function openSettings() {
   const cfg = await fetchConfig();
   config = cfg;
@@ -427,9 +494,21 @@ async function openSettings() {
   sel.innerHTML = (cfg.availableModels || ['glm-5.3-flash', 'glm-5.1'])
     .map((m) => `<option value="${m}" ${m === cfg.model ? 'selected' : ''}>${m}</option>`)
     .join('');
+  const custom = $('set-model-custom');
+  if (custom) {
+    custom.value = '';
+    custom.placeholder = `或直接输入模型名（当前：${cfg.model}）`;
+  }
+  const eff = $('set-effort');
+  if (eff) {
+    const list = ['', ...(cfg.availableReasoningEfforts || ['low', 'high', 'max'])];
+    eff.innerHTML = list
+      .map((e) => `<option value="${e}" ${String(cfg.reasoningEffort ?? '') === e ? 'selected' : ''}>${e || '（默认，不传）'}</option>`)
+      .join('');
+  }
   $('set-key').value = '';
   $('set-url').value = cfg.apiUrl?.replace('/***', '/chat/completions') || '';
-  $('set-key-mask').textContent = `当前 Key：${cfg.keyMask || '（无）'}　模式：${cfg.mockMode ? 'MOCK' : '真实调用'}`;
+  renderSettingsStatus(cfg);
   $('set-status').textContent = '';
   $('set-test-result').innerHTML = '';
   showOverlay('screen-settings');
@@ -438,34 +517,45 @@ async function openSettings() {
 function bindSettings() {
   $('btn-settings-close').onclick = () => hideOverlay('screen-settings');
   $('btn-set-save').onclick = async () => {
-    const body = {
-      model: $('set-model').value,
-      apiUrl: $('set-url').value.trim(),
-    };
+    const body = settingsForm();
     const key = $('set-key').value.trim();
     if (key) body.apiKey = key;
     try {
       const r = await saveConfig(body);
       config = await fetchConfig();
       setAiMode(config);
-      $('title-model').textContent = config.model + (config.mockMode ? '（MOCK）' : '');
-      $('set-key-mask').textContent = `当前 Key：${config.keyMask || '（无）'}　模式：${config.mockMode ? 'MOCK' : '真实调用'}`;
-      $('set-status').textContent = `已保存：${r.model}　${r.mockMode ? 'MOCK' : '真实调用'}`;
+      $('title-model').textContent = config.model;
+      renderSettingsStatus(config);
+      $('set-status').textContent = `已保存并生效：${r.model}　推理档位 ${r.reasoningEffort || '（默认）'}${r.hasKey ? '' : '　⚠ 未配置 Key'}`;
       $('set-key').value = '';
+      $('set-model-custom').value = '';
       toast('设置已保存');
     } catch (e) {
       $('set-status').textContent = '保存失败：' + e.message;
     }
   };
   $('btn-set-test').onclick = async () => {
-    $('set-status').textContent = '测试中…';
-    $('set-test-result').innerHTML = '';
+    const f = settingsForm();
+    const key = $('set-key').value.trim();
+    const body = { ...f };
+    if (key) body.apiKey = key;
+    $('set-status').textContent = `测试中…（${body.model}${body.reasoningEffort ? ' · ' + body.reasoningEffort : ''}）`;
+    $('set-test-result').innerHTML = '<p class="muted sm">正在用上面填写的配置发一次真实请求…</p>';
     try {
-      const r = await testConfig();
-      $('set-status').textContent = r.mock
-        ? r.message || 'MOCK 模式'
-        : `连通成功　${r.model}　${r.latencyMs}ms　source=${r.source}`;
-      $('set-test-result').innerHTML = r.reply ? `<div class="muted sm">回声：${escapeHtml(r.reply)}</div>` : '';
+      const { probe } = await testConfig(body);
+      if (probe.ok) {
+        $('set-status').textContent =
+          `✓ 连通成功　${probe.model}　${probe.latencyMs}ms　推理档位 ${probe.reasoningEffort || '（默认）'}`
+          + `　JSON ${probe.jsonOk ? '正常' : '未解析'}　finish=${probe.finishReason || '—'}`;
+        const u = probe.usage;
+        $('set-test-result').innerHTML = `
+          <div class="muted sm">回声：${escapeHtml(probe.reply || '（内容为空）')}</div>
+          ${u ? `<div class="muted sm">tokens：in ${u.prompt_tokens} / out ${u.completion_tokens}</div>` : ''}
+          ${probe.emptyContent ? '<div class="sm" style="color:#e07a5f">⚠ content 为空：多半是推理档位没设，或 max_tokens 不够</div>' : ''}`;
+      } else {
+        $('set-status').textContent = `✗ 失败${probe.httpStatus ? '（HTTP ' + probe.httpStatus + '）' : ''}　${probe.latencyMs}ms`;
+        $('set-test-result').innerHTML = `<div class="sm" style="color:#e07a5f">${escapeHtml(probe.error || '未知错误')}</div>`;
+      }
     } catch (e) {
       $('set-status').textContent = '连通失败：' + e.message;
     }
@@ -476,13 +566,6 @@ function bindSettings() {
     $('ai-count').textContent = '0';
     toast('调用日志已重置');
     $('set-status').textContent = '日志已清空';
-  };
-  $('btn-set-mock').onclick = async () => {
-    await saveConfig({ mock: true });
-    config = await fetchConfig();
-    setAiMode(config);
-    $('set-status').textContent = '已切到 MOCK 模式';
-    toast('MOCK 模式');
   };
 }
 

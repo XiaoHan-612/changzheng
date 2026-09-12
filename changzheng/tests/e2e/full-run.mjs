@@ -1,5 +1,5 @@
 /**
- * E2E 全流程：五幕通关（MOCK）
+ * E2E 全流程：五幕真调通关（需要 GLM_API_KEY）
  * 运行：npm run test:e2e
  */
 import { chromium } from 'playwright';
@@ -15,7 +15,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
 fs.mkdirSync(ART, { recursive: true });
 
-// 用例会把服务切到 MOCK；跑完把 runtime-config.json 原样还原，别动用户本机设置
+// 用例会写 runtime-config.json；跑完原样还原，别动用户本机设置
 const RUNTIME = path.join(ROOT, 'runtime-config.json');
 function snapshotRuntime() {
   try { return fs.readFileSync(RUNTIME, 'utf8'); } catch { return null; }
@@ -69,13 +69,16 @@ async function main() {
   }
 }
 
+/** 只走真调：没有 Key 直接失败（本项目已移除 MOCK）。每次 1.5–8s，所以等待全部是轮询。*/
+async function setupMode() {
+  const before = await (await fetch(`${BASE}/api/config`)).json();
+  if (!before.hasKey) throw new Error('本用例只走真调：请在 changzheng/.env 或「设置」里配置 GLM_API_KEY');
+  console.log(`真调：${before.model}（reasoning_effort=${before.reasoningEffort || '默认'}）`);
+}
+
 async function run() {
   await ensureServer();
-  await fetch(`${BASE}/api/config`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mock: true }),
-  });
+  await setupMode();
   await fetch(`${BASE}/api/logs/clear`, { method: 'POST' });
 
   const browser = await chromium.launch({
@@ -100,7 +103,8 @@ async function run() {
   let last = '';
   let didGomoku = false;
   let talkAsked = false;
-  for (let i = 0; i < 480; i++) {
+  const MAX_ITER = 4000; // 真调每次要等 1.5–8s，循环上限要放宽
+  for (let i = 0; i < MAX_ITER; i++) {
     const act = await page.locator('#act-title').innerText().catch(() => '');
     if (act && act !== last) {
       seenActs.push(act);
@@ -197,7 +201,13 @@ async function run() {
       if (await tryClick(page, '.path-zone')) { await page.waitForTimeout(120); continue; }
     }
     if (await tryClick(page, '#fish-cast')) {
-      await page.waitForTimeout(1200);
+      // 漂相三档：等到「真口/黑漂」再起竿，最多等 3.5s
+      const status = page.locator('#fish-status');
+      for (let k = 0; k < 14; k++) {
+        const t = await status.innerText().catch(() => '');
+        if (/真口|黑漂/.test(t)) break;
+        await page.waitForTimeout(250);
+      }
       await tryClick(page, '#fish-hook');
       continue;
     }
@@ -212,13 +222,33 @@ async function run() {
   }
 
   const ended = await page.locator('#screen-end').isVisible().catch(() => false);
-  const endTitle = await page.locator('#end-title').innerText().catch(() => '');
+  let endTitle = await page.locator('#end-title').innerText().catch(() => '');
+  // 真调时终局要等模型写完；轮询到标题不再是「结算中…」
+  if (ended && /结算中/.test(endTitle)) {
+    const t0 = Date.now();
+    while (Date.now() - t0 < 60000) {
+      await page.waitForTimeout(500);
+      endTitle = await page.locator('#end-title').innerText().catch(() => '');
+      if (endTitle && !/结算中/.test(endTitle)) break;
+    }
+  }
   await page.screenshot({ path: path.join(ART, 'e2e-end.png') });
 
   if (ended) await page.click('#btn-end-logs').catch(() => {});
   else await page.click('#btn-logs').catch(() => {});
   await page.waitForTimeout(250);
   const logCount = await page.locator('.log-item').count();
+
+  // 终局之后还会异步生成「研学报告」（study_report），等它落盘再统计
+  {
+    const t0 = Date.now();
+    for (;;) {
+      const res = await (await fetch(`${BASE}/api/logs`)).json();
+      if ((res.logs || []).some((l) => l.callType === 'study_report')) break;
+      if (Date.now() - t0 > 90000) { console.warn('⚠ study_report 未在 90s 内落盘'); break; }
+      await page.waitForTimeout(800);
+    }
+  }
 
   // 回归断言：同一锅汤只能结算一次（曾经在钓鱼→分汤的强制链里跑两遍）
   const serverLogs = await (await fetch(`${BASE}/api/logs`)).json();
@@ -252,7 +282,7 @@ async function run() {
   if (!QUICK && gomokuTimes !== 1) throw new Error(`五子棋未按预期触发: ${gomokuTimes} 次`);
   if (ludingTimes !== 1) throw new Error(`泸定桥未按预期触发: ${ludingTimes} 次`);
   if (nightTimes !== 2) throw new Error(`夜间抉择应有 night_options + night_resolve 两条: ${nightTimes}`);
-  if (sources.some((s) => /glm-5\.1/i.test(s))) throw new Error('source 被误标为 GLM-5.1: ' + sources.join(','));
+  if (sources.some((s) => s !== 'GLM')) throw new Error('出现非真调来源（已移除 MOCK）: ' + sources.join(','));
 
   console.log('E2E FULL PASS');
   await browser.close();

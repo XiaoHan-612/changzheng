@@ -1,5 +1,5 @@
 /**
- * 回归用例（MOCK）：
+ * 回归用例（真调）：
  * 1) 反复进出沙盘不会叠加 submit 监听（一次行动 = 一次 sim_turn 日志）
  * 2) 沙盘存档不会落在上一回合（日志与画面同回合）
  * 运行：npm run qa:regress
@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3001;
 const BASE = `http://localhost:${PORT}`;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-// 用例会把服务切到 MOCK；跑完把 runtime-config.json 原样还原，别动用户本机设置
+// 用例会写 runtime-config.json；跑完原样还原，别动用户本机设置
 const RUNTIME = path.join(ROOT, 'runtime-config.json');
 function snapshotRuntime() {
   try { return fs.readFileSync(RUNTIME, 'utf8'); } catch { return null; }
@@ -55,11 +55,9 @@ async function main() {
 
 async function run() {
   await ensureServer();
-  await fetch(`${BASE}/api/config`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mock: true }),
-  });
+  // 只走真调（本项目已移除 MOCK）
+  const cfg = await (await fetch(`${BASE}/api/config`)).json();
+  if (!cfg.hasKey) throw new Error('本用例只走真调：请配置 GLM_API_KEY');
   await fetch(`${BASE}/api/logs/clear`, { method: 'POST' });
 
   const browser = await chromium.launch({ headless: true, channel: 'chrome' });
@@ -94,7 +92,18 @@ async function run() {
   const action = '用绳子把队伍串起来走';
   await page.fill('#sb-input', action);
   await page.click('#sb-send');
-  await page.waitForTimeout(2000);
+  // 等这次 sim_turn 真正落盘（真调可能 5–20s）
+  {
+    const t0 = Date.now();
+    let n = 0;
+    while (Date.now() - t0 < 90000) {
+      const res = await (await fetch(`${BASE}/api/logs`)).json();
+      n = (res.logs || []).filter((l) => l.callType === 'sim_turn').length;
+      if (n >= 1) break;
+      await sleep(600);
+    }
+    if (!n) throw new Error('sim_turn 未在 90s 内落盘');
+  }
 
   const res = await (await fetch(`${BASE}/api/logs`)).json();
   const simTurns = (res.logs || []).filter((l) => l.callType === 'sim_turn');

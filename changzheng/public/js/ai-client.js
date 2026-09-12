@@ -7,7 +7,7 @@ export async function fetchConfig() {
     modeCache = data;
     return data;
   } catch {
-    return { mockMode: true, model: 'glm-5.3-flash', availableModels: ['glm-5.3-flash'] };
+    return { model: 'glm-5.3-flash', hasKey: false, availableModels: ['glm-5.3-flash'] };
   }
 }
 
@@ -60,8 +60,12 @@ export async function saveConfig(body) {
   return data;
 }
 
-export async function testConfig() {
-  const res = await fetch('/api/config/test', { method: 'POST' });
+export async function testConfig(payload = {}) {
+  const res = await fetch('/api/config/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || '测试失败');
   return data;

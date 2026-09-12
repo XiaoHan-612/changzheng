@@ -39,11 +39,7 @@ async function shot(page, name) {
 
 async function main() {
   await ensureServer();
-  await fetch(`${BASE}/api/config`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mock: true }),
-  });
+  // 只做布局截图，不改运行模式
 
   const browser = await chromium.launch({ headless: true, channel: 'chrome' });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });

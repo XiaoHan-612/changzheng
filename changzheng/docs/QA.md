@@ -6,11 +6,11 @@
 |------|------|----------|
 | `npm run test:unit` | 资源钳制、史实解锁、附身线门控、行动点、每日场景、失败判定 | 13/13 通过 |
 | `npm run qa:smoke` | 标题→营地→热点→回营地 | SMOKE PASS |
-| `npm run test:e2e` | 五幕 MOCK 通关 + 五个新玩法各 1 次 + 不重复结算 | E2E FULL PASS，无 pageerror |
+| `npm run test:e2e` | 五幕**真调**通关 + 五个新玩法各 1 次 + 不重复结算 | E2E FULL PASS，`source=GLM`，无 pageerror |
 | `node tests/e2e/full-run.mjs --quick` | 快速模式通关 | E2E FULL PASS |
 | `npm run qa:sandbox` | 沙盘两回合 + 存档恢复 | SANDBOX PASS |
 | `npm run qa:regress` | 沙盘监听泄漏、存档回合 | REGRESS PASS |
-| `npm run qa:audit` | 日志 schema 审计 | 字段缺失 0、FALLBACK 可解释 |
+| `npm run qa:audit` | 日志 schema 审计 | 字段缺失 0、ERROR 可解释 |
 
 ## 手工（真调）
 
@@ -25,6 +25,6 @@
 
 ## 已知约束
 
-- 无 Key 为 MOCK，正式演示需真调  
+- **无 MOCK**：未配置 Key 会直接报错并写 `source=ERROR`；演示前务必先用「设置 → 测试连通」确认  
 - 预置语音仅覆盖固定台词；LLM 自由回复无声  
 - 头像/场景为 AI 生成，已裁水印  

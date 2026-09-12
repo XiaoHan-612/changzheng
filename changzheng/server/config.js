@@ -46,15 +46,16 @@ export const CONFIG = {
   GLM_API_KEY: runtime.GLM_API_KEY || process.env.GLM_API_KEY || envFile.GLM_API_KEY || '',
   // 赛制指定 glm-5.1；本机网络受限时用 .env 覆盖成 glm-5.3-flash 便于测试
   GLM_MODEL: runtime.GLM_MODEL || process.env.GLM_MODEL || envFile.GLM_MODEL || 'glm-5.1',
-  // 设置界面点过「MOCK 模式」后，即使 .env 里有 Key 也保持 MOCK，直到显式关闭
-  MOCK_FLAG: runtime.MOCK_AI === true,
-  get MOCK_AI() {
-    return this.MOCK_FLAG === true || process.env.MOCK_AI === '1' || !this.GLM_API_KEY;
-  },
+  // glm-5.3-flash 等模型「始终思考」：不设此值时 token 会被推理吃光、content 返回空。
+  // low 实测 1.4s / 51 tokens 出 JSON；high|max 更慢更贵，按需在 .env 调。
+  GLM_REASONING_EFFORT:
+    runtime.GLM_REASONING_EFFORT || process.env.GLM_REASONING_EFFORT
+    || envFile.GLM_REASONING_EFFORT || 'low',
   PORT: Number(process.env.PORT || envFile.PORT || 3001),
   LOG_DIR: process.env.LOG_DIR || path.join(__dirname, '..', 'logs'),
+  // 没有兜底文案了，重试与超时要克制：最坏 25s + 0.6s + 25s ≈ 51s 就报错给用户重试
   MAX_RETRIES: 2,
-  TIMEOUT_MS: 45000,
+  TIMEOUT_MS: 25000,
   runtimePath,
 };
 
@@ -69,13 +70,14 @@ export function saveRuntimeConfig(patch) {
   if ('GLM_API_KEY' in patch) CONFIG.GLM_API_KEY = patch.GLM_API_KEY ?? CONFIG.GLM_API_KEY;
   if ('GLM_MODEL' in patch) CONFIG.GLM_MODEL = patch.GLM_MODEL ?? CONFIG.GLM_MODEL;
   if ('GLM_API_URL' in patch) CONFIG.GLM_API_URL = patch.GLM_API_URL ?? CONFIG.GLM_API_URL;
-  if ('MOCK_AI' in patch) CONFIG.MOCK_FLAG = patch.MOCK_AI === true;
+  if ('GLM_REASONING_EFFORT' in patch) CONFIG.GLM_REASONING_EFFORT = patch.GLM_REASONING_EFFORT ?? CONFIG.GLM_REASONING_EFFORT;
   if (patch.GLM_API_KEY === '') CONFIG.GLM_API_KEY = '';
   if (patch.GLM_MODEL === '') CONFIG.GLM_MODEL = 'glm-5.3-flash';
   return {
     model: CONFIG.GLM_MODEL,
+    reasoningEffort: CONFIG.GLM_REASONING_EFFORT,
     hasKey: !!CONFIG.GLM_API_KEY,
-    mockMode: CONFIG.MOCK_AI,
     apiUrl: CONFIG.GLM_API_URL.replace(/\/[^/]*$/, '/***'),
+    keyMask: CONFIG.GLM_API_KEY ? `${CONFIG.GLM_API_KEY.slice(0, 6)}…${CONFIG.GLM_API_KEY.slice(-4)}` : '',
   };
 }

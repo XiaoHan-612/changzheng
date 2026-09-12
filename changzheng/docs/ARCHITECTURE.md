@@ -10,10 +10,10 @@
 changzheng/
   package.json          # scripts: start / test:* / qa:* / tts:manifest
   .env                  # GLM_API_KEY / GLM_MODEL / PORT（不入库）
-  runtime-config.json   # 设置界面写入，可覆盖 .env（含 MOCK 锁定）
+  runtime-config.json   # 设置界面写入，可覆盖 .env（模型 / Key / 接口 / 推理档位）
   server/               # 服务端：静态托管 + AI 代理 + 日志
     index.js            # 路由 /api/decide /api/sim /api/tts /api/config /api/logs /api/data/*
-    ai.js               # VN 侧：提示词 + MOCK + FALLBACK
+    ai.js               # VN 侧：提示词 + 真调 + 失败重试（无兜底文案）
     sim.js              # 沙盘世界裁判（sim_turn）
     config.js           # 双层配置 + 损坏容错
     logger.js           # JSONL 落盘 + 8MB 轮转
@@ -67,7 +67,7 @@ changzheng/
 
 ```
 UI 事件 → main.js(withLock) → ai-client → POST /api/decide
-       → server/ai.js(GLM|MOCK|FALLBACK) → logger JSONL
+       → server/ai.js(GLM|ERROR) → logger JSONL
        → applyEffects(state) → 史实回响(echo) → 下一屏
 ```
 
@@ -88,7 +88,7 @@ UI 事件 → main.js(withLock) → ai-client → POST /api/decide
 ```powershell
 npm run test:unit     # 资源钳制 / 史实解锁
 npm run qa:smoke      # 标题→营地→一次互动
-npm run test:e2e      # 五幕 MOCK 通关
+npm run test:e2e      # 五幕真调通关（需配好 Key）
 npm run qa:sandbox    # 沙盘两回合 + 存档恢复
 npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
 npm run qa:audit      # 日志 schema 审计（真调一局后跑，产出 docs/LOG-AUDIT.md）
@@ -100,9 +100,10 @@ npm run tts:manifest  # 更新语音清单（改台词后必跑）
 ## 配置层约定
 
 - `runtime-config.json` 覆盖 `.env`；`RUNTIME_CONFIG` / `ENV_FILE` 环境变量可改路径（测试用）
-- 设置里点过「MOCK 模式」会写入 `MOCK_AI: true`，**重启后仍然 MOCK**；填新 Key 会自动解除
+- 设置界面写入的模型 / Key / 接口 / 推理档位会持久化到 `runtime-config.json`，重启后仍生效
 - 配置文件损坏时按空配置启动并告警，不会让服务起不来
-- 日志 `source` 只标 `GLM` / `MOCK_AI` / `FALLBACK`；具体模型名看 `model` 字段
+- 日志 `source` 只有 `GLM`（成功）与 `ERROR`（重试用尽）；具体模型名看 `model` 字段
+- **没有 MOCK 模式**：无 Key 或调用失败一律报错并记录，不再编造叙事
 
 ## 与同类图文互动游戏的对照
 

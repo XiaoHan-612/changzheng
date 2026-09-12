@@ -22,7 +22,7 @@
   minigame_review / branch_judge / quiz_generate / quiz_answer_ai / quiz_judge /
   night_options / night_resolve / act_review / ending_review / failure_review / study_report）
 - `/api/sim`：沙盘单次调用完成「裁判 + 世界更新 + NPC 反应」
-- 三态 AI：`GLM`（具体模型名见日志 `model` 字段）/ `MOCK_AI` / `FALLBACK`，每次调用落 JSONL
+- 两态日志：`GLM`（成功，具体模型看 `model` 字段）/ `ERROR`（重试用尽，附原因），每次调用落 JSONL；**没有 MOCK**
 - `/api/config` 读写模型与 Key，`/api/config/test` 连通测试，`/api/logs/clear` 重置
 
 ### 客户端
@@ -36,7 +36,7 @@
 ```powershell
 npm run test:unit    # 5 项，资源钳制 / 史实解锁 / 失败判定
 npm run qa:smoke     # 标题→营地→一次互动
-npm run test:e2e     # 五幕 MOCK 通关（~50 次调用）+ 重复结算回归断言
+npm run test:e2e     # 五幕真调通关（~57 次调用）+ 重复结算回归断言
 npm run qa:sandbox   # 沙盘两回合 + 建议行动
 npm run qa:regress   # 沙盘监听泄漏 / 存档回合错位回归
 ```
@@ -47,7 +47,7 @@ npm run qa:regress   # 沙盘监听泄漏 / 存档回合错位回归
 
 | 优先级 | 缺口 | 说明 |
 |--------|------|------|
-| P0 | **沙盘真调未验证** | 沙盘只在 MOCK 下跑过；真调 GLM 的 JSON schema 健壮性、超时表现需实测 |
+| P0 | ~~沙盘真调未验证~~ | 已解决：`qa:sandbox` 与 `qa:regress` 都跑真调并通过 |
 | P0 | 沙盘无持久化 | ~~已解决~~ localStorage 存档，刷新可续上，`重开沙盘`可清 |
 | P0 | 沙盘无模型化收尾 | ~~已解决~~ 中断/走出时调 `ending_review` 写小结 |
 | P1 | 失败条件偏少 | 只有「体力≤0」触发失败；断粮有扣体力但无专属失败叙事 |
@@ -81,8 +81,8 @@ npm run qa:regress   # 沙盘监听泄漏 / 存档回合错位回归
 ```
 server/
   index.js      路由（/api/decide /api/sim /api/config /api/logs）
-  ai.js         VN 侧：提示词 + MOCK + FALLBACK
-  sim.js        沙盘侧：世界裁判提示词 + MOCK
+  ai.js         VN 侧：提示词 + 真调 + 重试
+  sim.js        沙盘侧：世界裁判提示词 + 真调 + 重试
   config.js     .env / runtime-config.json 双层配置
 public/js/
   main.js       主线状态机（幕、强制链、失败结算、锁定）

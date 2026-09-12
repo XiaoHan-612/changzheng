@@ -98,22 +98,28 @@
           <div>
             <h3>模型</h3>
             <select id="set-model" class="set-input"></select>
+            <input id="set-model-custom" class="set-input" type="text"
+                   placeholder="或直接输入模型名（留空则用上面选的）" style="margin-top:6px" />
+          </div>
+          <div>
+            <h3>推理档位</h3>
+            <select id="set-effort" class="set-input"></select>
+            <p class="muted sm">「始终思考」的模型（如 glm-5.3-flash）必填 low/high/max，否则 token 被推理吃光、content 为空</p>
           </div>
           <div>
             <h3>API Key</h3>
-            <input id="set-key" class="set-input" type="password" placeholder="留空则 MOCK" autocomplete="off" />
+            <input id="set-key" class="set-input" type="password" placeholder="留空则沿用当前 Key" autocomplete="off" />
             <p class="muted sm" id="set-key-mask">当前：—</p>
           </div>
           <div>
-            <h3>接口</h3>
+            <h3>接口地址</h3>
             <input id="set-url" class="set-input" type="text" />
           </div>
         </div>
         <div class="set-actions">
-          <button type="button" id="btn-set-save" class="btn primary">保存</button>
-          <button type="button" id="btn-set-test" class="btn">测试连通</button>
+          <button type="button" id="btn-set-test" class="btn">测试连通（用上面填的值，不保存）</button>
+          <button type="button" id="btn-set-save" class="btn primary">保存并生效</button>
           <button type="button" id="btn-set-clear-logs" class="btn ghost">重置日志</button>
-          <button type="button" id="btn-set-mock" class="btn ghost">MOCK 模式</button>
         </div>
         <p id="set-status" class="muted sm" style="margin-top:10px"></p>
         <div id="set-test-result" class="set-test"></div>

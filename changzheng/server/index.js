@@ -5,7 +5,7 @@ import zlib from 'zlib';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { CONFIG, saveRuntimeConfig } from './config.js';
-import { callGlm51 } from './ai.js';
+import { callGlm51, probeGlm } from './ai.js';
 import { callSim } from './sim.js';
 import { readSessionLogs, clearSessionLogs } from './logger.js';
 
@@ -79,10 +79,12 @@ app.post('/api/logs/clear', (_req, res) => {
 });
 
 app.get('/api/config', (_req, res) => {
+  const models = ['glm-5.1', 'glm-5.3-flash', 'glm-4-plus', 'glm-4-air', 'glm-4-flash'];
+  if (!models.includes(CONFIG.GLM_MODEL)) models.unshift(CONFIG.GLM_MODEL);
   res.json({
     ok: true,
     model: CONFIG.GLM_MODEL,
-    mockMode: CONFIG.MOCK_AI,
+    reasoningEffort: CONFIG.GLM_REASONING_EFFORT,
     hasKey: !!CONFIG.GLM_API_KEY,
     port: CONFIG.PORT,
     apiUrl: CONFIG.GLM_API_URL.replace(/\/[^/]*$/, '/***'),
@@ -90,7 +92,8 @@ app.get('/api/config', (_req, res) => {
     keyMask: CONFIG.GLM_API_KEY
       ? CONFIG.GLM_API_KEY.slice(0, 6) + '…' + CONFIG.GLM_API_KEY.slice(-4)
       : '',
-    availableModels: ['glm-5.3-flash', 'glm-5.1', 'glm-4-flash', 'glm-4-air', 'glm-4-plus'],
+    availableModels: models,
+    availableReasoningEfforts: ['low', 'high', 'max'],
   });
 });
 
@@ -108,25 +111,18 @@ app.post('/api/tts', (req, res) => {
   if (fs.existsSync(file)) {
     return res.json({ ok: true, url: `/audio/cache/${name}`, source: 'CACHE', voiceId: voice, actorId });
   }
-  res.json({ ok: true, url: null, source: 'MOCK', reason: 'no-cached-voice', voiceId: voice, actorId });
+  res.json({ ok: true, url: null, source: 'NONE', reason: 'no-cached-voice', voiceId: voice, actorId });
 });
 
 // 设置：切换模型 / API Key / 接口
 app.post('/api/config', (req, res) => {
   try {
-    const { model, apiKey, apiUrl, mock } = req.body || {};
+    const { model, apiKey, apiUrl, reasoningEffort } = req.body || {};
     const patch = {};
     if (typeof model === 'string') patch.GLM_MODEL = model.trim();
     if (typeof apiUrl === 'string' && apiUrl.trim()) patch.GLM_API_URL = apiUrl.trim();
     if (typeof apiKey === 'string') patch.GLM_API_KEY = apiKey.trim();
-    if (mock === true) {
-      patch.MOCK_AI = true;
-      patch.GLM_API_KEY = '';
-    } else if (mock === false) {
-      patch.MOCK_AI = false;
-    }
-    // 填了新 Key 就认为要真调，自动解除 MOCK 锁定
-    if (patch.GLM_API_KEY) patch.MOCK_AI = false;
+    if (typeof reasoningEffort === 'string') patch.GLM_REASONING_EFFORT = reasoningEffort.trim();
     const info = saveRuntimeConfig(patch);
     res.json({ ok: true, ...info });
   } catch (err) {
@@ -135,26 +131,12 @@ app.post('/api/config', (req, res) => {
 });
 
 // 连通性测试
-app.post('/api/config/test', async (_req, res) => {
+app.post('/api/config/test', async (req, res) => {
   try {
-    if (!CONFIG.GLM_API_KEY) {
-      return res.json({ ok: true, mock: true, message: '未配置 Key，当前为 MOCK 模式' });
-    }
-    const t0 = Date.now();
-    const r = await callGlm51({
-      scene: '设置·连通性测试',
-      callType: 'npc_chat',
-      situation: '请只回复两个字：正常',
-      state: { 体力: 70, 粮食: 5, 士气: 60, 信念: 70, 民心: 50 },
-    });
-    res.json({
-      ok: true,
-      mock: false,
-      latencyMs: Date.now() - t0,
-      source: r._fallback ? 'FALLBACK' : 'GLM',
-      reply: (r.reply || r.narrative || '').slice(0, 40),
-      model: CONFIG.GLM_MODEL,
-    });
+    // 用表单里的值直接测，不必先保存；只读探测，不写日志
+    const { model, apiKey, apiUrl, reasoningEffort } = req.body || {};
+    const probe = await probeGlm({ model, apiKey, apiUrl, reasoningEffort });
+    res.json({ ok: true, probe });
   } catch (err) {
     res.status(500).json({ ok: false, error: String(err.message || err) });
   }
@@ -187,6 +169,6 @@ app.listen(CONFIG.PORT, () => {
   console.log('  《长征·抉择》正式工程 v0.1');
   console.log(`  地址: http://localhost:${CONFIG.PORT}`);
   console.log(`  模型: ${CONFIG.GLM_MODEL}`);
-  console.log(`  模式: ${CONFIG.MOCK_AI ? 'MOCK（未配置 Key）' : '真实调用 ' + CONFIG.GLM_MODEL}`);
+  console.log(`  模式: ${CONFIG.GLM_API_KEY ? '真实调用 ' + CONFIG.GLM_MODEL : '⚠ 未配置 GLM_API_KEY（调用会报错并写日志）'}`);
   console.log('══════════════════════════════════════════════');
 });

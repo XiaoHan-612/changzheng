@@ -189,6 +189,15 @@ function pushFeed(html) {
   feed.scrollTop = feed.scrollHeight;
 }
 
+/**
+ * 清掉「模型在推演…」气泡。
+ * 注意：气泡自身就带 .thinking，用 element.querySelector('.thinking') 只会找后代，
+ * 永远匹配不到，气泡会一直留在纪事里（历史遗留 bug）。
+ */
+function clearThinkingBubbles() {
+  $('sb-feed').querySelectorAll('.turn.thinking').forEach((n) => n.remove());
+}
+
 export function feedOpening(w) {
   $('sb-feed').innerHTML = '';
   pushFeed(`<div class="turn">
@@ -274,7 +283,16 @@ function renderTurn(w, action, result) {
 function renderSuggestions(list, onPick) {
   const box = $('sb-suggest');
   box.innerHTML = '';
-  (list || []).slice(0, 3).forEach((s) => {
+  // 真调实测模型可能漏掉 suggestions 字段；兜底三条，别让玩家无路可走
+  const DEFAULT_SUGGESTIONS = [
+    '先就地休整，派人去找吃的东西',
+    '用绳子把队伍串起来走',
+    '打着手电往前探一段路',
+  ];
+  const items = Array.isArray(list)
+    ? list.filter((s) => typeof s === 'string' && s.trim()).slice(0, 3)
+    : [];
+  (items.length ? items : DEFAULT_SUGGESTIONS).forEach((s) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'sug';
@@ -306,12 +324,10 @@ async function runSimEnding(w, reason) {
       callType: 'ending_review',
       scene: '沙盘收尾',
       ms: 0,
-      model: 'glm',
-      mock: false,
+        model: 'glm',
       snippet: end.title || '',
     });
-    const t = $('sb-feed').querySelectorAll('.turn');
-    if (t.length && t[t.length - 1].querySelector('.thinking')) t[t.length - 1].remove();
+    clearThinkingBubbles();
     pushFeed(`<div class="turn">
       <div class="act-line">${esc(end.title || '这一段路')}</div>
       <div class="narr">${(end.paragraphs || []).map(esc).join('<br/><br/>')}</div>
@@ -320,8 +336,7 @@ async function runSimEnding(w, reason) {
     </div>`);
     renderSuggestions(['回到标题'], () => window.__sbExit?.());
   } catch {
-    const t = $('sb-feed').querySelectorAll('.turn');
-    if (t.length && t[t.length - 1].querySelector('.thinking')) t[t.length - 1].remove();
+    clearThinkingBubbles();
     pushFeed(`<div class="turn"><div class="narr">你在 ${w.day} 天里做了 ${w.log.length} 次决策。这一段路告一段落。</div></div>`);
     renderSuggestions(['回到标题'], () => window.__sbExit?.());
   }
@@ -357,13 +372,13 @@ export async function bindSandbox({ onExit }) {
     const action = String(text || '').trim();
     if (!action) return;
     state.busy = true;
-    audio.playSfx('click');
-    $('sb-input').value = '';
-    $('sb-suggest').innerHTML = '';
-    pushFeed('<div class="turn thinking">模型在推演这一手…</div>');
+  audio.playSfx('click');
+  $('sb-input').value = '';
+  $('sb-suggest').innerHTML = '';
+  pushFeed('<div class="turn thinking">模型在推演这一手…</div>');
 
-    let result;
-    const t0 = Date.now();
+  let result;
+  const t0 = Date.now();
     try {
       result = await runSimTurn({ world: state.world, action });
       audio.playSfx('echo');
@@ -372,17 +387,18 @@ export async function bindSandbox({ onExit }) {
         scene: `沙盘·${state.world.place}`,
         ms: Date.now() - t0,
         model: 'glm',
-        mock: false,
         snippet: result.verdict || (result.narrative || '').slice(0, 60),
       });
     } catch (e) {
+      clearThinkingBubbles();
       pushFeed(`<div class="turn"><div class="narr">推演失败：${esc(e.message)}</div></div>`);
       state.busy = false;
+      // 失败也要给回可点的下一步，别让玩家卡死
+      renderSuggestions(null, (s) => submit(s));
       return;
     }
 
-    const t = $('sb-feed').querySelectorAll('.turn');
-    if (t.length && t[t.length - 1].querySelector('.thinking')) t[t.length - 1].remove();
+    clearThinkingBubbles();
 
     applyWorld(state.world, result);
     renderTurn(state.world, action, result);

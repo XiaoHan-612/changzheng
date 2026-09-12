@@ -16,6 +16,7 @@
     "qa:regress": "node tests/e2e/regressions.mjs",
     "qa:audit": "node scripts/audit-logs.mjs",
     "tts:manifest": "node scripts/tts-manifest.mjs",
+    "check:glm": "node scripts/check-glm.mjs",
     "reset:logs": "node scripts/reset-logs.mjs"
   },
   "engines": {

@@ -149,8 +149,8 @@ export function setAiMode(cfg) {
     el.textContent = '—';
     return;
   }
-  el.textContent = cfg.mockMode ? 'MOCK 演示' : cfg.model || 'GLM';
-  el.classList.toggle('mock', !!cfg.mockMode);
+  el.textContent = cfg.hasKey ? (cfg.model || 'GLM') : '未配置 Key';
+  el.classList.toggle('nokey', !cfg.hasKey);
 }
 
 export function bumpAiCount(state) {
@@ -207,13 +207,13 @@ export function escapeHtml(s) {
 
 export function renderLogs(logs) {
   const list = $('logs-list');
-  $('logs-meta').textContent = `共 ${logs.length} 条调用 · source 可辨 GLM / MOCK_AI / FALLBACK，具体模型见 model 字段`;
+  $('logs-meta').textContent = `共 ${logs.length} 条调用 · source 可辨 GLM / ERROR，具体模型与推理档位见 model 字段`;
   list.innerHTML = logs
     .slice()
     .reverse()
     .map((l) => {
       const src = (l.source || '').toLowerCase();
-      const cls = src.includes('glm') ? 'glm' : src.includes('mock') ? 'mock' : src.includes('fallback') || src.includes('error') ? 'fallback' : '';
+      const cls = src.includes('glm') ? 'glm' : src.includes('error') ? 'fallback' : '';
       const narr = l.response?.narrative || l.response?.reply || l.response?.scene_text || l.response?.title || '';
       const effects = l.appliedEffects && Object.keys(l.appliedEffects).length ? JSON.stringify(l.appliedEffects) : '';
       return `<div class="log-item">

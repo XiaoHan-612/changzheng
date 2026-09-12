@@ -1,5 +1,5 @@
 /**
- * E2E：自由行军沙盘（MOCK）— 存档恢复 + 事件图卡
+ * E2E：自由行军沙盘（真调）— 存档恢复 + 事件图卡
  * 运行：npm run qa:sandbox
  */
 import { chromium } from 'playwright';
@@ -15,7 +15,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
 fs.mkdirSync(ART, { recursive: true });
 
-// 用例会把服务切到 MOCK；跑完把 runtime-config.json 原样还原，别动用户本机设置
+// 用例会写 runtime-config.json；跑完原样还原，别动用户本机设置
 const RUNTIME = path.join(ROOT, 'runtime-config.json');
 function snapshotRuntime() {
   try { return fs.readFileSync(RUNTIME, 'utf8'); } catch { return null; }
@@ -55,12 +55,28 @@ async function main() {
 
 async function run() {
   await ensureServer();
-  await fetch(`${BASE}/api/config`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mock: true }),
-  });
+  // 只走真调（本项目已移除 MOCK）
+  const cfg = await (await fetch(`${BASE}/api/config`)).json();
+  if (!cfg.hasKey) throw new Error('本用例只走真调：请配置 GLM_API_KEY');
   await fetch(`${BASE}/api/logs/clear`, { method: 'POST' });
+
+  /**
+   * 等一次回合真正结束：回合数增加 **且** 「模型在推演…」气泡已消失。
+   * 注意思考气泡本身也是 .turn，只看数量会在真调时提前返回。
+   */
+  async function waitTurn(before, ms = 180000) {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      const thinking = await page.locator('#sb-feed .turn.thinking').count().catch(() => 1);
+      const n = await page.locator('#sb-feed .turn').count().catch(() => 0);
+      if (!thinking && n > before) return n;
+      await sleep(500);
+    }
+    const thinking = await page.locator('#sb-feed .turn.thinking').count().catch(() => -1);
+    const n = await page.locator('#sb-feed .turn').count().catch(() => -1);
+    const tail = (await page.locator('#sb-feed').innerText().catch(() => '')).slice(-200).replace(/\s+/g, ' ');
+    throw new Error(`沙盘回合未在 ${ms}ms 内返回（before=${before} now=${n} thinking=${thinking} 末尾=${tail}）`);
+  }
 
   const browser = await chromium.launch({ headless: true, channel: 'chrome' });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -77,16 +93,17 @@ async function run() {
   const day0 = await page.locator('#sb-day').innerText();
 
   await page.fill('#sb-input', '用绳子把队伍串起来走');
+  const t0 = await page.locator('#sb-feed .turn').count();
   await page.click('#sb-send');
-  await page.waitForTimeout(1800);
-  const feedTurns = await page.locator('#sb-feed .turn').count();
+  const feedTurns = await waitTurn(t0);
   if (feedTurns < 2) throw new Error('回合未写入 feed: ' + feedTurns);
 
   const sug = page.locator('.sb-suggest .sug').first();
   if (await sug.count()) {
     const label = await sug.innerText();
+    const t1 = await page.locator('#sb-feed .turn').count();
     await sug.click();
-    await page.waitForTimeout(1800);
+    await waitTurn(t1);
     console.log('picked suggestion:', label);
   }
 
@@ -100,7 +117,7 @@ async function run() {
 
   await page.reload({ waitUntil: 'networkidle' });
   await page.click('#btn-mode-sandbox');
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(1200);
   const restored = await page.locator('#sb-feed .turn').first().innerText().catch(() => '');
   const day2 = await page.locator('#sb-day').innerText();
   console.log('restored day', day2, 'feed starts:', restored.slice(0, 50).replace(/\n/g, ' '));

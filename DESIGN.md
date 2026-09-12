@@ -15,7 +15,7 @@
 |---|---|
 | 完整游戏循环 | 开场 → 五幕路线 → 营地日行动 → 节点/小游戏 → 对决 → 多结局 |
 | 核心 AI 决策调用指定大模型 | GLM-5.1：npc_chat / branch_judge / share_judge / night_* / quiz_* / minigame_review / ending_review |
-| 每次 AI 决策有日志 | JSONL + 游戏内「行军记录」；source=GLM-5.1\|MOCK_AI\|FALLBACK |
+| 每次 AI 决策有日志 | JSONL + 游戏内「行军记录」；source=GLM\|ERROR（无 MOCK） |
 | 算法对抗 | 知识对决 human_vs_ai / ai_vs_ai，独立 session，日志成对 |
 
 本地只做：小游戏手感判定、点选节奏推进、数值执行。智能判断一律走模型。
@@ -69,7 +69,7 @@
 `npc_chat` · `branch_judge` · `share_judge` · `night_options` · `night_resolve`  
 `quiz_generate` · `quiz_answer_ai` · `quiz_judge` · `minigame_review` · `ending_review`
 
-失败重试 1 次 → FALLBACK。无 Key → MOCK。整局真调约 18–28 次。
+失败重试 2 次 → 记 `source=ERROR` 并在界面提示原因、给「重试」键（不编造兜底文案）。无 Key 直接报错。整局真调约 50+ 次。
 
 ## 8. 结局
 
@@ -95,7 +95,7 @@ Vite+TS 前端（DOM 叙事 + Canvas 小游戏）· Node Express 代理 GLM/日�
 | M4 | 对决 + 双 AI + 多结局 |
 | M5 | 史实档案、快速模式、录屏 |
 
-演示样品（现归档于 `_archive/sample/`，另有中间版本 `_archive/demo-v1/`）的篝火中枢、小游戏骨架、行军记录、MOCK 可在 M1–M3 复用升级。
+演示样品（现归档于 `_archive/sample/`，另有中间版本 `_archive/demo-v1/`）的篝火中枢、小游戏骨架、行军记录可在 M1–M3 复用升级。
 
 ## 12. 界面草图
 
