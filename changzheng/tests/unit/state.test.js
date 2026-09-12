@@ -72,18 +72,24 @@ test('行动点：读取 acts 的 apPerDay，缺省 2', () => {
 
 test('每日场景：无 dayScenes 回退 act.pano，有则按天取并夹紧', () => {
   const act = { pano: '/a.jpg', hotspots: [{ id: 'x' }] };
-  assert.deepEqual(dayScene(act, 1), { pano: '/a.jpg', hotspots: act.hotspots });
+  const only = dayScene(act, 1);
+  assert.equal(only.pano, '/a.jpg');
+  assert.equal(only.alt, '');
+  assert.deepEqual(only.hotspots, act.hotspots);
 
   const multi = {
     pano: '/fallback.jpg',
     hotspots: [],
     dayScenes: [
-      { pano: '/snow.jpg', hotspots: [{ id: 's' }] },
+      { pano: '/snow.jpg', alt: '/snow_camp.jpg', label: '雪山', hotspots: [{ id: 's' }] },
       { pano: '/grass.jpg', hotspots: [{ id: 'g' }] },
     ],
   };
   assert.equal(dayScene(multi, 1).pano, '/snow.jpg');
+  assert.equal(dayScene(multi, 1).alt, '/snow_camp.jpg');
+  assert.equal(dayScene(multi, 1).label, '雪山');
   assert.equal(dayScene(multi, 2).pano, '/grass.jpg');
+  assert.equal(dayScene(multi, 2).alt, '');
   assert.equal(dayScene(multi, 9).pano, '/grass.jpg');
 });
 

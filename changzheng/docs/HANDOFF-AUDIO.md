@@ -12,20 +12,29 @@
 | 操作音效 | 点击热点、抛竿、起竿、翻页、回响盖章、答对/答错、行军鼓点 | 本地即时 | ≤0.4s，wav/mp3，音量 0.5–0.8 |
 | 人声 TTS | 同伴关键台词、史实回响标题句、新玩法开场句 | 模型/固定文本后异步播放 | 单声道 wav，16k/22.05kHz，≤80 字 |
 
-**当前状态**：环境床与音效由 WebAudio 实时合成兜底（`public/js/audio.js`），**能听但质地粗糙**；预录台词 21 条 + 反应音 6 条已存在；TTS 缓存目录已建但为空。
+**当前状态**：8 条环境床一个都没到位，全部走 WebAudio 合成兜底（`public/js/audio.js`），**能听但质地粗糙**；操作音效同样是合成；预录台词 21 条 + 反应音 6 条已存在；TTS 缓存目录已建但为空。
+
+优先级建议：`grass_fire.ogg`（第四幕是重头戏）→ `snow_wind.ogg` → `jinsha_rapids.ogg` → 其余。
 
 ## 二、产线 ① 环境床（ogg）
 
-| 场景 | 落盘路径 | 说明 | 时长 |
+### 落盘即生效（不用改代码）
+
+代码里有 `kind → 文件` 的映射（`public/js/audio.js` 的 `AMBIENT_FILE`）：
+**把 ogg 按下面第二列的名字放进 `public/audio/ambient/`，刷新页面就生效**；
+文件不存在或播放失败会自动回落到现在的 WebAudio 合成，流程完全不受影响。
+目录已建好（含 `.gitkeep`）。自检：`npm run qa:assets`（会列出「已就位环境床 / 合成兜底环境床」）。
+
+| 游戏内场景 | 落盘路径（文件名固定） | 说明 | 时长 |
 |---|---|---|---|
-| 于都河夜 | `public/audio/ambient/depart_river.ogg` | 河水 + 夜虫，克制 | 20–30s 可循环 |
-| 湘江 | `public/audio/ambient/xiangjiang_wind.ogg` | 远炮闷响（很轻）+ 风 + 江水 | 20–30s |
-| 遵义雨夜 | `public/audio/ambient/zunyi_rain.ogg` | 雨声 + 室内静（可加极轻木楼吱呀） | 20–30s |
-| 金沙江 | `public/audio/ambient/jinsha_rapids.ogg` | 急流 | 20–30s |
-| 泸定桥 | `public/audio/ambient/luding_iron.ogg` | 铁索风 + 对岸火力余响 | 20–30s |
-| 雪山 | `public/audio/ambient/snow_wind.ogg` | 雪风，高频风声 | 20–30s |
-| 草地营火 | `public/audio/ambient/grass_fire.ogg` | 风 + 火，水汽感 | 20–30s |
-| 会宁 | `public/audio/ambient/huining_low.ogg` | 低人流嘈杂 + 远号，**不抢人声** | 20–30s |
+| 开场·于都河 | `public/audio/ambient/depart_river.ogg` | 河水 + 夜虫，克制 | 20–30s 可循环 |
+| 一幕·湘江 | `public/audio/ambient/xiangjiang_wind.ogg` | 远炮闷响（很轻）+ 风 + 江水 | 20–30s |
+| 二幕·遵义 | `public/audio/ambient/zunyi_rain.ogg` | 雨声 + 室内静（可加极轻木楼吱呀） | 20–30s |
+| 三幕·金沙江 | `public/audio/ambient/jinsha_rapids.ogg` | 急流 | 20–30s |
+| 三幕·泸定桥 | `public/audio/ambient/luding_iron.ogg` | 铁索风 + 对岸火力余响 | 20–30s |
+| 四幕·雪山日 | `public/audio/ambient/snow_wind.ogg` | 雪风，高频风声 | 20–30s |
+| 四幕·草地日 | `public/audio/ambient/grass_fire.ogg` | 风 + 火，水汽感 | 20–30s |
+| 五幕·会宁 | `public/audio/ambient/huining_low.ogg` | 低人流嘈杂 + 远号，**不抢人声** | 20–30s |
 
 要求：首尾各留 200ms 静音便于循环；无音乐性旋律（避免情绪过载）；响度 -24 LUFS 左右。
 
@@ -91,3 +100,4 @@ audio.speak({ text: '……', voiceId: 'laoban', actorId: 'laoban' })
 3. 断网/无 Key 时全程静音也能通关。
 4. `npm start` → 浏览器控制台无音频 404。
 5. 产出后更新 `ASSETS.md` 第四节的表格状态。
+6. 跑 `npm run qa:assets`，确认新音频出现在「已就位环境床」里（出现即在游戏内生效）。

@@ -160,8 +160,14 @@ app.get('/api/data/sim-visuals', (_req, res) => {
   else res.json({ ok: false, error: 'no sim-visuals' });
 });
 
-app.get('*', (_req, res) => {
+// SPA 兜底：只对"页面路由"回 index.html。
+// 静态资源/接口找不到必须 404 —— 否则缺图会伪装成 200，前端探测与素材核对全部失效。
+app.get('*', (req, res, next) => {
+  if (/^\/(assets|audio|css|js|favicon\.svg)/.test(req.path)) return next();
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+app.use((req, res) => {
+  res.status(404).json({ ok: false, error: `not found: ${req.method} ${req.path}` });
 });
 
 app.listen(CONFIG.PORT, () => {

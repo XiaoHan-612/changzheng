@@ -16,11 +16,14 @@ if (typeof window !== 'undefined') window.__pushAiFeed = pushAiFeed;
 
 async function callAI(payload) {
   const t0 = Date.now();
+  setStepState('busy');           // 契约：告诉所有人"这一步在等模型，先别点"
   let result;
   try {
     result = await decide(payload);
   } catch (err) {
     result = { _error: true, message: String(err.message || err) };
+  } finally {
+    setStepState('awaiting');
   }
   // 不再用兜底文案编造叙事：失败就明说，并给一个重试键
   if (result?._error) {
@@ -69,10 +72,12 @@ function askAiRetry(info, payload) {
     retryBtn.type = 'button';
     retryBtn.className = 'btn primary';
     retryBtn.textContent = '重试这一次调用';
+    retryBtn.dataset.action = 'ai-retry';
     const skipBtn = document.createElement('button');
     skipBtn.type = 'button';
     skipBtn.className = 'btn ghost';
     skipBtn.textContent = '跳过（本次不留叙事）';
+    skipBtn.dataset.action = 'ai-skip';
     const tip = document.createElement('div');
     tip.className = 'muted sm';
     tip.style.width = '100%';
@@ -113,6 +118,7 @@ import { runFishing, runNightSchool, runCandy, runSentry, runGomoku, runBendNeed
 import { audio } from './audio.js';
 import { bindSandbox } from './sandbox.js';
 import * as UI from './ui.js';
+import { setStep, setStepState, waitContinue, askChoice, markAction, markMini } from './step.js';
 
 const { $, showScreen, setTopbar, renderStats, renderAp, renderCompanions,
   appendCampLog, toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
@@ -126,10 +132,51 @@ let config = { model: 'glm-5.3-flash', hasKey: false };
 let echoResolve = null;
 let talkPending = false;
 
+/** 声明当前步骤：全项目统一的交互契约入口（见 step.js） */
+function step(id, kind = 'choice', state = 'awaiting') {
+  setStep(id, kind, state);
+}
+
+/**
+ * 素材「落盘即生效」：优先用新图，探测不到就退回占位图。
+ * 生图模型按 docs/HANDOFF-ART.md 的表把文件放进 public/assets/scenes/，
+ * 无需改任何代码，下一次进入对应场景就会用上。
+ */
+const _imgState = new Map();
+function sceneImage(primary, fallback) {
+  if (!primary) return fallback;
+  const st = _imgState.get(primary);
+  if (st === true) return primary;
+  if (st === false) return fallback;
+  const img = new Image();
+  img.onload = () => _imgState.set(primary, true);
+  img.onerror = () => _imgState.set(primary, false);
+  img.src = primary;
+  _imgState.set(primary, false); // 探测完成前先用兜底，避免白屏
+  return fallback;
+}
+
+/** 启动时预热候选素材，进入场景时就能立刻用上新图 */
+function preloadScenes() {
+  [
+    '/assets/scenes/sentry_night.jpg', '/assets/scenes/sugar_close.jpg', '/assets/scenes/snow_climb.jpg',
+    '/assets/scenes/snow_camp.jpg', '/assets/scenes/snow_let_clothes.jpg', '/assets/scenes/luding_bridge.jpg',
+    '/assets/scenes/jinsha_ferry.jpg', '/assets/scenes/map_desk.jpg', '/assets/scenes/depart_bridge.jpg',
+    '/assets/scenes/huining_flag.jpg', '/assets/scenes/lazikou_cliff.jpg',
+    '/assets/scenes/xiangjiang_bridge.jpg', '/assets/scenes/zunyi_street.jpg', '/assets/scenes/huining_crowd.jpg',
+  ].forEach((p) => {
+    const img = new Image();
+    img.onload = () => _imgState.set(p, true);
+    img.onerror = () => _imgState.set(p, false);
+    img.src = p;
+  });
+}
+
 const CHOICE_SETS = {
   cross: {
     title: '怎么过河',
     callType: 'branch_judge',
+    img: '/assets/scenes/depart_bridge.jpg',
     options: [
       { label: '跟着队伍快走', sub: '跟上，别掉队' },
       { label: '扶一把崴脚的战友', sub: '慢一点，拉他一把' },
@@ -140,6 +187,7 @@ const CHOICE_SETS = {
   escort: {
     title: '护送伤员过封锁',
     callType: 'branch_judge',
+    img: '/assets/scenes/xiangjiang_bridge.jpg',
     loss: { who: '担架上的伤员', reason: '为了抢时间冲过封锁，担架没能全部抬过去' },
     options: [
       { label: '立刻冲过去', sub: '快，但风险大' },
@@ -151,6 +199,7 @@ const CHOICE_SETS = {
   direction: {
     title: '往哪里走',
     callType: 'branch_judge',
+    img: '/assets/scenes/map_desk.jpg',
     options: [
       { label: '要开个会，把方向定下来', sub: '信念向' },
       { label: '听上面的就行', sub: '稳妥' },
@@ -161,6 +210,7 @@ const CHOICE_SETS = {
   ferry: {
     title: '今夜能不能渡',
     callType: 'branch_judge',
+    img: '/assets/scenes/jinsha_ferry.jpg',
     options: [
       { label: '跟船工的桨声走', sub: '信老乡' },
       { label: '天亮再渡', sub: '更安全，更慢' },
@@ -181,6 +231,7 @@ const CHOICE_SETS = {
   lazikou: {
     title: '腊子口怎么打',
     callType: 'branch_judge',
+    img: '/assets/scenes/lazikou_cliff.jpg',
     options: [
       { label: '正面佯攻，侧崖奇袭', sub: '出其不意' },
       { label: '集中火力正面强攻', sub: '硬碰硬' },
@@ -191,6 +242,7 @@ const CHOICE_SETS = {
   rally: {
     title: '会师',
     callType: 'branch_judge',
+    img: '/assets/scenes/huining_flag.jpg',
     options: [
       { label: '跑过去和另一路兄弟拥抱', sub: '说不出话' },
       { label: '先安顿伤员再会合', sub: '责任' },
@@ -201,6 +253,7 @@ const CHOICE_SETS = {
   snow_help: {
     title: '扶他一把',
     callType: 'branch_judge',
+    img: '/assets/scenes/snow_climb.jpg',
     loss: { who: '掉队的战士', reason: '风雪里他没能跟上，队伍在天黑前下不了山' },
     options: [
       { label: '架起他的胳膊一起走', sub: '慢，但谁都不落' },
@@ -212,6 +265,7 @@ const CHOICE_SETS = {
   message: {
     title: '一封密信',
     callType: 'branch_judge',
+    img: '/assets/scenes/zunyi_street.jpg',
     options: [
       { label: '按地址送到，不问内容', sub: '守规矩' },
       { label: '先交给指导员', sub: '稳妥' },
@@ -232,6 +286,7 @@ async function boot() {
   bindTitle();
   bindEcho();
   bindSettings();
+  preloadScenes();
   offerResume();
   showScreen('screen-title');
   setTopbar(false);
@@ -570,6 +625,7 @@ function bindSettings() {
 }
 
 function showEcho({ title, play, real, fic }) {
+  markAction($('btn-echo-ok'), 'echo-ok');
   return new Promise((resolve) => {
     audio.playSfx('echo');
     audio.speak('你刚经历的，和真实发生过的，往往只隔着一层时间。', '叙事', 'narr_echo');
@@ -632,6 +688,7 @@ async function settlePressure(act) {
 }
 
 async function runFailure(fail, act) {
+  step('failure', 'end');
   showScreen('screen-end');
   $('end-eyebrow').textContent = `${S.mode === 'march' ? '行军模式' : '研学模式'} · ${fail.kind}`;
   $('end-title').textContent = '结算中…';
@@ -716,6 +773,7 @@ async function runQuickAct(act) {
 }
 
 async function runCutscene(frames) {
+  step('cutscene', 'cutscene');
   showScreen('screen-cutscene');
   const stage = $('cut-stage');
   const cap = $('cut-caption');
@@ -735,6 +793,8 @@ async function runCutscene(frames) {
   const waitUser = () => new Promise((r) => { waitClick = r; });
   nextBtn.onclick = onClick;
   skipBtn.onclick = () => { skipped = true; onClick(); };
+  markAction(nextBtn, 'continue');
+  markAction(skipBtn, 'skip');
   screen.onclick = onClick;
 
   for (let i = 0; i < frames.length && !skipped; i++) {
@@ -754,30 +814,21 @@ async function runCutscene(frames) {
   nextBtn.onclick = null;
   skipBtn.onclick = null;
   screen.onclick = null;
+  // 过场结束必须摘掉契约标记：这些按钮是静态 DOM，留着会让"当前可交互项"判断出错
+  delete nextBtn.dataset.action;
+  delete skipBtn.dataset.action;
 }
 
 async function runPrelude(act) {
+  step(`${act.id}:prelude`, 'choice');
   const pre = act.prelude;
   showScreen('screen-stage');
-  setStageBanner(pre.title, pre.pano);
+  setStageBanner(pre.title, sceneImage('/assets/scenes/snow_let_clothes.jpg', pre.pano));
   setPortrait('你', '年轻战士', '你', '风雪');
   setStagePanel('<p class="hint">雪线之上，有人发抖。你怎么选？</p><div class="choices" id="pre-opts"></div>');
   audio.speak('他接过外衣，没说谢。后来在你走不动时，递了水壶。', '叙事', 'narr_snow');
   const cs = CHOICE_SETS[pre.choice];
-  const choice = await new Promise((resolve) => {
-    const box = $('pre-opts');
-    cs.options.forEach((o) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'btn choice';
-      b.innerHTML = `<b>${o.label}</b><span>${o.sub}</span>`;
-      b.onclick = () => {
-        [...box.children].forEach((x) => { x.disabled = true; });
-        resolve(o.label);
-      };
-      box.appendChild(b);
-    });
-  });
+  const choice = (await askChoice($('pre-opts'), cs.options)).label;
   showThinking(true);
   let result;
   try {
@@ -801,16 +852,9 @@ async function runPrelude(act) {
 
 function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
-function makeChoice(label, sub, onClick, icon, extra, keyHint) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'btn choice';
-  b.innerHTML = `<span class="ic">${icon || '·'}</span><span class="ch-text"><b>${escapeHtml(label)}</b><span class="ch-sub">${escapeHtml(sub || '')}</span>${extra ? `<span class="ch-extra">${extra}</span>` : ''}</span>${keyHint ? `<span class="kbd-hint">${keyHint}</span>` : ''}`;
-  b.onclick = onClick;
-  return b;
-}
 
 function enterCampDay(act, day) {
+  step(`${act.id}:camp:${day}`, 'camp');
   S.day = day;
   S.maxAp = apPerDay(act);
   S.ap = S.maxAp;
@@ -818,13 +862,12 @@ function enterCampDay(act, day) {
   S.行动日志 = [];
   const scene = dayScene(act, day);
   showScreen('screen-camp');
-  $('pano-img').style.backgroundImage = `url('${scene.pano}')`;
+  $('pano-img').style.backgroundImage = `url('${sceneImage(scene.alt, scene.pano)}')`;
   $('act-title').textContent = scene.label ? `${act.title} · ${scene.label}` : act.title;
   $('day-num').textContent = String(day);
   $('day-max').textContent = String(act.apDays || 1);
   $('camp-hint').textContent = '用光照亮他们。点余烬，走进他的一夜。';
-  const amb = act.id === 'act4' ? 'camp' : act.id === 'act3' ? 'river' : act.id === 'act2' ? 'night' : act.id === 'act5' ? 'wind' : 'wind';
-  audio.playAmbient(amb);
+  audio.playAmbient(ambientFor(act, day));
   audio.playSfx('day');
   renderStats(S);
   renderAp(S);
@@ -854,6 +897,14 @@ async function fireSceneGen(act) {
       appendCampLog(S, '场景', r.whisper || r.atmosphere.slice(0, 40));
     }
   } catch { /* 静默 */ }
+}
+
+/** 环境床按幕/按天选：ogg 存在就播文件，否则合成（见 audio.js 的 AMBIENT_FILE） */
+function ambientFor(act, day) {
+  const scene = dayScene(act, day);
+  if (scene.label === '雪山') return 'snow';
+  if (scene.label === '草地') return 'camp';
+  return { act0: 'depart', act1: 'xiangjiang', act2: 'zunyi', act3: 'river', act5: 'huining' }[act.id] || 'wind';
 }
 
 function updateDusk() {
@@ -896,6 +947,7 @@ function bindLantern() {
 function bindMarchButton(act) {
   const btn = $('btn-march-fixed');
   if (!btn) return;
+  markAction(btn, 'march');
   btn.onclick = () => onHotspot(act, { kind: 'march', label: '启程' });
   updateMarchButton();
 }
@@ -939,6 +991,9 @@ function renderHotspots(act, hotspots) {
     b.className = 'hotspot' + (h.kind === 'march' ? ' march' : '');
     b.style.left = h.x + '%';
     b.style.top = h.y + '%';
+    markAction(b, h.kind === 'march' ? 'march' : 'hotspot');
+    b.dataset.hotspot = h.kind || '';
+    b.dataset.hotspotLabel = h.label || '';
     const apOut = S.ap <= 0 && h.kind !== 'march';
     b.disabled = apOut;
     b.innerHTML = `
@@ -990,7 +1045,11 @@ const HOTSPOT_HANDLERS = {
 };
 
 async function onHotspot(act, h) {
-  if (S?.busy) return;
+  if (S?.busy) {
+    // 切日/过场的瞬间仍在上一步的锁里，给个反馈别让玩家以为点坏了
+    toast('上一步还在进行…', 1200);
+    return;
+  }
   audio.playSfx('click');
   if (h.kind === 'march') {
     return withLock(async () => {
@@ -1036,7 +1095,8 @@ async function onHotspot(act, h) {
     renderCompanions(S);
     saveState(S);
     showScreen('screen-camp');
-    $('pano-img').style.backgroundImage = `url('${dayScene(act, S.day).pano}')`;
+    const ds = dayScene(act, S.day);
+    $('pano-img').style.backgroundImage = `url('${sceneImage(ds.alt, ds.pano)}')`;
     updateMarchButton();
     updateDusk();
     if (S.ap <= 0) {
@@ -1065,6 +1125,7 @@ function renderFireMenu(act) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn choice';
+    b.dataset.choiceIndex = String(items.indexOf(f));
     b.innerHTML = `<b>${f.label}</b><span>${f.sub}</span>`;
     b.disabled = S.ap <= 0;
     b.onclick = async () => {
@@ -1083,7 +1144,8 @@ function renderFireMenu(act) {
         renderCompanions(S);
         saveState(S);
         showScreen('screen-camp');
-        $('pano-img').style.backgroundImage = `url('${dayScene(act, S.day).pano}')`;
+        const ds2 = dayScene(act, S.day);
+        $('pano-img').style.backgroundImage = `url('${sceneImage(ds2.alt, ds2.pano)}')`;
       });
     };
     box.appendChild(b);
@@ -1091,6 +1153,7 @@ function renderFireMenu(act) {
 }
 
 async function doTalk(act, h) {
+  step(`${act.id}:talk`, 'talk');
   talkPending = false;
   const npcName = h.npc || '同伴';
   const comp = COMPANIONS.find((c) => npcName.includes(c.name)) || COMPANIONS[0];
@@ -1100,10 +1163,10 @@ async function doTalk(act, h) {
   setStagePanel(`
     <div class="chat-row">
       <input id="talk-input" placeholder="对${npcName}说点什么…" autocomplete="off" />
-      <button type="button" class="btn primary" id="talk-send">说</button>
+      <button type="button" class="btn primary" id="talk-send" data-action="talk-send">说</button>
     </div>
     <div class="choices" style="margin-top:10px" id="talk-quick"></div>
-    <button type="button" class="btn ghost sm" id="talk-end" style="margin-top:14px">结束交谈</button>
+    <button type="button" class="btn ghost sm" id="talk-end" data-action="talk-end" style="margin-top:14px">结束交谈</button>
   `);
   await say(npcName, npcName.includes('老班') ? '来了。坐下，别踩了水花。'
     : npcName.includes('指导') ? '坐。有话慢慢说。'
@@ -1120,10 +1183,12 @@ async function doTalk(act, h) {
     : undefined);
   const quick = ['前面的路怎么走？', '你为什么来当红军？', '我想家了。'];
   const qbox = $('talk-quick');
-  quick.forEach((q) => {
+  quick.forEach((q, i) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn choice';
+    b.dataset.choiceIndex = String(i);
+    b.dataset.action = 'talk-quick';
     b.innerHTML = `<b>${q}</b>`;
     b.onclick = () => sendTalk(npcName, q);
     qbox.appendChild(b);
@@ -1172,6 +1237,7 @@ async function sendTalk(npcName, text) {
 }
 
 async function doRest() {
+  step('rest', 'minigame');
   showScreen('screen-stage');
   setStageBanner('休息', '/assets/scenes/camp_evening.jpg');
   setPortrait('你', '年轻战士', '你', '疲惫');
@@ -1197,19 +1263,15 @@ async function doRest() {
 }
 
 async function doShare() {
+  step('share', 'choice');
   showScreen('screen-stage');
   setStageBanner('分一口粮', '/assets/scenes/night_fire.jpg');
   setPortrait('你', '年轻战士', '你', '平静');
   setStagePanel('<div class="choice-row" id="share-opts"></div>');
   const shareOpts = ['全给伤员', '全班平分，自己少一点', '先紧着小鬼和卫生员', '自己留大半'];
-  const choice = await new Promise((resolve) => {
-    shareOpts.forEach((o, i) => {
-      $('share-opts').appendChild(makeChoice(o, '', () => {
-        [...$('share-opts').children].forEach((x) => { x.disabled = true; });
-        resolve(o);
-      }, '分', '', String(i + 1)));
-    });
-  });
+  const choice = (await askChoice($('share-opts'), shareOpts.map((label) => ({ label })), {
+    extraOf: () => '',
+  })).label;
   logShare(choice);
   showThinking(true);
   let result;
@@ -1233,10 +1295,12 @@ async function doShare() {
 }
 
 async function doSchool() {
+  step('school', 'minigame');
   showScreen('screen-stage');
   setStageBanner('夜校识字', '/assets/scenes/school_close.jpg');
   setPortrait('文化教员', '夜校', '教', '耐心');
   setStagePanel('<div id="school-host"></div>');
+  markMini($('school-host'), 'school');
   await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
   const op = await runNightSchool($('school-host'));
   S.tonightPassword = op.detail?.password || '瑞金';
@@ -1264,10 +1328,12 @@ async function doSchool() {
 
 /** 红小鬼 · 分糖：三颗糖，AI 逐颗判定 */
 async function doCandy() {
+  step('candy', 'minigame');
   showScreen('screen-stage');
-  setStageBanner('分糖', '/assets/scenes/camp_pano.jpg');
+  setStageBanner('分糖', sceneImage('/assets/scenes/sugar_close.jpg', '/assets/scenes/camp_pano.jpg'));
   setPortrait('红小鬼', '16岁小战士', '鬼', '倔强', '/assets/characters/xiaogui.png');
   setStagePanel('<div id="candy-host"></div>');
+  markMini($('candy-host'), 'candy');
   await say('红小鬼', '我腿不软。就是夜里冷，想家的时候数干粮。', 'xiaogui_home');
   const op = await runCandy($('candy-host'));
   S.sugarPlan = op.detail || null;
@@ -1296,10 +1362,12 @@ async function doCandy() {
 
 /** 哨兵 · 夜岗：五信号判断，夜校口令在此生效 */
 async function doSentry() {
+  step('sentry', 'minigame');
   showScreen('screen-stage');
-  setStageBanner('夜岗', '/assets/scenes/camp_pano.jpg');
+  setStageBanner('夜岗', sceneImage('/assets/scenes/sentry_night.jpg', '/assets/scenes/camp_pano.jpg'));
   setPortrait('哨兵', '夜哨', '哨', '警觉');
   setStagePanel('<div id="sentry-host"></div>');
+  markMini($('sentry-host'), 'sentry');
   await say('哨兵', '后半夜归你。听不清就再听一遍——别喊，别急着开枪。');
   const op = await runSentry(S.tonightPassword, $('sentry-host'));
   S.sentryScore = op.score;
@@ -1329,10 +1397,12 @@ async function doSentry() {
 
 /** 两个小鬼 · 泥地五子棋 */
 async function doGomoku() {
+  step('gomoku', 'minigame');
   showScreen('screen-stage');
   setStageBanner('泥地五子棋', '/assets/scenes/camp_pano.jpg');
   setPortrait('两个小鬼', '泥地上的棋', '棋', '专注', '/assets/characters/xiaogui.png');
   setStagePanel('<div id="gomoku-host"></div>');
+  markMini($('gomoku-host'), 'gomoku');
   await say('红小鬼', '石子当子，泥地当盘。你要是输了，可不许说没吃饱。');
   const op = await runGomoku($('gomoku-host'));
   markLine(S, 'gomoku');
@@ -1358,10 +1428,12 @@ async function doGomoku() {
 
 /** 雪山陡坡 · 拽住同伴（时机操作） */
 async function doGrab() {
+  step('grab', 'minigame');
   showScreen('screen-stage');
-  setStageBanner('陡坡上', '/assets/scenes/snow_pano.jpg');
+  setStageBanner('陡坡上', sceneImage('/assets/scenes/snow_climb.jpg', '/assets/scenes/snow_pano.jpg'));
   setPortrait('你', '年轻战士', '你', '咬牙');
   setStagePanel('<div id="grab-host"></div>');
+  markMini($('grab-host'), 'grab');
   await say('你', '他的手在滑。前面的雪是硬的，下面是空的。');
   const op = await runGrab($('grab-host'));
   showThinking(true);
@@ -1388,7 +1460,7 @@ async function doGrab() {
 /** 会宁 · 数一数熟面孔（读关系与牺牲名单） */
 async function doRoster() {
   showScreen('screen-stage');
-  setStageBanner('会宁 · 数一数熟面孔', '/assets/scenes/huining_pano.jpg');
+  setStageBanner('会宁 · 数一数熟面孔', sceneImage('/assets/scenes/huining_crowd.jpg', '/assets/scenes/huining_pano.jpg'));
   setPortrait('你', '年轻战士', '你', '平静');
   setStagePanel('<p class="hint">队伍汇合了，人山人海。你在人群里找那些熟悉的脸。</p>');
   await say('你', '（你在数。有些位置，怎么数都空着。）');
@@ -1419,16 +1491,19 @@ async function doRoster() {
 }
 
 async function doFishing(act, forced) {
+  step('fishing', 'minigame');
   showScreen('screen-stage');
   // 弯针 → 咬钩起竿（与报名信息一致：先做钩，再钓鱼）
   setStageBanner('金色的鱼钩 · 弯针', '/assets/scenes/pond_close.jpg');
   setPortrait('老班长', '炊事班长', '班', '专注', '/assets/characters/laoban.png');
   setStagePanel('<div id="needle-host"></div>');
+  markMini($('needle-host'), 'needle');
   await say('老班长', '鱼钩是缝衣针弯的。手上稳着点，别掰断。');
   await runBendNeedle($('needle-host'));
 
   setStageBanner('金色的鱼钩 · 起竿', '/assets/scenes/pond_close.jpg');
   setStagePanel('<div id="fish-host"></div>');
+  markMini($('fish-host'), 'fishing');
   await say('老班长', '漂相看真了再起竿。晃是假的，沉才是口。', 'laoban_hook');
   const op = await runFishing($('fish-host'));
   S.fishingBest = Math.max(S.fishingBest || 0, op.score);
@@ -1461,19 +1536,19 @@ async function doFishing(act, forced) {
 }
 
 async function doSoup() {
+  step('soup', 'choice');
   showScreen('screen-stage');
   setStageBanner('煮粥分汤', '/assets/scenes/pond_close.jpg');
   setPortrait('老班长', '炊事班长', '班', '沉默', '/assets/characters/laoban.png');
   setStagePanel('<p class="hint">锅里只有几条小鱼和草根。</p><div class="choices" id="soup-opts"></div>');
   await say('老班长', '汤要分匀。伤员先喝，我们再看锅底。', 'laoban_soup');
-  const choice = await new Promise((resolve) => {
-    ['稠的全给伤员，自己喝清汤', '全班平分', '只给病号', '自己先盛一碗'].forEach((o, i) => {
-      $('soup-opts').appendChild(makeChoice(o, '', () => {
-        [...$('soup-opts').children].forEach((x) => { x.disabled = true; });
-        resolve(o);
-      }, ['汤', '分', '病', '己'][i], '', String(i + 1)));
-    });
-  });
+  const soupOpts = [
+    { label: '稠的全给伤员，自己喝清汤', icon: '汤' },
+    { label: '全班平分', icon: '分' },
+    { label: '只给病号', icon: '病' },
+    { label: '自己先盛一碗', icon: '己' },
+  ];
+  const choice = (await askChoice($('soup-opts'), soupOpts)).label;
   logShare(choice);
   showThinking(true);
   let result;
@@ -1497,10 +1572,11 @@ async function doSoup() {
 }
 
 async function doChoice(act, actionId) {
+  step(`${act.id}:${actionId}`, 'choice');
   const cs = CHOICE_SETS[actionId];
   if (!cs) return;
   showScreen('screen-stage');
-  setStageBanner(cs.title, act.pano);
+  setStageBanner(cs.title, sceneImage(cs.img, act.pano));
   setPortrait('你', act.title, '你', '决断');
   setStagePanel(`<div class="choice-row" id="ch-opts"></div>`);
   // 深度调用：选项倾向预告（类 Reigns 卡牌预览）
@@ -1517,24 +1593,14 @@ async function doChoice(act, actionId) {
     (hr.hints || []).forEach((h) => { if (h?.label) hints[h.label] = h; });
   } catch { /* 静默 */ }
 
-  const choice = await new Promise((resolve) => {
-    cs.options.forEach((o, i) => {
+  const choice = (await askChoice($('ch-opts'), cs.options, {
+    extraOf: (o) => {
       const h = hints[o.label];
       const trend = h?.trend ? `<em class="trend">${escapeHtml(h.trend)}</em>` : '';
       const risk = h?.risk ? `<em class="risk r-${h.risk}">${h.risk}风险</em>` : '';
-      $('ch-opts').appendChild(makeChoice(
-        o.label,
-        `${o.sub || ''}`,
-        () => {
-          [...$('ch-opts').children].forEach((x) => { x.disabled = true; });
-          resolve(o.label);
-        },
-        String.fromCharCode(65 + i),
-        `${trend}${risk}`,
-        i < 9 ? String(i + 1) : ''
-      ));
-    });
-  });
+      return `${trend}${risk}`;
+    },
+  })).label;
   logChoice(act, choice, hints[choice]?.trend || '');
   // 行军模式：高风险抉择可能留下一个人（不可逆）
   if (S.mode === 'march' && cs.loss) {
@@ -1571,10 +1637,13 @@ async function doChoice(act, actionId) {
 
 /** 飞夺泸定桥：横版过桥（第一次跌落由战友拉住，体力 −10） */
 async function doLuding(act) {
+  step('luding', 'minigame');
   showScreen('screen-stage');
-  setStageBanner('飞夺泸定桥', '/assets/scenes/luding_pano.jpg');
+  setStageBanner('飞夺泸定桥', sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg'));
+  audio.playAmbient('luding');
   setPortrait('突击队长', '红四团', '勇', '决绝');
   setStagePanel('<div id="luding-host"></div>');
+  markMini($('luding-host'), 'luding');
   await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
   const op = await runLuding($('luding-host'));
   S.ludingResult = op.detail || null;
@@ -1601,19 +1670,8 @@ async function doLuding(act) {
   await afterJudge(result, '飞夺泸定桥', 'h_luding');
 }
 
-function waitBtn(label, hostEl) {
-  return new Promise((resolve) => {
-    const host = hostEl || $('sheet-actions') || $('stage-panel') || document.body;
-    host.querySelectorAll('#btn-continue').forEach((n) => n.remove());
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn primary';
-    btn.id = 'btn-continue';
-    btn.textContent = label;
-    btn.onclick = () => { btn.remove(); resolve(); };
-    host.appendChild(btn);
-  });
-}
+// 「继续」统一走 step.js 的 waitContinue（带 data-action 契约标记）
+const waitBtn = waitContinue;
 
 async function withLock(fn) {
   if (S && S.busy) return;
@@ -1656,15 +1714,17 @@ async function runForcedChain(act) {
 }
 
 async function runPathOnImage() {
+  step('path', 'choice');
   showScreen('screen-path');
   audio.speak('前面岔开了三条路。你定。', '指导员', 'zhiyuan_grass');
   const zones = $('path-zones');
   zones.innerHTML = '';
   const choice = await new Promise((resolve) => {
-    PATH_ZONES.forEach((z) => {
+    PATH_ZONES.forEach((z, i) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'path-zone';
+      b.dataset.choiceIndex = String(i);
       b.style.left = z.x + '%';
       b.style.top = z.y + '%';
       b.style.width = z.w + '%';
@@ -1700,6 +1760,7 @@ async function runPathOnImage() {
 }
 
 async function runQuiz(act) {
+  step(`${act.id}:quiz`, 'quiz');
   showScreen('screen-quiz');
   $('quiz-bg').style.backgroundImage = `url('${act.pano}')`;
   $('quiz-score').textContent = `${S.quiz.human} : ${S.quiz.ai}`;
@@ -1724,8 +1785,8 @@ async function runQuiz(act) {
     <p class="quiz-q">${escapeHtml(q.question || '题目')}</p>
     <div class="quiz-opts" id="quiz-opts"></div>
     <div id="quiz-feedback" class="quiz-result"></div>
-    <button type="button" class="btn ghost sm" id="quiz-auto" style="margin-top:10px">看两个 AI 对答（ai_vs_ai）</button>
-    <button type="button" class="btn primary" id="quiz-next" style="margin-top:12px;display:none">继续</button>
+    <button type="button" class="btn ghost sm" id="quiz-auto" data-action="quiz-auto" style="margin-top:10px">看两个 AI 对答（ai_vs_ai）</button>
+    <button type="button" class="btn primary" id="quiz-next" data-action="continue" style="margin-top:12px;display:none">继续</button>
   `;
   const optsBox = $('quiz-opts');
   const opts = Array.isArray(q.options) && q.options.length >= 2
@@ -1824,6 +1885,7 @@ async function runQuiz(act) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'quiz-opt';
+      b.dataset.choiceIndex = String(i);
       b.textContent = `${String.fromCharCode(65 + i)}. ${text}`;
       b.onclick = () => finish(i);
       optsBox.appendChild(b);
@@ -1850,6 +1912,7 @@ function nightContext() {
  * 选项禁止写死；生成失败才用内置兜底两项。
  */
 async function runNightChoice(act) {
+  step('night', 'choice');
   if (isDone(act.id, 'night')) return false;
   if (!canNight(S, 3)) {
     appendCampLog(S, '系统', `附身线不足三条（${linesDoneCount(S)}/${LINES_TOTAL}），今夜没有议事。`);
@@ -1890,14 +1953,8 @@ async function runNightChoice(act) {
   $('night-lead').textContent = gen?.lead || '火压低了。没人先开口。';
   const body = $('night-body');
   body.innerHTML = '';
-  const choice = await new Promise((resolve) => {
-    options.forEach((o, i) => {
-      body.appendChild(makeChoice(o.label, o.sub, () => {
-        body.querySelectorAll('.btn.choice').forEach((x) => { x.disabled = true; });
-        resolve(o);
-      }, '夜', '', String(i + 1)));
-    });
-  });
+  const picked = await askChoice(body, options, { extraOf: () => '' });
+  const choice = picked.raw;
   logChoice(act, choice.label, '篝火夜');
   S.nightChoice = choice.label;
   markDone(act.id, 'night');
@@ -1969,6 +2026,7 @@ async function finishAct(act) {
 }
 
 async function runEnding() {
+  step('end', 'end');
   showScreen('screen-end');
   $('end-title').textContent = '结算中…';
   $('end-paras').innerHTML = '';

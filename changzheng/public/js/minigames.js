@@ -42,8 +42,8 @@ export function runFishing(container) {
         <span id="fish-status" class="muted">点「抛竿」开始</span>
       </div>
       <div style="display:flex;gap:8px;justify-content:center">
-        <button type="button" class="btn primary" id="fish-cast">抛竿</button>
-        <button type="button" class="btn" id="fish-hook" disabled>起竿 (空格)</button>
+        <button type="button" class="btn primary" id="fish-cast" data-mini-action="cast">抛竿</button>
+        <button type="button" class="btn" id="fish-hook" data-mini-action="hook" disabled>起竿 (空格)</button>
       </div>
     `;
     const canvas = container.querySelector('#fish-canvas');
@@ -51,6 +51,7 @@ export function runFishing(container) {
     const status = container.querySelector('#fish-status');
     const btnCast = container.querySelector('#fish-cast');
     const btnHook = container.querySelector('#fish-hook');
+    container.dataset.miniState = 'idle';
 
     const TOTAL = 3;
     let castIndex = 0;
@@ -128,6 +129,7 @@ export function runFishing(container) {
       phase = 'idle';
       btnHook.disabled = true;
       btnCast.disabled = castIndex >= TOTAL;
+      container.dataset.miniState = castIndex >= TOTAL ? 'done' : 'idle';
       status.textContent = castIndex >= TOTAL ? '三竿结束' : `第 ${castIndex + 1}/${TOTAL} 竿 — 点「抛竿」`;
     }
 
@@ -155,6 +157,7 @@ export function runFishing(container) {
           phase = 'window';
         }
         btnHook.disabled = false;
+        container.dataset.miniState = 'window';
         setTimeout(() => {
           if (phase === 'window' && !resolved) {
             hits.push({ type: biteType, result: 'miss', score: 0.1 });
@@ -170,6 +173,7 @@ export function runFishing(container) {
       if (resolved) return;
       resolved = true;
       phase = 'done';
+      container.dataset.miniState = 'done';
       btnCast.disabled = true;
       btnHook.disabled = true;
       const best = hits.reduce((m, h) => Math.max(m, h.score), 0);
@@ -240,6 +244,7 @@ export function runFishing(container) {
     });
     btnHook.addEventListener('click', hook);
     const onKey = (e) => {
+      if (!document.body.contains(container)) { window.removeEventListener('keydown', onKey); return; }
       if (e.code === 'Space') {
         e.preventDefault();
         hook();
@@ -344,6 +349,7 @@ export function runCandy(container) {
     const candies = [];
     for (let i = 0; i < 3; i++) {
       const c = h('div', { class: 'candy', text: '糖', role: 'button', tabindex: '0' });
+      c.dataset.miniAction = 'candy';
       c.dataset.idx = String(i);
       const pick = () => {
         if (c.classList.contains('used')) return;
@@ -362,6 +368,7 @@ export function runCandy(container) {
     const cards = {};
     for (const t of targets) {
       const card = h('div', { class: 'target-card', role: 'button', tabindex: '0' });
+      card.dataset.miniAction = 'target';
       card.appendChild(h('div', { class: 't-name', text: t.name }));
       card.appendChild(h('div', { class: 't-desc', text: t.desc }));
       const cnt = h('div', { class: 't-count', text: '0 颗' });
@@ -373,6 +380,8 @@ export function runCandy(container) {
         if (!candy || candy.classList.contains('used')) return;
         candy.classList.add('used');
         candy.style.outline = '';
+        candy.setAttribute('aria-disabled', 'true');
+        delete candy.dataset.miniAction;   // 契约要如实反映"这颗糖已经给出去了"
         given[t.id] += 1;
         left -= 1;
         cards[t.id].cnt.textContent = `${given[t.id]} 颗`;
@@ -387,7 +396,9 @@ export function runCandy(container) {
     }
 
     const selfBtn = h('button', { class: 'btn ghost', type: 'button', text: '自己收好（不给）' });
+    selfBtn.dataset.miniAction = 'self';
     const confirmBtn = h('button', { class: 'btn primary', type: 'button', text: '就这样' });
+    confirmBtn.dataset.miniAction = 'confirm';
     confirmBtn.disabled = true;
     const leftLabel = h('div', { class: 'score-line', text: '还剩 3 颗' });
 
@@ -401,6 +412,7 @@ export function runCandy(container) {
         given.self += left;
         left = 0;
         candies.forEach((c) => c.classList.add('used'));
+        candies.forEach((c) => { c.setAttribute('aria-disabled', 'true'); delete c.dataset.miniAction; });
         leftLabel.textContent = '你把剩下的糖收回兜里';
         confirmBtn.disabled = false;
         selfBtn.disabled = true;
@@ -444,6 +456,7 @@ export function runSentry(knownPassword, container) {
     const btnA = h('button', { class: 'choice-btn', type: 'button' });
     const btnB = h('button', { class: 'choice-btn', type: 'button' });
     const btnC = h('button', { class: 'choice-btn', type: 'button' });
+    [btnA, btnB, btnC].forEach((b) => { b.dataset.miniAction = 'answer'; });
     row.append(btnA, btnB, btnC);
     root.appendChild(row);
     const prog = h('div', { class: 'score-line', text: '信号 1 / 5' });
@@ -534,6 +547,7 @@ export function runBendNeedle(container) {
     const label = h('div', { class: 'mg-hint', text: '1. 针眼端固定' });
     const bar = h('div', { class: 'score-line', text: '进度 □□□' });
     const btn = h('button', { class: 'btn primary', type: 'button', text: '弯折 1/3' });
+    btn.dataset.miniAction = 'bend';
     root.append(label, btn, bar);
     let i = 0;
     const steps = ['1. 针眼端固定', '2. 中段支点', '3. 弯出钩尖'];
@@ -573,11 +587,13 @@ export function runGomoku(container) {
     const grid = h('div', { class: 'wzq-grid' });
     root.appendChild(status);
     root.appendChild(grid);
+    container.dataset.miniState = 'player'; // 你先手
 
     const cells = [];
     for (let y = 0; y < N; y++) {
       for (let x = 0; x < N; x++) {
         const c = h('button', { class: 'wzq-cell', type: 'button' });
+        c.dataset.miniAction = 'cell';
         c.dataset.x = String(x);
         c.dataset.y = String(y);
         c.onclick = () => play(x, y, 1);
@@ -618,6 +634,7 @@ export function runGomoku(container) {
     function finish(result, note) {
       over = true;
       status.textContent = note;
+      container.dataset.miniState = 'done';
       audio.playSfx(result === 'win' ? 'correct' : result === 'draw' ? 'echo' : 'wrong');
       const score = result === 'win' ? 1 : result === 'draw' ? 0.55 : 0.25;
       setTimeout(() => {
@@ -638,6 +655,7 @@ export function runGomoku(container) {
       }
       turn = 2;
       status.textContent = '小鬼在想…';
+      container.dataset.miniState = 'ai';
       setTimeout(kidMove, 380 + Math.random() * 400);
     }
 
@@ -685,6 +703,7 @@ export function runGomoku(container) {
       }
       turn = 1;
       status.textContent = '轮到你了';
+      container.dataset.miniState = 'player';
     }
   });
 }
@@ -874,6 +893,7 @@ export function runLuding(container) {
     }
 
     const onKeyDown = (e) => {
+      if (!document.body.contains(container)) { cleanup(); return; }
       const k = e.key.toLowerCase();
       if (k === 'a' || k === 'arrowleft') { keys.add('left'); e.preventDefault(); }
       if (k === 'd' || k === 'arrowright') { keys.add('right'); e.preventDefault(); }
@@ -900,6 +920,10 @@ export function runLuding(container) {
     const btnLeft = container.querySelector('#luding-left');
     const btnRight = container.querySelector('#luding-right');
     const btnJump = container.querySelector('#luding-jump');
+    btnLeft.dataset.miniAction = 'left';
+    btnRight.dataset.miniAction = 'right';
+    btnJump.dataset.miniAction = 'jump';
+    container.dataset.miniState = 'player';
     btnLeft.onclick = () => press('left');
     btnRight.onclick = () => press('right');
     btnJump.onclick = jump;
@@ -939,6 +963,7 @@ export function runGrab(container) {
     track.append(zone, marker);
     const status = h('div', { class: 'score-line', text: `第 1 / ${TRIES} 次` });
     const btn = h('button', { class: 'btn primary', type: 'button', text: '抓住（空格）' });
+    btn.dataset.miniAction = 'grab';
     root.append(track, h('div', { class: 'mg-row' }, [btn]), status);
 
     let zonePos = 22 + Math.random() * 46;
@@ -1002,6 +1027,7 @@ export function runGrab(container) {
     }
 
     const onKey = (e) => {
+      if (!document.body.contains(container)) { window.removeEventListener('keydown', onKey); return; }
       if (e.code === 'Space') { e.preventDefault(); grab(); }
     };
     window.addEventListener('keydown', onKey);

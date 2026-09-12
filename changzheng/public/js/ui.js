@@ -10,7 +10,11 @@ export function showScreen(id) {
   const el = $(id);
   if (el) el.classList.remove('hidden');
   if (id !== 'screen-stage') {
+    // 离开舞台屏时把舞台内容一起清掉：否则小游戏容器会作为"残留节点"留在 DOM 里，
+    // 既有重复 id，也会让"元素存在即当前场景"的判断出错。
     document.querySelectorAll('#sheet-actions').forEach((n) => { n.innerHTML = ''; });
+    const panel = $('stage-panel');
+    if (panel) panel.innerHTML = '';
   }
   if (id === 'screen-camp') {
     const b = $('stage-banner');

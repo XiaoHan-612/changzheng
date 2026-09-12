@@ -26,6 +26,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 | 文件 | 职责 | 改动注意 |
 |---|---|---|
 | `public/js/main.js` | 主线状态机：五幕、营地日、强制链、对决、失败/终局、篝火夜 | 最大的文件；热点用 `HOTSPOT_HANDLERS` 映射表分发，**加玩法只加一行** |
+| `public/js/step.js` | **交互契约**：`step()` / `askChoice()` / `waitContinue()` / `markMini()` | 新增玩法只要声明契约，测试与自动化无需改动；详见 ARCHITECTURE 的「交互契约」 |
 | `public/js/minigames.js` | 7 个小游戏：钓鱼/弯针/识字/分糖/夜岗/五子棋/泸定桥/陡坡 | 统一返回 `{score, detail, summary?}`，本地只判手感，结算走 `/api/decide` |
 | `public/js/state.js` | 资源/好感/附身线/行动点/每日场景/失败判定 | 纯函数、可单测；新增资源维度要同时改 `applyEffects` 的钳制表 |
 | `public/js/sandbox.js` | 自由行军沙盘（世界裁判 + 存档） | 表单监听只绑一次（`bindSandboxFormOnce`），别改回 `addEventListener` |
@@ -95,14 +96,19 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 8. **空 JSON 的根因是推理吃 token** —— 实测 54 次真调里 8 次返回 `{}`，耗时 9.6–12.3 秒。根因是 glm-5.3-flash「始终思考」：不设 `reasoning_effort` 时 token 全用在推理上。现在默认 `reasoning_effort=low` + `max_tokens` 2000（sim 2400），实测 1.2 秒、21 tokens 就返回合规 JSON；空对象仍按失败处理。
 9. **真调可能等 10 秒以上** —— 「思考中」指示器会显示秒数；失败会弹出原因与「重试」键（不再有兜底文案）。
 10. **日志审计要按 id 去重** —— 同一条调用会同时写进「按日文件」和 `session-full.jsonl`；`audit-logs.mjs` 已去重。`docs/LOG-AUDIT.md` 里的「字段缺失」混有旧版本历史记录；想只看当前版本，用 `LOG_DIR=<临时目录>` 单独跑一局再审计（当前版本 MOCK 全流程字段缺失为 0）。
+11. **素材是「探测式」接入** —— 图片走 `sceneImage(新图, 占位图)`（`main.js` 顶部 + boot 里的 `preloadScenes()`），音频走 `AMBIENT_FILE` 映射（`audio.js`）。生图/音频模型把文件按约定名字落盘就自动生效，**不需要改代码**；加新素材时同步更新 `preloadScenes()` 与 `AMBIENT_FILE` 两张表即可。自检：`npm run qa:assets`。
+12. **静态资源找不到必须 404** —— SPA 兜底只对页面路由生效（`server/index.js` 里排除了 `/assets`、`/audio`、`/css`、`/js`）。如果让缺图回 index.html（200），前端的素材探测和 `qa:assets` 都会被骗过。
+13. **契约标记要随状态撤销** —— 过场按钮是静态 DOM，结束后必须 `delete dataset.action`；已用掉的糖/已落子的格必须移除 `data-mini-action` 或置 `aria-disabled`，否则"当前可交互项"会撒谎（这几条都是踩过的坑）。
+14. **自动化只认契约** —— `tests/e2e/full-run.mjs` 的驱动按 `body[data-step]` + `data-action`/`data-choice-index`/`data-mini-*` 操作，不认识任何中文标签或屏内元素 id。新增玩法时先声明契约，别再改驱动。
 
 ## 六、下一步建议（按价值排序）
 
 1. **真调验证**：标准模式真调一局已跑通（57 次调用、`source=GLM`、无 ERROR）；`npm run qa:audit` 显示 15 类 callType 全部有真调记录。**只剩 `failure_review`（行军模式掉队结算）未验证** —— 需要故意把体力耗到 0 跑一次失败线。
-2. **数值平衡**：行军模式的失败条件现在是「体力≤0」或「粮食=0 且体力≤30」；建议真人试 3 局记录曲线。
-3. **场景图补齐**：按 `HANDOFF-ART.md` 生成 3 张本轮必需 + 18 张后续，落盘后热点背景即可升级。
-4. **音频升级**：环境床从 WebAudio 合成换成 ogg，TTS 缓存按 `TTS-MANIFEST.md` 产出。
-5. **移动端专项**：目前只有 820/900px 两个断点，未逐屏验证 375 宽。
+2. **契约扩散**：`runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto`、夜校小游戏的内层选项（`#school-opts`）目前靠 `data-choice-index` 兼职，建议也走 `askChoice`；`runRest` 只有一个「继续」，可直接 `waitContinue`。
+3. **数值平衡**：行军模式的失败条件现在是「体力≤0」或「粮食=0 且体力≤30」；建议真人试 3 局记录曲线。
+4. **场景图补齐**：按 `HANDOFF-ART.md` 生成 3 张本轮必需 + 18 张后续，落盘后热点背景即可升级。
+5. **音频升级**：环境床从 WebAudio 合成换成 ogg，TTS 缓存按 `TTS-MANIFEST.md` 产出。
+6. **移动端专项**：目前只有 820/900px 两个断点，未逐屏验证 375 宽。
 
 ## 七、验收清单
 

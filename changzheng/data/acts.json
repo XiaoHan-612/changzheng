@@ -94,6 +94,7 @@
       "dayScenes": [
         {
           "pano": "/assets/scenes/snow_pano.jpg",
+          "alt": "/assets/scenes/snow_camp.jpg",
           "label": "雪山",
           "hotspots": [
             { "id": "straggler", "label": "掉队的战士", "sub": "扶他一把", "x": 30, "y": 50, "kind": "choice", "action": "snow_help" },

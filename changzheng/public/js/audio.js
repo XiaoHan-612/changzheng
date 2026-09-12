@@ -16,6 +16,21 @@ function noiseBuffer(ctx, seconds = 2) {
   return buf;
 }
 
+/**
+ * 环境床文件映射（音频模型按 docs/HANDOFF-AUDIO.md 的表把 ogg 放进
+ * public/audio/ambient/，落盘即生效；没有就用 WebAudio 合成兜底）。
+ */
+const AMBIENT_FILE = {
+  depart: '/audio/ambient/depart_river.ogg',
+  xiangjiang: '/audio/ambient/xiangjiang_wind.ogg',
+  zunyi: '/audio/ambient/zunyi_rain.ogg',
+  river: '/audio/ambient/jinsha_rapids.ogg',
+  luding: '/audio/ambient/luding_iron.ogg',
+  snow: '/audio/ambient/snow_wind.ogg',
+  camp: '/audio/ambient/grass_fire.ogg',
+  huining: '/audio/ambient/huining_low.ogg',
+};
+
 class GameAudio {
   constructor() {
     this.ctx = null;
@@ -169,6 +184,13 @@ class GameAudio {
   }
 
   stopAmbient() {
+    if (this.ambientEl) {
+      try {
+        this.ambientEl.pause();
+        this.ambientEl.currentTime = 0;
+      } catch { /* ignore */ }
+      this.ambientEl = null;
+    }
     for (const n of this.ambientNodes) {
       try { n.stop?.(); n.disconnect?.(); } catch { /* ignore */ }
     }
@@ -182,6 +204,43 @@ class GameAudio {
     this.stopAmbient();
     this.currentAmbient = kind;
     if (!kind || kind === 'none') return;
+    // 优先用 public/audio/ambient/<file>.ogg（音频模型产出的真实环境床）；
+    // 文件不存在/播放失败 → 回落到 WebAudio 实时合成，流程不受影响。
+    const file = AMBIENT_FILE[kind];
+    if (file) {
+      this._playAmbientFile(kind, file);
+      return;
+    }
+    this._playAmbientSynth(kind);
+  }
+
+  /** 音频文件版环境床：循环播放，失败自动回落合成 */
+  _playAmbientFile(kind, file) {
+    try {
+      let fell = false;
+      const fallback = () => {
+        if (fell) return;          // 只回落一次，避免合成链生成两份
+        fell = true;
+        if (this.currentAmbient !== kind) return;
+        this.ambientEl = null;
+        this._playAmbientSynth(kind);
+      };
+      const el = new Audio(file);
+      el.loop = true;
+      el.volume = 0.32;
+      this.ambientEl = el;
+      el.onerror = fallback;
+      el.play().catch(fallback);
+      // 文件 404 时部分浏览器不触发 error，用 fetch 兜一次
+      fetch(file, { method: 'HEAD' })
+        .then((r) => { if (!r.ok) fallback(); })
+        .catch(fallback);
+    } catch {
+      this._playAmbientSynth(kind);
+    }
+  }
+
+  _playAmbientSynth(kind) {
     const ctx = this.ensure();
     if (!ctx) return;
 
@@ -193,6 +252,9 @@ class GameAudio {
       wind: { cut: 360, level: 0.08, lfo: 0.04 },
       night: { cut: 240, level: 0.07, lfo: 0.03, cricket: true },
       gorge: { cut: 300, level: 0.08, lfo: 0.06 },
+      xiangjiang: { cut: 320, level: 0.09, lfo: 0.05 },
+      zunyi: { cut: 260, level: 0.07, lfo: 0.03, cricket: true },
+      huining: { cut: 400, level: 0.08, lfo: 0.06 },
     }[kind] || { cut: 360, level: 0.08, lfo: 0.05 };
 
     const g = ctx.createGain();

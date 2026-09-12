@@ -71,6 +71,27 @@ UI 事件 → main.js(withLock) → ai-client → POST /api/decide
        → applyEffects(state) → 史实回响(echo) → 下一屏
 ```
 
+## 交互契约（`public/js/step.js`）—— 全项目唯一"当前在做什么"的真相
+
+历史上进度只存在内存（`S.busy` / `doneKeys`），DOM 里没有"当前步骤"的表示，
+于是出现三类通病：残留节点被当成当前场景、每个玩法各写一套选项渲染、测试脚本必须认识每个屏的元素 id。
+现在统一由 `step.js` 往 DOM 写契约，**人和自动化都读它**：
+
+| 契约 | 含义 |
+|---|---|
+| `body[data-step]` / `[data-step-kind]` / `[data-step-state]` | 当前步骤 id / 类型（choice·minigame·talk·quiz·camp·cutscene·echo·end）/ 状态（awaiting·busy·done） |
+| `[data-action="continue\|echo-ok\|march\|hotspot\|skip\|talk-end\|ai-retry"]` | 通用动作；**离开该屏时必须摘掉标记**，否则会误导消费方 |
+| `[data-choice-index]` | 任何选项（抉择/答题/岔路/篝火菜单/夜校…），由 `askChoice()` 统一产出 |
+| `host[data-mini]` + `[data-mini-state]` + `[data-mini-action]` | 小游戏容器/状态/可操作项；不能操作的项（已用掉的糖、已落子的格）**必须移除 action 或置 aria-disabled** |
+
+**规则**
+
+1. 新增玩法：实现小游戏 → `markMini(host, name)` → 控件加 `data-mini-action` → 状态变化时更新 `data-mini-state`；
+   主流程 `step('<id>', 'minigame')`；测试无需改动（驱动只认契约）。
+2. 选项一律用 `askChoice()`，不要再手写"渲染选项→禁用→resolve"。
+3. 等模型时 `setStepState('busy')`（`callAI()` 已自动处理），消费方据此等待而不是乱点。
+4. 离开屏幕时清理内容（`showScreen()` 已清 `#stage-panel`/`#sheet-actions`），并摘掉 `data-action` 标记。
+
 ## 关键设计约束
 
 | 约束 | 实现 |

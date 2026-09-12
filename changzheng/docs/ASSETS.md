@@ -29,9 +29,12 @@
 
 | 文件 | 用途 | 当前占位 | 状态 |
 |---|---|---|---|
-| `sentry_night.jpg` | 夜岗近景（暗夜营地边缘、树线、哨位） | `camp_pano.jpg` + CSS 暗角 | 待生成 |
-| `sugar_close.jpg` | 分糖近景（火光下的手与三颗糖） | `camp_pano.jpg` | 待生成 |
-| `snow_climb.jpg` | 雪山陡坡（拉人时机） | `snow_pano.jpg` | 待生成 |
+| `sentry_night.jpg` | 夜岗近景（暗夜营地边缘、树线、哨位） | `camp_pano.jpg` + CSS 暗角 | 待生成（**落盘即生效**） |
+| `sugar_close.jpg` | 分糖近景（火光下的手与三颗糖） | `camp_pano.jpg` | 待生成（**落盘即生效**） |
+| `snow_climb.jpg` | 雪山陡坡（拉人时机） | `snow_pano.jpg` | 待生成（**落盘即生效**） |
+
+> 「落盘即生效」= 按文件名放进 `public/assets/scenes/` 就会被自动用上，不用改代码。
+> 完整清单（含 14 张自动生效的图）见 [`HANDOFF-ART.md`](HANDOFF-ART.md) 第四节；自检 `npm run qa:assets`。
 
 ### 后续补齐（策划案 §11.1，目标 28–32 张）
 
@@ -65,7 +68,7 @@
 
 | 类别 | 现状 | 说明 |
 |---|---|---|
-| 环境床 | **合成兜底** | `public/js/audio.js` 用 WebAudio 实时合成（火/风/水/雪/夜）。目标形态是 ogg，清单见 HANDOFF-AUDIO |
+| 环境床 | **合成兜底（8 条全缺）** | 现在用 WebAudio 实时合成；ogg 按 `public/audio/ambient/` 的规定文件名落盘即生效，清单见 HANDOFF-AUDIO |
 | 操作音效 | **合成兜底** | click / cast / hook / echo / correct / wrong / march / day 等，同上 |
 | 预录台词 | **已有 21 条** | `public/audio/voices/*.wav` + 索引 `public/audio/voice-lines.json` |
 | 同伴反应音 | **已有 6 条** | `public/audio/reactions/*.wav`（老班长赞成/反对、卫生员担忧、红小鬼嘴硬、向导建议、新兵自责） |

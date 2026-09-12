@@ -48,18 +48,6 @@ async function ensureServer() {
   throw new Error('无法启动服务');
 }
 
-async function tryClick(page, sel) {
-  try {
-    const loc = page.locator(sel).first();
-    if (!(await loc.count())) return false;
-    if (!(await loc.isVisible().catch(() => false))) return false;
-    await loc.click({ force: true, timeout: 600 });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function main() {
   const runtimeSnap = snapshotRuntime();
   try {
@@ -88,6 +76,8 @@ async function run() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
+  const consoleErrs = [];
+  page.on('console', (m) => { if (m.type() === 'error') consoleErrs.push(m.text().slice(0, 200)); });
   page.on('dialog', (d) => d.accept().catch(() => {}));
 
   await page.goto(`${BASE}/?e2e=${Date.now()}`, { waitUntil: 'networkidle' });
@@ -99,126 +89,162 @@ async function run() {
   await page.waitForTimeout(120);
   try { await page.click('#btn-cut-skip'); } catch { /* ok */ }
 
+  // ─── 状态驱动循环 ───
+  // 真调每次 1.5–8s，又慢又不能靠固定选择器顺序硬试：每轮先读一次「当前屏幕快照」，
+  // 再按屏幕决定点哪里；40s 没有进展就 dump 现场并失败，避免再次静默卡死。
+  const snap = () => page.evaluate(() => {
+    const live = (sel) => [...document.querySelectorAll(sel)].filter((e) => e.offsetParent !== null && !e.disabled);
+    const body = document.body;
+    const mini = [...document.querySelectorAll('[data-mini]')].find((e) => e.offsetParent !== null) || null;
+    return {
+      screens: [...document.querySelectorAll('.screen')].filter((s) => !s.classList.contains('hidden')).map((s) => s.id),
+      // ── 步骤契约（step.js 写入）──
+      step: body.dataset.step || '',
+      kind: body.dataset.stepKind || '',
+      state: body.dataset.stepState || '',
+      // ── 通用交互契约 ──
+      choices: live('[data-choice-index]').length,
+      cont: live('[data-action="continue"]').length,
+      echoOk: live('[data-action="echo-ok"]').length,
+      aiRetry: live('[data-action="ai-retry"]').length,
+      talkEnd: live('[data-action="talk-end"]').length,
+      hotspots: live('[data-action="hotspot"]').map((e) => e.dataset.hotspotLabel || ''),
+      march: live('[data-action="march"]').length,
+      // ── 小游戏契约 ──
+      mini: mini ? mini.dataset.mini : '',
+      miniState: mini ? (mini.dataset.miniState || '') : '',
+      miniActions: mini ? [...mini.querySelectorAll('[data-mini-action]')].filter((e) => !e.disabled).map((e) => e.dataset.miniAction) : [],
+      act: (document.getElementById('act-title')?.textContent || '').trim(),
+    };
+  });
+  const tap = async (sel) => {
+    // 必须按"可见"挑元素：契约元素可能残留在隐藏屏里（如过场按钮）
+    const loc = page.locator(sel);
+    const n = await loc.count().catch(() => 0);
+    for (let i = 0; i < n; i++) {
+      const el = loc.nth(i);
+      const ok = (await el.isVisible().catch(() => false)) && !(await el.isDisabled().catch(() => false));
+      if (ok && (await el.getAttribute('aria-disabled').catch(() => null)) === 'true') continue;
+      if (ok) {
+        await el.click({ force: true, timeout: 400 }).catch(() => {});
+        return true;
+      }
+    }
+    return false;
+  };
+
   const seenActs = [];
-  let last = '';
+  let lastAct = '';
   let didGomoku = false;
-  let talkAsked = false;
-  const MAX_ITER = 4000; // 真调每次要等 1.5–8s，循环上限要放宽
-  for (let i = 0; i < MAX_ITER; i++) {
-    const act = await page.locator('#act-title').innerText().catch(() => '');
-    if (act && act !== last) {
-      seenActs.push(act);
-      last = act;
-      console.log('act', act);
-    }
-    if (await page.locator('#screen-end').isVisible().catch(() => false)) break;
+  let lastSig = '';
+  let lastProgress = Date.now();
+  const trace = [];
+  const MAX_MS = 20 * 60 * 1000;
+  const started = Date.now();
 
-    if (process.argv.includes('--debug') && i % 25 === 0) {
-      const vis = await page.evaluate(() => [...document.querySelectorAll('.screen')]
-        .filter((s) => !s.classList.contains('hidden')).map((s) => s.id).join(','));
-      const btn = await page.evaluate(() => [...document.querySelectorAll('#stage-panel button, #sheet-actions button, #night-body button')]
-        .filter((b) => b.offsetParent !== null).map((b) => b.id || b.className).slice(0, 4).join(' | '));
-      console.log(`  [debug ${i}] screens=${vis} buttons=${btn}`);
-    }
+  while (Date.now() - started < MAX_MS) {
+    const s = await snap();
+    if (s.act && s.act !== lastAct) { lastAct = s.act; seenActs.push(s.act); console.log('act', s.act); }
+    // 进入五子棋步骤就记下来（比"点了热点后 300ms 内看元素"可靠）
+    if (s.step === 'gomoku') didGomoku = true;
+    if (s.screens.includes('screen-end')) break;
 
-    if (await tryClick(page, '#btn-echo-ok')) { await page.waitForTimeout(40); continue; }
-    if (await tryClick(page, '#btn-continue')) { await page.waitForTimeout(40); continue; }
-    if (await tryClick(page, '#btn-cut-next')) { await page.waitForTimeout(30); continue; }
-
-    // ── 新玩法：分糖 / 夜岗 / 五子棋 / 夜间抉择 ──
-    if (await page.locator('#candy-host').isVisible().catch(() => false)) {
-      for (let k = 0; k < 6; k++) {
-        const candy = page.locator('#candy-host .candy:not(.used)').first();
-        if (!(await candy.count().catch(() => 0))) break;
-        await candy.click({ force: true }).catch(() => {});
-        await page.waitForTimeout(30);
-        await page.locator('#candy-host .target-card').first().click({ force: true }).catch(() => {});
-        await page.waitForTimeout(30);
-      }
-      if (await tryClick(page, '#candy-host .mg-row .btn.primary')) { await page.waitForTimeout(150); continue; }
-    }
-    if (await tryClick(page, '#sentry-host .choice-btn')) { await page.waitForTimeout(150); continue; }
-    if (await tryClick(page, '#gomoku-host .wzq-cell:not([disabled])')) { await page.waitForTimeout(120); continue; }
-    if (await tryClick(page, '#needle-host .btn.primary')) { await page.waitForTimeout(220); continue; }
-    if (await page.locator('#luding-host').isVisible().catch(() => false)) {
-      await page.keyboard.down('d');
-      for (let k = 0; k < 14; k++) {
-        await page.keyboard.press('Space');
-        await page.waitForTimeout(380);
-        if (!(await page.locator('#luding-host').isVisible().catch(() => false))) break;
-      }
-      await page.keyboard.up('d');
-      await page.waitForTimeout(200);
-      continue;
-    }
-    if (await tryClick(page, '#night-body .btn.choice:not([disabled])')) { await page.waitForTimeout(150); continue; }
-
-    // --aivia：走 ai_vs_ai 分支（两个 AI 对答），覆盖双 AI 判分
-    if (process.argv.includes('--aivia') && await tryClick(page, '#quiz-auto:not([disabled])')) {
-      await page.waitForTimeout(400);
-      continue;
+    const sig = [s.screens.join(), s.act, s.step, s.state, s.choices, s.cont, s.mini, s.miniState].join('|');
+    if (sig !== lastSig) { lastSig = sig; lastProgress = Date.now(); }
+    if (Date.now() - lastProgress > 30000) {
+      const logsRes = await (await fetch(BASE + '/api/logs')).json();
+      const dump = {
+        snapshot: s,
+        trace: trace.slice(-40),
+        logCount: logsRes.count,
+        pageErrors: errs.slice(-10),
+        consoleErrors: consoleErrs.slice(-10),
+      };
+      fs.writeFileSync(path.join(ART, 'stall-dump.json'), JSON.stringify(dump, null, 2), 'utf8');
+      throw new Error('卡住 30s：screen=' + s.screens.join(',') + ' act=' + s.act
+        + '，现场已写入 tests/e2e/artifacts/stall-dump.json');
     }
 
-    if (await page.locator('#screen-camp').isVisible().catch(() => false)) {
-      // 第四幕先把可选的「两个小鬼」点掉，保证五子棋也被覆盖
-      if (act.includes('雪山') && !didGomoku) {
-        const g = page.locator('.hotspot', { hasText: '两个小鬼' }).first();
-        if ((await g.count().catch(() => 0)) && (await g.isVisible().catch(() => false))) {
-          await g.click({ force: true }).catch(() => {});
-          didGomoku = true;
-          await page.waitForTimeout(150);
-          continue;
-        }
-      }
-      if (await tryClick(page, '#btn-march-fixed')) { await page.waitForTimeout(180); continue; }
-    }
-    if (await tryClick(page, '.quiz-opt:not([disabled])')) { await page.waitForTimeout(300); continue; }
-    if (await tryClick(page, '#quiz-next')) { await page.waitForTimeout(40); continue; }
-    if (await tryClick(page, '#ch-opts .btn.choice:not([disabled])')) { await page.waitForTimeout(120); continue; }
-    if (await tryClick(page, '#pre-opts .btn.choice:not([disabled])')) { await page.waitForTimeout(120); continue; }
-    if (await tryClick(page, '#soup-opts .btn.choice:not([disabled])')) { await page.waitForTimeout(120); continue; }
-    if (await tryClick(page, '#school-opts .btn.choice:not([disabled])')) { await page.waitForTimeout(40); continue; }
-    // 交谈：问一次就够了，然后结束（否则会一直重复提问）
-    if (await page.locator('#talk-quick').isVisible().catch(() => false)) {
-      if (!talkAsked) {
-        if (await tryClick(page, '#talk-who .btn.choice')) { await page.waitForTimeout(60); continue; }
-        if (await tryClick(page, '#talk-quick .btn.choice')) {
-          talkAsked = true;
+    const log = (what) => {
+      trace.push(new Date().toISOString().slice(11, 19) + ' ' + what + ' @' + s.screens.join(','));
+    };
+
+    // 0) 回响 / 继续：契约里最简单的两类
+    if (s.echoOk) { log('echo-ok'); await tap('[data-action="echo-ok"]'); continue; }
+    if (s.cont) { log('continue'); await tap('[data-action="continue"]'); continue; }
+    // 模型调用失败时界面会给「重试 / 跳过」，驱动也按契约处理
+    if (s.aiRetry) { log('ai-retry'); await tap('[data-action="ai-retry"]'); continue; }
+    // 步骤状态为 busy = 正在等模型，什么都别点
+    if (s.state === 'busy') { await page.waitForTimeout(400); continue; }
+
+    // 1) 小游戏：只按 mini 契约操作（新增玩法只需在这里加一条）
+    if (s.mini) {
+      const a = s.miniActions;
+      const has = (x) => a.includes(x);
+      switch (s.mini) {
+        case 'fishing':
+          if (has('cast')) { log('fish-cast'); await tap('[data-mini-action="cast"]'); }
+          else if (has('hook')) { log('fish-hook'); await tap('[data-mini-action="hook"]'); }
+          else await page.waitForTimeout(250);
+          break;
+        case 'needle':
+          if (has('bend')) { log('needle'); await tap('[data-mini-action="bend"]'); }
           await page.waitForTimeout(220);
+          break;
+        case 'candy':
+          if (has('candy') && has('target')) {
+            log('candy-give');
+            await tap('[data-mini-action="candy"]');
+            await page.waitForTimeout(40);
+            await tap('[data-mini-action="target"]');
+          } else if (has('confirm')) { log('candy-ok'); await tap('[data-mini-action="confirm"]'); }
+          await page.waitForTimeout(80);
+          break;
+        case 'sentry':
+          if (has('answer')) { log('sentry'); await tap('[data-mini-action="answer"]'); }
+          await page.waitForTimeout(120);
+          break;
+        case 'gomoku':
+          if ((s.miniState === 'player' || s.miniState === 'awaiting') && has('cell')) { log('gomoku-move'); await tap('[data-mini-action="cell"]'); }
+          else await page.waitForTimeout(220);
+          break;
+        case 'luding':
+          log('luding');
+          if (has('jump')) await tap('[data-mini-action="jump"]');
+          if (has('right')) await tap('[data-mini-action="right"]');
+          await page.waitForTimeout(320);
+          break;
+        case 'grab':
+          if (has('grab')) { log('grab'); await tap('[data-mini-action="grab"]'); }
+          await page.waitForTimeout(420);
+          break;
+        default:
+          await page.waitForTimeout(250);
+      }
+      continue;
+    }
+
+    // 2) 通用选项（抉择 / 预热 / 分汤 / 分享 / 夜校 / 篝火菜单 / 答题 / 岔路）
+    if (s.choices) { log('choice:' + s.kind); await tap('[data-choice-index]'); await page.waitForTimeout(120); continue; }
+
+    // 3) 交谈：直接结束（问句是可选的）
+    if (s.talkEnd) { log('talk-end'); await tap('[data-action="talk-end"]'); await page.waitForTimeout(150); continue; }
+
+    // 4) 营地：先点亮可选线（五子棋），再启程
+    if (s.screens.includes('screen-camp')) {
+      if (!didGomoku && s.hotspots.includes('两个小鬼')) {
+        const g = page.locator('[data-action="hotspot"]', { hasText: '两个小鬼' }).first();
+        if ((await g.count().catch(() => 0)) && (await g.isVisible().catch(() => false))) {
+          log('gomoku-open');
+          await g.click({ force: true, timeout: 400 }).catch(() => {});
+          await page.waitForTimeout(250);
           continue;
         }
       }
-      if (await tryClick(page, '#talk-end')) {
-        talkAsked = false;
-        await page.waitForTimeout(60);
-        continue;
-      }
-      await page.waitForTimeout(80);
-      continue;
+      if (s.march) { log('march'); await tap('[data-action="march"]'); await page.waitForTimeout(250); continue; }
     }
-    if (await tryClick(page, '#stage-panel .btn.choice:not([disabled])')) { await page.waitForTimeout(120); continue; }
-    if (await page.locator('#screen-path').isVisible().catch(() => false)) {
-      if (await tryClick(page, '.path-zone')) { await page.waitForTimeout(120); continue; }
-    }
-    if (await tryClick(page, '#fish-cast')) {
-      // 漂相三档：等到「真口/黑漂」再起竿，最多等 3.5s
-      const status = page.locator('#fish-status');
-      for (let k = 0; k < 14; k++) {
-        const t = await status.innerText().catch(() => '');
-        if (/真口|黑漂/.test(t)) break;
-        await page.waitForTimeout(250);
-      }
-      await tryClick(page, '#fish-hook');
-      continue;
-    }
-    if (await tryClick(page, '#fire-opts .btn.choice:not([disabled])')) { await page.waitForTimeout(180); continue; }
-    if (await tryClick(page, '.hotspot:not([disabled])')) { await page.waitForTimeout(100); continue; }
-    if (process.argv.includes('--debug') && i % 20 === 0) {
-      const vis = await page.evaluate(() => [...document.querySelectorAll('.screen')]
-        .filter((s) => !s.classList.contains('hidden')).map((s) => s.id).join(','));
-      console.log(`  [debug ${i}] screens=${vis} title=${await page.locator('#act-title').innerText().catch(() => '')}`);
-    }
-    await page.waitForTimeout(100);
+    if (s.hotspots.length) { log('hotspot'); await tap('[data-action="hotspot"]'); await page.waitForTimeout(150); continue; }
+    await page.waitForTimeout(200);
   }
 
   const ended = await page.locator('#screen-end').isVisible().catch(() => false);

@@ -1,0 +1,1 @@
+﻿# 环境床 ogg 放这里（文件名见 docs/HANDOFF-AUDIO.md）：depart_river / xiangjiang_wind / zunyi_rain / jinsha_rapids / luding_iron / snow_wind / grass_fire / huining_low。文件不存在时自动回落到 WebAudio 合成。

@@ -73,9 +73,14 @@ export function dayScene(act, day) {
   const list = act?.dayScenes;
   if (Array.isArray(list) && list.length) {
     const i = Math.min(Math.max(day, 1), list.length) - 1;
-    return { pano: list[i].pano || act.pano, hotspots: list[i].hotspots || act.hotspots };
+    return {
+      pano: list[i].pano || act.pano,
+      alt: list[i].alt || '',      // 有就用 alt（生图模型落盘即生效），没有再用 pano
+      label: list[i].label || '',
+      hotspots: list[i].hotspots || act.hotspots,
+    };
   }
-  return { pano: act?.pano, hotspots: act?.hotspots || [] };
+  return { pano: act?.pano, alt: '', label: '', hotspots: act?.hotspots || [] };
 }
 
 export function addLoss(state, who, reason) {
