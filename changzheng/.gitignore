@@ -8,3 +8,7 @@ runtime-config.json
 # 测试运行产物
 tests/e2e/artifacts/
 logs/session-full.jsonl
+
+# 环境床的 WAV 兼容格式：能用，但体积约为 Ogg 的 10 倍。
+# 等音频模型按同名导出 Ogg Vorbis 后再入库（代码优先用 .ogg）。
+public/audio/ambient/*.wav

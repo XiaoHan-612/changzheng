@@ -17,8 +17,9 @@ function noiseBuffer(ctx, seconds = 2) {
 }
 
 /**
- * 环境床文件映射（音频模型按 docs/HANDOFF-AUDIO.md 的表把 ogg 放进
- * public/audio/ambient/，落盘即生效；没有就用 WebAudio 合成兜底）。
+ * 环境床文件映射（音频模型按 docs/HANDOFF-AUDIO.md 的表把文件放进
+ * public/audio/ambient/，落盘即生效）。
+ * 回退链：.ogg（体积小，首选） → .wav（模型只给 wav 时也能用） → WebAudio 合成。
  */
 const AMBIENT_FILE = {
   depart: '/audio/ambient/depart_river.ogg',
@@ -214,8 +215,11 @@ class GameAudio {
     this._playAmbientSynth(kind);
   }
 
-  /** 音频文件版环境床：循环播放，失败自动回落合成 */
-  _playAmbientFile(kind, file) {
+  /**
+   * 音频文件版环境床：循环播放。
+   * 失败顺序：同名 .wav → WebAudio 合成（.ogg 缺失或解码失败时不再卡住）。
+   */
+  _playAmbientFile(kind, file, isAlt = false) {
     try {
       let fell = false;
       const fallback = () => {
@@ -223,6 +227,11 @@ class GameAudio {
         fell = true;
         if (this.currentAmbient !== kind) return;
         this.ambientEl = null;
+        // 模型可能只产出 wav（体积大但能用）：先试同名 .wav，再回落合成
+        if (!isAlt && /\.ogg$/.test(file)) {
+          this._playAmbientFile(kind, file.replace(/\.ogg$/, '.wav'), true);
+          return;
+        }
         this._playAmbientSynth(kind);
       };
       const el = new Audio(file);

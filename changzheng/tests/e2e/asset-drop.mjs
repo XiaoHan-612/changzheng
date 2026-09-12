@@ -30,6 +30,8 @@ const AMBIENT = [
   '/audio/ambient/jinsha_rapids.ogg', '/audio/ambient/luding_iron.ogg', '/audio/ambient/snow_wind.ogg',
   '/audio/ambient/grass_fire.ogg', '/audio/ambient/huining_low.ogg',
 ];
+// 代码支持 ogg → wav → 合成 三级回退；这里按实际存在的那个判定
+const AMBIENT_WAV = AMBIENT.map((p) => p.replace(/\.ogg$/, '.wav'));
 
 async function ensureServer() {
   try {
@@ -57,9 +59,11 @@ async function main() {
     const r = await fetch(BASE + p, { method: 'HEAD' });
     report.image[p] = r.ok ? '已就位' : '待生成';
   }
-  for (const p of AMBIENT) {
-    const r = await fetch(BASE + p, { method: 'HEAD' });
-    report.ambient[p] = r.ok ? '已就位' : '合成兜底';
+  const ambientReady = [];
+  for (const [i, p] of AMBIENT.entries()) {
+    if ((await fetch(BASE + p, { method: 'HEAD' })).ok) { report.ambient[p] = '已就位（ogg）'; ambientReady.push(p); continue; }
+    if ((await fetch(BASE + AMBIENT_WAV[i], { method: 'HEAD' })).ok) { report.ambient[p] = '已就位（wav）'; ambientReady.push(AMBIENT_WAV[i]); continue; }
+    report.ambient[p] = '合成兜底';
   }
 
   // 浏览器侧：确认已就位的图能被解码（前端探测就是靠 Image.onload）
@@ -78,15 +82,30 @@ async function main() {
     })));
     return out;
   }, [...NEW_ASSETS, ...FUTURE]);
+  // 环境床：用 Audio 真解码一次（能拿到 duration 才说明 MIME 与容器没问题）
+  const audioOk = await page.evaluate(async (list) => {
+    const out = {};
+    await Promise.all(list.map((src) => new Promise((resolve) => {
+      const a = new Audio();
+      const done = (v) => { out[src] = v; resolve(); };
+      a.preload = 'metadata';
+      a.onloadedmetadata = () => done(Number.isFinite(a.duration) && a.duration > 0 ? Math.round(a.duration) : false);
+      a.onerror = () => done(false);
+      a.src = src;
+      setTimeout(() => done(false), 8000);
+    })));
+    return out;
+  }, ambientReady);
   await browser.close();
 
   const readyImages = Object.entries(report.image).filter(([, v]) => v === '已就位').map(([k]) => k);
-  const readyAmbient = Object.entries(report.ambient).filter(([, v]) => v === '已就位').map(([k]) => k);
+  const readyAmbient = Object.entries(report.ambient).filter(([, v]) => v.startsWith('已就位')).map(([k]) => k);
   console.log(JSON.stringify({
     已就位图片: readyImages,
     待生成图片: Object.entries(report.image).filter(([, v]) => v !== '已就位').map(([k]) => k),
     已就位环境床: readyAmbient,
     合成兜底环境床: Object.entries(report.ambient).filter(([, v]) => v !== '已就位').map(([k]) => k),
+    环境床解码时长秒: audioOk,
     浏览器解码结果: decoded,
     errs,
   }, null, 2));
@@ -94,6 +113,11 @@ async function main() {
   // 已就位的图必须能被浏览器解码，否则前端探测会退回占位图
   for (const p of readyImages) {
     if (decoded[p] !== true) throw new Error(`已就位但浏览器无法解码：${p}`);
+  }
+  for (const p of readyAmbient) {
+    // readyAmbient 里放的是清单键（.ogg），实际可播路径可能是同名 .wav
+    const served = audioOk[p] ? p : p.replace(/\.ogg$/, '.wav');
+    if (!audioOk[served]) throw new Error(`环境床无法在浏览器解码（MIME 或容器有问题）：${p}`);
   }
   if (errs.length) throw new Error('PAGE_ERRORS: ' + errs.join(' | '));
   console.log('ASSET DROP PASS');
