@@ -104,7 +104,7 @@ async function main() {
     已就位图片: readyImages,
     待生成图片: Object.entries(report.image).filter(([, v]) => v !== '已就位').map(([k]) => k),
     已就位环境床: readyAmbient,
-    合成兜底环境床: Object.entries(report.ambient).filter(([, v]) => v !== '已就位').map(([k]) => k),
+    合成兜底环境床: Object.entries(report.ambient).filter(([, v]) => !v.startsWith('已就位')).map(([k]) => k),
     环境床解码时长秒: audioOk,
     浏览器解码结果: decoded,
     errs,

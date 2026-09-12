@@ -29,7 +29,7 @@
 
 | 文件 | 用途 | 当前占位 | 状态 |
 |---|---|---|---|
-| `sentry_night.jpg` | 夜岗近景（暗夜营地边缘、树线、哨位） | `camp_pano.jpg` + CSS 暗角 | ⚠ 已产出但**待返工**（2026-09-12）：构图/夜景/无文字均达标，但军装是鲜红色，应对齐 `night_fire.jpg` 的灰蓝军装；纸纹也偏弱 |
+| `sentry_night.jpg` | 夜岗近景（暗夜营地边缘、树线、哨位） | 已产出 1280×872，军装为灰蓝（对齐 `night_fire.jpg`），纸纹毛边到位 | ✅ 已就位（返工后，2026-09-12） |
 | `sugar_close.jpg` | 分糖近景（火光下的手与三颗糖） | `camp_pano.jpg` | ✅ 已就位（2026-09-12） |
 | `snow_climb.jpg` | 雪山陡坡（拉人时机） | `snow_pano.jpg` | ✅ 已就位（2026-09-12） |
 
@@ -68,7 +68,7 @@
 
 | 类别 | 现状 | 说明 |
 |---|---|---|
-| 环境床 | **已就位 8 条（2026-09-12，容器为 WAV）** | 落盘在 `public/audio/ambient/*.wav`（单声道 44.1kHz 16bit 24.4s，浏览器解码通过）。**首选交付 Ogg Vorbis**：体积约为 WAV 的 1/10，代码优先用 `.ogg`、缺失时自动用同名 `.wav`。WAV 暂不入库（见 `.gitignore`），拿到 Ogg 后同名替换即可 |
+| 环境床 | **已就位 8 条（2026-09-12，Ogg Vorbis）** | 真正的 **Ogg Vorbis**（文件头 `OggS`），单声道 44.1kHz、24.4s、`subtype=VORBIS`，体积 116–225KB。`qa:assets` 浏览器解码 24s 全部通过。同名 `.wav` 保留作回退，代码优先 `.ogg` |
 | 操作音效 | **合成兜底** | click / cast / hook / echo / correct / wrong / march / day 等，同上 |
 | 预录台词 | **已有 21 条** | `public/audio/voices/*.wav` + 索引 `public/audio/voice-lines.json` |
 | 同伴反应音 | **已有 6 条** | `public/audio/reactions/*.wav`（老班长赞成/反对、卫生员担忧、红小鬼嘴硬、向导建议、新兵自责） |
