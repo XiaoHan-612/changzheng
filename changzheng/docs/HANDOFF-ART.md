@@ -68,6 +68,9 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 
 其余 13 张（`depart_crowd`、`xiangjiang_wreck`、`xiangjiang_night`、`zunyi_room`、`luding_run`、`snow_climb` 之外的雪山图、`map_route`、`echo_paper` 等）落盘后**需要一行代码接入**，位置见 `HANDOFF-CODE.md` 的模块地图。
 
+**立绘同样落盘即生效**：`public/assets/characters/` 下按约定名放就能自动替换文字头像（`main.js` 的 `PORTRAIT_FILE` 映射 + 启动预热）：
+`mother`（母亲）· `xianggui`（老乡）· `guide`（向导）· `boatman`（船工）· `recruit`（新兵）· `straggler`（掉队战士）· `drummer`（宣传员）· `captain`（突击队长）· `teacher`（文化教员）· `wounded`（担架伤员）——10 张已接线，规格 280×280 PNG、脸心居中偏上。
+
 ### 自检命令（产图后跑一次）
 
 ```powershell

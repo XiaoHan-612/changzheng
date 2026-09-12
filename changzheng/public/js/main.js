@@ -164,12 +164,41 @@ function preloadScenes() {
     '/assets/scenes/jinsha_ferry.jpg', '/assets/scenes/map_desk.jpg', '/assets/scenes/depart_bridge.jpg',
     '/assets/scenes/huining_flag.jpg', '/assets/scenes/lazikou_cliff.jpg',
     '/assets/scenes/xiangjiang_bridge.jpg', '/assets/scenes/zunyi_street.jpg', '/assets/scenes/huining_crowd.jpg',
+    // 立绘（第三轮）：落盘即生效，见 portraitImage()
+    '/assets/characters/mother.png', '/assets/characters/xianggui.png', '/assets/characters/guide.png',
+    '/assets/characters/boatman.png', '/assets/characters/recruit.png', '/assets/characters/straggler.png',
+    '/assets/characters/drummer.png', '/assets/characters/captain.png', '/assets/characters/teacher.png',
+    '/assets/characters/wounded.png',
   ].forEach((p) => {
     const img = new Image();
     img.onload = () => _imgState.set(p, true);
     img.onerror = () => _imgState.set(p, false);
     img.src = p;
   });
+}
+
+/** 角色名 → 立绘文件（约定名，落盘即生效；没有就退回文字头像） */
+const PORTRAIT_FILE = {
+  老班长: '/assets/characters/laoban.png',
+  指导员: '/assets/characters/zhiyuan.png',
+  红小鬼: '/assets/characters/xiaogui.png',
+  卫生员: '/assets/characters/weisheng.png',
+  母亲: '/assets/characters/mother.png',
+  老乡: '/assets/characters/xianggui.png',
+  向导: '/assets/characters/guide.png',
+  船工: '/assets/characters/boatman.png',
+  新兵: '/assets/characters/recruit.png',
+  掉队的战士: '/assets/characters/straggler.png',
+  宣传员: '/assets/characters/drummer.png',
+  突击队长: '/assets/characters/captain.png',
+  文化教员: '/assets/characters/teacher.png',
+  担架伤员: '/assets/characters/wounded.png',
+};
+
+function portraitImage(name) {
+  if (!name) return undefined;
+  const key = Object.keys(PORTRAIT_FILE).find((k) => String(name).includes(k));
+  return key ? sceneImage(PORTRAIT_FILE[key], '') : undefined;
 }
 
 const CHOICE_SETS = {
@@ -1161,7 +1190,7 @@ async function doTalk(act, h) {
   const comp = COMPANIONS.find((c) => npcName.includes(c.name)) || COMPANIONS[0];
   showScreen('screen-stage');
   setStageBanner(`${act.title} · 交谈`, act.pano);
-  setPortrait(npcName, h.sub || '同伴', comp.ava, '平静', comp.img);
+  setPortrait(npcName, h.sub || '同伴', comp.ava, '平静', comp.img || portraitImage(npcName));
   setStagePanel(`
     <div class="chat-row">
       <input id="talk-input" placeholder="对${npcName}说点什么…" autocomplete="off" />
@@ -1300,7 +1329,7 @@ async function doSchool() {
   step('school', 'minigame');
   showScreen('screen-stage');
   setStageBanner('夜校识字', '/assets/scenes/school_close.jpg');
-  setPortrait('文化教员', '夜校', '教', '耐心');
+  setPortrait('文化教员', '夜校', '教', '耐心', portraitImage('文化教员'));
   setStagePanel('<div id="school-host"></div>');
   markMini($('school-host'), 'school');
   await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
@@ -1643,7 +1672,7 @@ async function doLuding(act) {
   showScreen('screen-stage');
   setStageBanner('飞夺泸定桥', sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg'));
   audio.playAmbient('luding');
-  setPortrait('突击队长', '红四团', '勇', '决绝');
+  setPortrait('突击队长', '红四团', '勇', '决绝', portraitImage('突击队长'));
   setStagePanel('<div id="luding-host"></div>');
   markMini($('luding-host'), 'luding');
   await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
