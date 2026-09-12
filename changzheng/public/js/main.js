@@ -164,6 +164,7 @@ function preloadScenes() {
     '/assets/scenes/jinsha_ferry.jpg', '/assets/scenes/map_desk.jpg', '/assets/scenes/depart_bridge.jpg',
     '/assets/scenes/huining_flag.jpg', '/assets/scenes/lazikou_cliff.jpg',
     '/assets/scenes/xiangjiang_bridge.jpg', '/assets/scenes/zunyi_street.jpg', '/assets/scenes/huining_crowd.jpg',
+    '/assets/scenes/luding_run.jpg', '/assets/scenes/luding_bridge.jpg', '/assets/scenes/jinsha_ferry.jpg',
     // 立绘（第三轮）：落盘即生效，见 portraitImage()
     '/assets/characters/mother.png', '/assets/characters/xianggui.png', '/assets/characters/guide.png',
     '/assets/characters/boatman.png', '/assets/characters/recruit.png', '/assets/characters/straggler.png',
@@ -773,7 +774,7 @@ async function runActIntro() {
   if ($('act-tag')) $('act-tag').textContent = `${act.title} · ${act.subtitle}`;
   await runCutscene([
     { img: act.pano, text: `${act.date}。${act.subtitle}——${act.theme}。` },
-    { img: act.pano, text: '营地在暮色里安顿下来。光点在呼吸，走近一处，把事做完。' },
+    { img: sceneImage(act.cutAlt, act.pano), text: '营地在暮色里安顿下来。光点在呼吸，走近一处，把事做完。' },
   ]);
   if (act.prelude) await runPrelude(act);
   if (S.mode === 'quick') return runQuickAct(act);
