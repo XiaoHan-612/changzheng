@@ -4,6 +4,7 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,19 +12,13 @@ const PORT = process.env.PORT || 3001;
 const BASE = `http://localhost:${PORT}`;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-// 本轮新增素材（生图模型按 HANDOFF-ART.md 产出的就是这些名字）
-const NEW_ASSETS = [
-  '/assets/scenes/sentry_night.jpg',
-  '/assets/scenes/sugar_close.jpg',
-  '/assets/scenes/snow_climb.jpg',
-];
-// 未来补齐的素材：允许暂时不存在
-const FUTURE = [
-  '/assets/scenes/snow_camp.jpg', '/assets/scenes/snow_let_clothes.jpg', '/assets/scenes/luding_bridge.jpg',
-  '/assets/scenes/jinsha_ferry.jpg', '/assets/scenes/map_desk.jpg', '/assets/scenes/depart_bridge.jpg',
-  '/assets/scenes/huining_flag.jpg', '/assets/scenes/lazikou_cliff.jpg',
-  '/assets/scenes/xiangjiang_bridge.jpg', '/assets/scenes/zunyi_street.jpg', '/assets/scenes/huining_crowd.jpg',
-];
+// 素材清单直接读契约表（design/asset-prompts.md），避免测试清单与文档漂移
+const CONTRACT = (() => {
+  const md = fs.readFileSync(path.resolve(ROOT, '..', 'design/asset-prompts.md'), 'utf8');
+  const scenes = [...new Set([...md.matchAll(/^\| `([a-z_]+\.jpg)`/gm)].map((m) => m[1]))];
+  return scenes.map((f) => `/assets/scenes/${f}`);
+})();
+const NEW_ASSETS = CONTRACT;   // 全部按契约校验；已就位 vs 待生成由 HEAD 决定
 // 环境床 ogg
 const AMBIENT = [
   '/audio/ambient/depart_river.ogg', '/audio/ambient/xiangjiang_wind.ogg', '/audio/ambient/zunyi_rain.ogg',
@@ -55,7 +50,7 @@ async function main() {
 
   // 服务端可达性
   const report = { image: {}, ambient: {} };
-  for (const p of [...NEW_ASSETS, ...FUTURE]) {
+  for (const p of NEW_ASSETS) {
     const r = await fetch(BASE + p, { method: 'HEAD' });
     report.image[p] = r.ok ? '已就位' : '待生成';
   }
@@ -81,7 +76,7 @@ async function main() {
       img.src = src;
     })));
     return out;
-  }, [...NEW_ASSETS, ...FUTURE]);
+  }, NEW_ASSETS);
   // 环境床：用 Audio 真解码一次（能拿到 duration 才说明 MIME 与容器没问题）
   const audioOk = await page.evaluate(async (list) => {
     const out = {};

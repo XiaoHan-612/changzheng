@@ -43,7 +43,7 @@
 | 开场 | `depart_bridge`、`depart_crowd` |
 | 一幕 | `xiangjiang_bridge`、`xiangjiang_wreck`、`xiangjiang_night` |
 | 二幕 | `zunyi_room`、`map_desk`、`zunyi_street` |
-| 三幕 | `jinsha_ferry`、`luding_bridge`、`luding_run` |
+| 三幕 | `jinsha_ferry` ✅ · `luding_bridge` ✅（铁索压中段，适配横版小游戏）· `luding_run` ✅（湿脚印 + 丢下的草鞋 + 远处火把） |
 | 四幕 | `snow_camp` ✅ · `snow_let_clothes` ✅ 均已就位（2026-09-12，返工后双手为自然肤色，红军红只留帽徽） |
 | 五幕 | `lazikou_cliff`、`huining_flag`、`huining_crowd` |
 | 通用 | `map_route`、`echo_paper` |
