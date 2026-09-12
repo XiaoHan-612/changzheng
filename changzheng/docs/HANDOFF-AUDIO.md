@@ -23,7 +23,8 @@
 代码里有 `kind → 文件` 的映射（`public/js/audio.js` 的 `AMBIENT_FILE`）：
 **把文件按下面第二列的名字放进 `public/audio/ambient/`，刷新页面就生效**。
 回退链是 **`.ogg`（首选，体积约 WAV 的 1/10）→ 同名 `.wav` → WebAudio 合成**：
-模型只产出 WAV 也能直接播，但**交付首选 Ogg Vorbis**；容器必须与扩展名一致，否则服务器会发出错误 MIME。
+模型只产出 WAV 也能直接播（放在同一目录、用同名 `.wav`），但**交付首选 Ogg Vorbis**；
+容器必须与扩展名一致，否则服务器会发出错误 MIME。`.wav` 已被 `.gitignore` 忽略，避免仓库被 10 倍体积占掉。
 文件不存在或播放失败会自动回落到合成，流程完全不受影响。
 目录已建好（含 `.gitkeep`）。自检：`npm run qa:assets`（会列出「已就位环境床 / 合成兜底环境床」）。
 

@@ -68,7 +68,7 @@
 
 | 类别 | 现状 | 说明 |
 |---|---|---|
-| 环境床 | **已就位 8 条（2026-09-12，Ogg Vorbis）** | 真正的 **Ogg Vorbis**（文件头 `OggS`），单声道 44.1kHz、24.4s、`subtype=VORBIS`，体积 116–225KB。`qa:assets` 浏览器解码 24s 全部通过。同名 `.wav` 保留作回退，代码优先 `.ogg` |
+| 环境床 | **已就位 8 条（2026-09-12，Ogg Vorbis）** | 真正的 **Ogg Vorbis**（文件头 `OggS`），单声道 44.1kHz、24.4s，体积 116–226KB（合计 1.3MB）。`qa:assets` 浏览器解码 24s 全部通过。代码的 `.ogg → .wav → 合成` 回退链保留，但当前只存在 `.ogg` |
 | 操作音效 | **合成兜底** | click / cast / hook / echo / correct / wrong / march / day 等，同上 |
 | 预录台词 | **已有 21 条** | `public/audio/voices/*.wav` + 索引 `public/audio/voice-lines.json` |
 | 同伴反应音 | **已有 6 条** | `public/audio/reactions/*.wav`（老班长赞成/反对、卫生员担忧、红小鬼嘴硬、向导建议、新兵自责） |
