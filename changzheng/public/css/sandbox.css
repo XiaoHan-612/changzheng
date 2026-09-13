@@ -1,5 +1,5 @@
 /* ═══ 自由行军沙盘 ═══ */
-.sandbox-bg, .sandbox-grade { position: absolute; inset: 0; }
+.sandbox-bg, .sandbox-grade { position: absolute; inset: 0; pointer-events: none; }
 .sandbox-bg {
   background-size: cover; background-position: center 40%;
   filter: brightness(0.62) saturate(0.85);
