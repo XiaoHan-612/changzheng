@@ -20,7 +20,7 @@
 | `npm run qa:inspect` | 素材体检：格式/尺寸/时长/重复（含立绘） | 素材体检通过 |
 | `npm run qa:handoff` | 交接文档与代码契约一致（场景/环境床/TTS/立绘） | 可以交接 |
 | `node tests/e2e/layout-audit.mjs [--width 820]` | 逐屏布局硬伤（横向溢出/控件出界/点按区<32px），含**玩法板五屏**巡屏 | 1280 与 820 均 0 处问题 |
-| `npm run qa:board` | **玩法板体检**：几个玩法逐屏摆到板屏上（板屏壳/数值签/契约标记/第一步可点/离开清空） | 36 项全 ✓ |
+| `npm run qa:board` | **玩法板体检**：8 个玩法逐屏摆到板屏上（板屏壳/数值签/契约标记/第一步可点/离开清空） | 57 项全 ✓ |
 | `npm run qa:assets` | 素材落盘即生效：立绘兜底顺序（如「母亲」必须是 `mother.png`）等回归断言 | ASSETS PASS |
 | `npm run qa:audit` | 日志 schema 审计（按 `contractOk` 戳记分「本版本 / 历史」两拨算账） | 本版本字段缺失 0、FALLBACK 0；历史违约单列并注明成因 |
 

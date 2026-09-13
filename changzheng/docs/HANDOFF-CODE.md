@@ -123,10 +123,16 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 26. **评委/调试入口由「设置 → 展示」控制** —— `public/js/features.js` 的 `FEATURES.devTools` 是默认值（当前 false），运行时开关写在 localStorage（`czjc_devtools`）。关掉时 `body` 没有 `.dev-tools`，CSS 隐藏所有 `.dev-only` 元素：标题页「评委演示」与模型署名、顶栏「答辩」「记录」与模型标签。**答辩/路演要展示真调日志时，在设置里勾一下即可**，不必改代码。相关测试已改成不依赖这些入口（full-run 直接读 `/api/logs` 计数）。
 27. **玩法都在板屏上（`tpl-board`），宿主只有一条路** —— 小游戏原先挤在舞台纸卷里（上面还顶着给对白用的人物立绘），批四给它们建了 `#screen-board`：人物在舞台屏交代任务 → 切板屏玩 → 切回舞台屏结算（`say()` 与「继续」键都在舞台）。
    新增/搬迁玩法照抄这套：`const board = openBoard({ title, bg })` + `mountMini(board, name, id)`（内部会 `markMini`），状态用区块 `.blk-stat` 经 `stats(board.stats, [...])` 写进板头；**别再回到 `setStagePanel`**，也别在玩法里自己拼标题。截图/体检用 `__czScreens.mini(name)`（玩法都在幕深处，跑一整幕太贵）。
-   坑：`runSentry` 的三个处置键此前用 `.choice-btn`——**这个类在 CSS 里根本不存在**，渲染出来是浏览器默认按钮（同类的还有 `.mg-hint` / `.t-desc` / `.t-count` / `.grab-*`，都是框架重做删掉 `minigames.css` 时的漏网）。`npm run qa:board` 就是盯这类事故的：元素必须在屏上、契约标记必须真带 `data-mini-action`。
+   坑：这一批陆续修掉了一串**"类名在、样式没了"**（框架重做删 `minigames.css` 时漏网，批四批五才逐个抓到）：`runSentry` 的三个处置键用 `.choice-btn`（**CSS 里根本没有这个类**，渲染成浏览器默认按钮）、五子棋石子写 `.p1/.p2` 而 CSS 里只有 `.black/.white`（棋子一直是空圈）、陡坡的 `.grab-*` 三兄弟、沙盘的 `.narr`/`.verdict`/`.sb-person`。`npm run qa:board` 盯的就是这类事故：元素必须在屏上、契约标记必须真带 `data-mini-action`。
    另一条：e2e 的「五子棋恰好 1 次」断言只靠**可选营地热点**（两个小鬼）触发——act4 的强制链里没有它，营地里那 2 点暮色花在哪由流程决定，偶尔会落空（2026-09-13 遇到一次，重跑即过）。失败信息现在会带「营地历次热点 apN:[…]」用于定位；要稳定覆盖就在 `tests/e2e/full-run.mjs` 的营地分支里保住那条 gomoku 抢先点击。
 
-28. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
+28. **板屏上的三件事：数值签会串写、rAF 不会自己停、点按区有门槛**（批五体检抓的）
+   - **数值签串写**：上一局残留的定时器（如五子棋的 AI 落子）会往同一块 `#board-stats` 写、覆盖新一局的板头。`openBoard()` 现在**每局换一个新的数值签节点**，残留写入落在被丢弃的 DOM 上。
+   - **rAF 不停**：离开板屏后容器被卸下，但钓鱼/泸定桥/陡坡的动画循环还在跑帧。三处循环都加了"`!document.body.contains(container)` 就 `cancelAnimationFrame`"的守卫（五子棋的定时器同款）——**新玩法照抄这条**。
+   - **点按区 ≥32px**：五子棋格子 28×28 会被 `layout-audit --width 820` 判"手指点不准"（现 32，9×32+间隙=320 放得进 620 的板身）。
+   - 另两条小的：`stats()` 返回句柄（标签 → `<b>`），倒计时这类每帧变的数值**只改文本**、别重写 HTML；`stats()` 的初始化要放在那几个状态变量声明**之后**（写在前面会踩 TDZ，抓过一次）。
+
+29. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
 
 ## 六、下一步建议（按价值排序）
 

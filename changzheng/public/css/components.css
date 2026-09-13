@@ -289,8 +289,8 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .comp-aff.high { color: var(--gold); }
 
 /* 数字统一用等宽数字：数值变化时不会左右跳动 */
-.comp-aff, .hud-sub b, .score-line, .luding-hud,
-.quiz-result b, .def-card .v, .fact-card .date { font-variant-numeric: tabular-nums; }
+/* 等宽数字：数值签的 .blk-stat b 在 framework.css 里已经声明过，别在这里重复（区块样式只允许在 framework） */
+.comp-aff, .hud-sub b, .quiz-result b, .def-card .v, .fact-card .date { font-variant-numeric: tabular-nums; }
 
 .hud-bottom { position: absolute; left: 190px; right: var(--sp-4); bottom: var(--sp-4); z-index: var(--z-hud); display: flex; align-items: center; gap: var(--sp-3); pointer-events: none; }
 .hud-bottom .camp-log { flex: 1; pointer-events: none; max-height: 24px; overflow: hidden; padding: 3px 10px; font-size: 12px; color: var(--paper-dim); background: var(--ink-bg); border: 1px solid var(--line-soft); border-radius: var(--radius-inset); }
@@ -428,6 +428,12 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .def-card .k { font-size: var(--fs-micro); color: var(--ink-2); letter-spacing: 0.08em; }
 .def-card .v { font-family: var(--font-num); font-size: 22px; color: var(--seal); margin-top: 4px; }
 .def-card .n { font-size: var(--fs-micro); color: var(--ink-2); margin-top: 4px; }
+/* AI 失败时的「重试／跳过」行（由 main.js 注入当前操作区；间距在这里给，别写在 JS 里） */
+#ai-retry-row { margin-top: var(--sp-3); }
+
+/* 告警/损失文本（调用失败、掉队名单）：颜色只此一处，JS 里不许再写十六进制 */
+.txt-bad { color: var(--bad); }
+
 .ai-inspector { position: fixed; right: var(--sp-4); bottom: var(--sp-4); width: 320px; max-height: 46vh; overflow: auto; z-index: var(--z-toast); padding: var(--sp-3); border-radius: var(--radius); }
 .ai-ins-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-2); font-family: var(--font-kai); color: var(--seal); }
 .ai-ins-body { display: flex; flex-direction: column; gap: 6px; }
@@ -448,7 +454,9 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .sb-people .row, .sb-mem .row { display: flex; justify-content: space-between; gap: var(--sp-2); }
 .sb-intel { margin-top: var(--sp-3); padding: var(--sp-2); border-radius: var(--radius-inset); background: var(--ink-veil); font-size: var(--fs-micro); color: var(--ink-1); }
 .sb-main { position: absolute; left: 272px; right: var(--sp-4); top: 64px; bottom: var(--sp-5); z-index: var(--z-hud); display: flex; flex-direction: column; gap: var(--sp-3); }
-.sb-feed { flex: 1; min-height: 0; overflow: auto; padding: var(--sp-5); border-radius: var(--radius); }
+/* 纸面读区：随内容伸缩，上限按"一屏纸面 ≤35%"倒推（1280×800 下 64vh ≈ 512px）。
+   这样空局不会撑出一大张白纸，长回合也能滚动读完。 */
+.sb-feed { flex: 1; min-height: 0; max-height: 64vh; overflow: auto; padding: var(--sp-5); border-radius: var(--radius); }
 .sb-feed .say { margin-bottom: var(--sp-3); font-family: var(--font); font-size: 15px; line-height: var(--lh-loose); color: var(--ink-0); }
 .sb-feed .npc .who { font-family: var(--font-kai); color: var(--seal); }
 .sb-feed .npc { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-2); }
@@ -457,19 +465,33 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .sb-form input { flex: 1; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--rule-strong); background: var(--paper-0); color: var(--ink-0); font-family: var(--font); font-size: var(--fs-label); outline: none; }
 .sb-suggest { display: flex; gap: 6px; flex-wrap: wrap; }
 .sb-suggest .sug { padding: 3px 10px; border-radius: var(--radius-pill); border: 1px solid var(--rule-strong); background: var(--paper-0); font-size: var(--fs-micro); color: var(--ink-1); cursor: pointer; }
+/* 叙述正文：沙盘的回合叙事与行军记录里的响应摘要都用它（此前没有样式，一直是裸段落） */
+.narr { font-family: var(--font); font-size: 15px; line-height: var(--lh-loose); color: var(--ink-0); }
+/* 可行性裁定签：yes / hard / no 三档只改描边与色，不换字号（同 blk-stat 的状态口径） */
+.verdict { display: inline-block; margin-left: var(--sp-2); padding: 0 8px; border-radius: var(--radius-inset); border: 1px solid var(--rule-strong); font-size: var(--fs-micro); color: var(--ink-2); }
+.verdict.yes { color: var(--ok); border-color: var(--ok); }
+.verdict.hard { color: var(--gold); border-color: var(--gold); }
+.verdict.no { color: var(--bad); border-color: var(--bad); }
+/* 队伍行：姓名 + 状态；受伤/掉队只改颜色，不加图标（sandbox.js 给的是 .hurt / .down） */
+.sb-person { display: flex; justify-content: space-between; gap: var(--sp-2); }
+.sb-person .st { color: var(--ink-2); }
+.sb-person.hurt .st { color: var(--gold); }
+.sb-person.down .st { color: var(--bad); }
+.sb-person.down > span:first-child { text-decoration: line-through; text-decoration-thickness: 1px; }
+/* 语音输入进行中：麦克风键换成告警色（此前 .rec 也没有样式） */
+.sb-form.rec #sb-mic { border-color: var(--seal); color: var(--seal-bright); }
 .sb-hint { font-size: var(--fs-micro); color: var(--ink-2); }
 .sb-scene-tag { position: absolute; right: var(--sp-5); top: 64px; z-index: var(--z-hud); padding: 6px 14px; border-radius: var(--radius-pill); border: 1px solid var(--rule-strong); background: var(--paper-0); font-family: var(--font-kai); font-size: var(--fs-label); letter-spacing: 0.2em; color: var(--ink-1); pointer-events: none; }
 .ev-card { position: relative; padding: var(--sp-3); border-radius: var(--radius-inset); border: 1px solid var(--rule); background-color: var(--paper-0); background-size: cover; min-height: 96px; animation: fade-in var(--dur-slow) var(--ease-out) both; }
 .ev-tag { position: absolute; left: var(--sp-3); bottom: 10px; padding: 3px 10px; border-radius: var(--radius-pill); background: var(--scrim); border: 1px solid var(--rule-strong); font-family: var(--font-kai); font-size: var(--fs-micro); color: var(--paper); }
 
 /* ───────── 玩法板（tpl-board）───────── */
-.mg-title { font-family: var(--font-display); font-size: var(--fs-h2); letter-spacing: var(--ls-title); color: var(--ink-0); margin-bottom: var(--sp-2); }
-.mg-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; }
+/* 玩法里的标题 / 提示 / 状态 / 动作行一律走区块（blk-title·blk-note·blk-stat·blk-actions），
+   这里只留"玩法自己的"部件。旧的 .mg-title / .mg-hint / .mg-row / .score-line 已删（批五，2026-09-13）。 */
 .hint { font-size: var(--fs-label); line-height: var(--lh-normal); color: var(--ink-1); }
 .float-result { text-align: center; padding: var(--sp-4); }
 .float-result .big { font-family: var(--font-num); font-size: 48px; color: var(--seal); }
 .float-result .score { font-family: var(--font); color: var(--ink-1); margin-top: 6px; }
-.score-line { font-family: var(--font-num); font-size: var(--fs-label); color: var(--ink-1); }
 .used { opacity: 0.4; }
 .mini { font-size: var(--fs-micro); color: var(--ink-2); }
 
@@ -492,16 +514,20 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .sentry-signal .sig-main { font-family: var(--font-num); font-size: 20px; line-height: var(--lh-tight); color: var(--ink-0); }
 .dir-arrows { font-family: var(--font-num); letter-spacing: 0.3em; color: var(--seal); }
 
+/* 陡坡拉人：一条轨道 + 高亮窗口 + 游标（此前三个类都没有样式，渲染成裸 div——批五补齐） */
+.grab-track { position: relative; height: 46px; border: 1px solid var(--rule-strong); border-radius: var(--radius-inset); background: var(--ink-veil); overflow: hidden; }
+.grab-zone { position: absolute; top: 0; bottom: 0; background: var(--gold-soft); border-left: 1px solid var(--gold); border-right: 1px solid var(--gold); }
+.grab-marker { position: absolute; top: -2px; bottom: -2px; width: 3px; transform: translateX(-50%); background: var(--seal); box-shadow: 0 0 6px var(--seal-veil); }
+
 /* 五子棋 */
 .wzq-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; padding: var(--sp-2); border-radius: var(--radius-inset); background-color: var(--paper-2); }
-.wzq-cell { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--rule); background: transparent; cursor: pointer; }
+/* 32×32 是触屏体检（layout-audit ≤820）的点按区门槛：28 会被判"手指点不准"。
+   9×32 + 8×2 间隙 + 内边距 = 320px，620 宽的板身放得下（批五实测 28 时 820 档报错）。 */
+.wzq-cell { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--rule); background: transparent; cursor: pointer; }
 .wzq-cell.black { background: var(--ink-0); }
 .wzq-cell.white { background: var(--paper-0); border-color: var(--rule-strong); }
 
-/* 泸定桥 / 陡坡 */
-.luding-hud { display: flex; gap: var(--sp-4); justify-content: center; font-family: var(--font-num); color: var(--ink-0); }
-.luding-pad { display: flex; gap: var(--sp-3); justify-content: center; }
-.luding-pad .btn { min-width: 64px; }
+/* 泸定桥：HUD 与方向键都走区块（blk-stat / blk-actions），这里不再有专属壳 */
 
 /* ───────── 窄屏（820 及以下）：只调结构，不改配色 ───────── */
 @media (max-width: 820px) {

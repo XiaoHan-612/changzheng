@@ -70,7 +70,12 @@
   width: 240px; padding: var(--sp-4); overflow: auto;
   z-index: var(--z-hud);
 }
-.tpl-world .tpl-body, .tpl-world .sb-main { position: absolute; left: 272px; right: var(--sp-4); top: 64px; bottom: var(--sp-5); }
+/* 主列收成一条阅读列：左侧让给世界面板，右侧居中。
+   沙盘是纸面读区，一屏纸面必须 ≤35%（批五实测铺满时是 64.9%）——顺带行长也从"整屏宽"收到 620。 */
+.tpl-world .tpl-body, .tpl-world .sb-main {
+  position: absolute; left: 272px; right: var(--sp-4); top: 64px; bottom: auto;
+  margin: 0 auto; max-width: var(--panel-w);
+}
 
 /* 模板共用：纸卷/面板都走纸面材质 */
 .tpl-body.paper { /* 与 .paper-surface 同义，便于页面只写类名 */ }

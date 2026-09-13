@@ -232,6 +232,27 @@ const BATCHES = {
     { name: '04-candy', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'candy'); } },
     { name: '05-sentry', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'sentry'); } },
   ],
+  5: [
+    // 玩法板三屏（同一块板）+ 自由行军沙盘（tpl-world，走真实入口跑一回合）
+    { name: '01-gomoku', setup: async (p) => { await intoCamp(p); await jump(p, 'screen-board', 'mini', 'gomoku'); } },
+    { name: '02-luding', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'luding'); } },
+    { name: '03-grab', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'grab'); } },
+    {
+      name: '04-sandbox',
+      fresh: true,
+      setup: async (p) => {
+        await p.click('#btn-mode-sandbox');
+        await p.waitForTimeout(800);
+        await p.fill('#sb-input', '派两个人去打探前面的路');
+        await p.click('#sb-send');
+        for (let i = 0; i < 40; i++) {                 // 等模型裁决 + 世界更新
+          if (await p.locator('#sb-feed .turn').count()) break;
+          await p.waitForTimeout(400);
+        }
+        await p.waitForTimeout(600);
+      },
+    },
+  ],
 };
 
 async function capture() {

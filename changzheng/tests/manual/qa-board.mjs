@@ -47,6 +47,9 @@ const specs = {
   school: { title: '夜校识字', stat: '第', kick: '#school-opts [data-mini-action="answer"]', after: '#school-opts [data-mini-action="answer"]' },
   candy: { title: '分糖', stat: '还剩', kick: '[data-mini-action="candy"]', after: '[data-mini-action="target"]' },
   sentry: { title: '夜岗', stat: '信号', kick: '[data-mini-action="answer"]', after: '[data-mini-action="answer"]' },
+  gomoku: { title: '泥地五子棋', stat: '手数', kick: '[data-mini-action="cell"]', after: '[data-mini-action="cell"]' },
+  luding: { title: '飞夺泸定桥', stat: '时间', kick: '[data-mini-action="left"]', after: '[data-mini-action="jump"]' },
+  grab: { title: '陡坡 · 拽住他', stat: '机会', kick: '[data-mini-action="grab"]', after: '[data-mini-action="grab"]' },
 };
 
 for (const [name, spec] of Object.entries(specs)) {

@@ -206,7 +206,7 @@ async function main() {
   await page.waitForTimeout(500);
   const hasHook = await page.evaluate(() => !!window.__czScreens?.mini);
   if (hasHook) {
-    for (const name of ['needle', 'fishing', 'school', 'candy', 'sentry']) {
+    for (const name of ['needle', 'fishing', 'school', 'candy', 'sentry', 'gomoku', 'luding', 'grab']) {
       await page.evaluate((n) => window.__czScreens.mini(n), name);
       await page.waitForTimeout(700);
       await shot(page, `12-board-${name}`);

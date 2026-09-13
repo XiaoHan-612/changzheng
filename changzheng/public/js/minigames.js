@@ -34,11 +34,13 @@ function mount(parent, root) {
  * 文案都是代码里的固定词，不含模型返回，所以直接拼。
  */
 function stats(host, items) {
-  if (!host) return;
-  host.innerHTML = items
-    .filter(Boolean)
+  if (!host) return {};
+  const rows = items.filter(Boolean);
+  host.innerHTML = rows
     .map(([label, value, cls]) => `<span class="blk-stat ${cls || ''}">${label}<b>${value}</b></span>`)
     .join('');
+  // 返回句柄：频繁变化的数值（倒计时、手数）直接改 <b> 的文本，不必重写整行 HTML
+  return Object.fromEntries([...host.children].map((el, i) => [rows[i][0], el.querySelector('b')]));
 }
 
 /**
@@ -89,6 +91,8 @@ export function runFishing(container, opts = {}) {
     let resolved = false;
 
     function draw() {
+      // 离开板屏后容器会被卸下：循环必须自己停，否则一直在跑帧（钓鱼是最早的一处，批五统一补）
+      if (!document.body.contains(container)) { cancelAnimationFrame(raf); return; }
       wave += 0.04;
       floatY += (floatTarget - floatY) * 0.12;
       if (phase === 'window' && biteType === 'shake') {
@@ -629,7 +633,7 @@ export function runBendNeedle(container, opts = {}) {
 }
 
 /** 泥地石子五子棋（9×9，简易对手） */
-export function runGomoku(container) {
+export function runGomoku(container, opts = {}) {
   return new Promise((resolve) => {
     const N = 9;
     const board = Array.from({ length: N }, () => Array(N).fill(0)); // 0 空 1 你 2 小鬼
@@ -639,16 +643,18 @@ export function runGomoku(container) {
 
     const root = h('div');
     mount(container, root);
-    root.appendChild(h('div', { class: 'mg-title', text: '泥地五子棋' }));
     root.appendChild(h('div', {
-      class: 'mg-hint',
+      class: 'blk-note',
       text: '你执深色石子，小鬼执浅色。连成五子为胜。平局也算你们打了个平手。',
     }));
-    const status = h('div', { class: 'score-line', text: '你先手' });
     const grid = h('div', { class: 'wzq-grid' });
-    root.appendChild(status);
     root.appendChild(grid);
     container.dataset.miniState = 'player'; // 你先手
+
+    // 板头数值签：手数 + 当前局面（status 文案的单一来源）
+    let note = '你先手';
+    function refreshStats() { stats(opts.stats, [['手数', moves], ['局面', note]]); }
+    function setNote(text) { note = text; refreshStats(); }
 
     const cells = [];
     for (let y = 0; y < N; y++) {
@@ -663,12 +669,15 @@ export function runGomoku(container) {
       }
     }
 
+    refreshStats();          // 开局先摆上（手数 0 / 局面）
     const idx = (x, y) => y * N + x;
 
     function setStone(x, y, who) {
       board[y][x] = who;
       const c = cells[idx(x, y)];
-      c.classList.add(who === 1 ? 'p1' : 'p2');
+      // 石子颜色走 CSS 里已有的 .black / .white（此前 JS 加的是 p1/p2——那两个类没有样式，
+      // 于是棋子一直是空圈：类名对不上就是这么静默地坏掉，2026-09-13 批五修）
+      c.classList.add(who === 1 ? 'black' : 'white');
       c.disabled = true;
       moves += 1;
     }
@@ -692,14 +701,14 @@ export function runGomoku(container) {
       return false;
     }
 
-    function finish(result, note) {
+    function finish(result, finalNote) {
       over = true;
-      status.textContent = note;
+      setNote(finalNote);
       container.dataset.miniState = 'done';
       audio.playSfx(result === 'win' ? 'correct' : result === 'draw' ? 'echo' : 'wrong');
       const score = result === 'win' ? 1 : result === 'draw' ? 0.55 : 0.25;
       setTimeout(() => {
-        resolve({ score, detail: { result, moves }, summary: `五子棋：${note}` });
+        resolve({ score, detail: { result, moves }, summary: `五子棋：${finalNote}` });
       }, 700);
     }
 
@@ -715,13 +724,13 @@ export function runGomoku(container) {
         return;
       }
       turn = 2;
-      status.textContent = '小鬼在想…';
+      setNote('小鬼在想…');
       container.dataset.miniState = 'ai';
       setTimeout(kidMove, 380 + Math.random() * 400);
     }
 
     function kidMove() {
-      if (over) return;
+      if (over || !document.body.contains(container)) return;   // 离开板屏就作废，别再落子/写数值签
       // 简易棋力：优先成五、其次封堵，再者为邻近空位
       let best = null;
       let bestScore = -1;
@@ -763,7 +772,7 @@ export function runGomoku(container) {
         return;
       }
       turn = 1;
-      status.textContent = '轮到你了';
+      setNote('轮到你了');
       container.dataset.miniState = 'player';
     }
   });
@@ -774,7 +783,7 @@ export function runGomoku(container) {
  * 45s 限时；第一次跌落由战友拉住（体力 −10），第二次跌落走"付出代价仍过桥"。
  * 返回 { score, detail:{ cleared, falls, hits, zeroFalls } }
  */
-export function runLuding(container) {
+export function runLuding(container, opts = {}) {
   return new Promise((resolve) => {
     const W = 460;
     const H = 220;
@@ -782,14 +791,20 @@ export function runLuding(container) {
     const GOAL = 420;
     const TIME_LIMIT = 45;
 
+    // 画布配色：能对上 tokens 的从 CSS 变量读（人是纸色、军装是朱红），
+    // 夜色/江水/木板/火力是这幅夜景画自己的色，留在这里并写明。
+    const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    const PAL = {
+      night: '#161c26', nightDeep: '#0b0f14', river: 'rgba(60,110,130,0.35)',
+      plank: '#4a3524', chain: 'rgba(180,180,170,0.5)',
+      fire: 'rgba(230,90,60,0.55)', fireDim: 'rgba(230,90,60,0.14)',
+      flag: '#c23a2e', flagVeil: 'rgba(194,58,46,0.85)',
+      paper: cssVar('--paper-0'), seal: cssVar('--seal'),
+    };
     container.innerHTML = `
-      <p class="hint">A / D 或 ← → 移动，空格跳过缺口。对岸火力会扫过桥面——被扫中要低头硬扛。45 秒内过桥。</p>
+      <p class="blk-note">A / D 或 ← → 移动，空格跳过缺口。对岸火力会扫过桥面——被扫中要低头硬扛。45 秒内过桥。</p>
       <canvas class="mini" id="luding-canvas" width="${W}" height="${H}"></canvas>
-      <div class="luding-hud">
-        <span id="luding-status" class="muted">按 A / D 开始</span>
-        <span class="muted" id="luding-time">45.0s</span>
-      </div>
-      <div class="luding-pad">
+      <div class="blk-actions center">
         <button type="button" class="btn sm" id="luding-left">←</button>
         <button type="button" class="btn sm" id="luding-jump">跳</button>
         <button type="button" class="btn sm" id="luding-right">→</button>
@@ -797,8 +812,6 @@ export function runLuding(container) {
 
     const canvas = container.querySelector('#luding-canvas');
     const ctx = canvas.getContext('2d');
-    const statusEl = container.querySelector('#luding-status');
-    const timeEl = container.querySelector('#luding-time');
 
     const gaps = [
       { x: 120, w: 34 },
@@ -826,6 +839,14 @@ export function runLuding(container) {
     const keys = new Set();
     let last = performance.now();
 
+    // 板头数值签：时间/状况/跌落/中弹。时间和状况每帧都在变，所以拿句柄直接改文本。
+    let note = '按 A / D 开始';
+    let S = {};
+    function refreshHud() {
+      S = stats(opts.stats, [['时间', `${Math.max(0, TIME_LIMIT - elapsed).toFixed(1)}s`], ['状况', note], ['跌落', falls], ['中弹', hits]]);
+    }
+    refreshHud();
+
     function inGap(x) {
       return gaps.some((g) => x > g.x && x < g.x + g.w);
     }
@@ -837,7 +858,7 @@ export function runLuding(container) {
       });
     }
 
-    function finish(cleared, note) {
+    function finish(cleared, finalNote) {
       if (resolved) return;
       resolved = true;
       over = true;
@@ -847,17 +868,19 @@ export function runLuding(container) {
       let score;
       if (!cleared) score = 0.2;
       else score = Math.min(1, 0.6 + (timeLeft / TIME_LIMIT) * 0.25 + (falls === 0 ? 0.15 : 0) - hits * 0.05);
-      statusEl.textContent = note;
+      note = finalNote;
+      refreshHud();
       setTimeout(() => {
         resolve({
           score: Math.max(0, score),
           detail: { cleared, falls, hits, timeLeft: Math.round(timeLeft), retry: falls > 0 },
-          summary: `泸定桥：${note}`,
+          summary: `泸定桥：${finalNote}`,
         });
       }, 600);
     }
 
     function draw(now) {
+      if (!document.body.contains(container)) { cancelAnimationFrame(raf); return; }
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       if (!over) elapsed = (now - t0) / 1000;
@@ -877,11 +900,13 @@ export function runLuding(container) {
         // 站在缺口上 → 跌落
         if (py >= GROUND - 1 && onGround && inGap(px)) {
           falls += 1;
+          if (S.跌落) S.跌落.textContent = falls;
           audio.playSfx('wrong');
           if (falls >= 2) {
             finish(false, '第二次跌落，队伍付出代价才过桥');
           } else {
-            statusEl.textContent = '战友一把拉住你（体力 −10）';
+            note = '战友一把拉住你（体力 −10）';
+            refreshHud();
             px = Math.max(8, (gaps.find((g) => px > g.x && px < g.x + g.w)?.x ?? px) - 16);
             py = GROUND;
             vy = 0;
@@ -894,6 +919,7 @@ export function runLuding(container) {
           hits += 1;
           hitCooldown = 0.8;
           audio.playSfx('wrong');
+          if (S.中弹) S.中弹.textContent = hits;
         }
         if (px >= GOAL) finish(true, hits === 0 && falls === 0 ? '干净利落过桥' : '过桥了');
         if (elapsed >= TIME_LIMIT) finish(false, '时间到了');
@@ -902,23 +928,23 @@ export function runLuding(container) {
       // ── 画面 ──
       ctx.clearRect(0, 0, W, H);
       const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, '#161c26');
-      sky.addColorStop(1, '#0b0f14');
+      sky.addColorStop(0, PAL.night);
+      sky.addColorStop(1, PAL.nightDeep);
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, W, H);
 
       // 江水
-      ctx.fillStyle = 'rgba(60,110,130,0.35)';
+      ctx.fillStyle = PAL.river;
       ctx.fillRect(0, GROUND + 22, W, H - GROUND - 22);
 
       // 桥面木板
       for (let x = 0; x < W - 30; x += 18) {
         if (inGap(x) || inGap(x + 12)) continue;
-        ctx.fillStyle = '#4a3524';
+        ctx.fillStyle = PAL.plank;
         ctx.fillRect(x, GROUND, 16, 8);
       }
       // 铁索
-      ctx.strokeStyle = 'rgba(180,180,170,0.5)';
+      ctx.strokeStyle = PAL.chain;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, GROUND - 26);
@@ -928,27 +954,27 @@ export function runLuding(container) {
       // 火力预警
       fires.forEach((f) => {
         const hot = fireHot(now);
-        ctx.fillStyle = hot ? 'rgba(230,90,60,0.55)' : 'rgba(230,90,60,0.14)';
+        ctx.fillStyle = hot ? PAL.fire : PAL.fireDim;
         ctx.fillRect(f.x, GROUND - 60, f.w, 60);
       });
 
       // 角色
-      ctx.fillStyle = '#e8dcc8';
+      ctx.fillStyle = PAL.paper;
       ctx.beginPath();
       ctx.arc(px, py - 26, 6, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#8b2e2e';
+      ctx.fillStyle = PAL.seal;
       ctx.fillRect(px - 5, py - 20, 10, 20);
 
       // 终点旗
-      ctx.fillStyle = '#c23a2e';
+      ctx.fillStyle = PAL.flag;
       ctx.fillRect(GOAL + 6, GROUND - 52, 3, 52);
-      ctx.fillStyle = 'rgba(194,58,46,0.85)';
+      ctx.fillStyle = PAL.flagVeil;
       ctx.fillRect(GOAL + 9, GROUND - 52, 20, 12);
 
       if (!over) {
-        timeEl.textContent = `${Math.max(0, TIME_LIMIT - elapsed).toFixed(1)}s`;
-        if (statusEl.textContent.startsWith('按')) statusEl.textContent = '过桥中…';
+        if (S.时间) S.时间.textContent = `${Math.max(0, TIME_LIMIT - elapsed).toFixed(1)}s`;
+        if (note.startsWith('按')) { note = '过桥中…'; if (S.状况) S.状况.textContent = note; }
       }
       raf = requestAnimationFrame(draw);
     }
@@ -1006,26 +1032,24 @@ export function runLuding(container) {
  * 陡坡 · 拽住同伴：0.8s 量级的时机操作，三次机会。
  * 返回 { score, detail:{ hits, tries, bestMiss } }
  */
-export function runGrab(container) {
+export function runGrab(container, opts = {}) {
   return new Promise((resolve) => {
     const TRIES = 3;
     const WIN = 16; // 窗口宽度（百分比）
 
     const root = h('div');
     mount(container, root);
-    root.appendChild(h('div', { class: 'mg-title', text: '拽住他' }));
     root.appendChild(h('div', {
-      class: 'mg-hint',
+      class: 'blk-note',
       text: '他滑脱的那一下只有很短的时间。光标扫进高亮区时按空格（或点「抓住」）。三次机会。',
     }));
     const track = h('div', { class: 'grab-track' });
     const zone = h('div', { class: 'grab-zone' });
     const marker = h('div', { class: 'grab-marker' });
     track.append(zone, marker);
-    const status = h('div', { class: 'score-line', text: `第 1 / ${TRIES} 次` });
     const btn = h('button', { class: 'btn primary', type: 'button', text: '抓住（空格）' });
     btn.dataset.miniAction = 'grab';
-    root.append(track, h('div', { class: 'mg-row' }, [btn]), status);
+    root.append(track, h('div', { class: 'blk-actions center' }, [btn]));
 
     let zonePos = 22 + Math.random() * 46;
     let pos = 0;
@@ -1033,6 +1057,12 @@ export function runGrab(container) {
     const speed = 86; // %/s
     let tries = 0;
     let hits = 0;
+
+    // 板头数值签：第几次 + 抓住几次（文案同时是给玩家的即时反馈）。
+    // 注意位置：必须在 hits 声明之后——写在前面会踩 TDZ（2026-09-13 体检抓到过）。
+    let note = `第 1 / ${TRIES} 次`;
+    function refreshStats() { stats(opts.stats, [['机会', note], ['抓住', hits]]); }
+    refreshStats();
     let sum = 0;
     let over = false;
     let last = performance.now();
@@ -1045,6 +1075,7 @@ export function runGrab(container) {
     }
 
     function tick(now) {
+      if (!document.body.contains(container)) { cancelAnimationFrame(raf); return; }
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       if (!over) {
@@ -1067,9 +1098,10 @@ export function runGrab(container) {
       if (inZone) hits += 1;
       tries += 1;
       audio.playSfx(inZone ? 'hook' : 'wrong');
-      status.textContent = inZone
+      note = inZone
         ? `抓住了！（第 ${tries}/${TRIES} 次）`
         : `手空了……（第 ${tries}/${TRIES} 次）`;
+      refreshStats();
       if (tries >= TRIES) {
         over = true;
         cancelAnimationFrame(raf);

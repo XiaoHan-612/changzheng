@@ -68,8 +68,7 @@ function askAiRetry(info, payload) {
     host.querySelectorAll('#ai-retry-row').forEach((n) => n.remove());
     const row = document.createElement('div');
     row.id = 'ai-retry-row';
-    row.className = 'mg-row';
-    row.style.marginTop = '12px';
+    row.className = 'blk-actions';   // 区块；与内容的间距由 #ai-retry-row 一条规则给（components.css）
     const retryBtn = document.createElement('button');
     retryBtn.type = 'button';
     retryBtn.className = 'btn primary';
@@ -435,6 +434,9 @@ function exposeSheetHooks() {
         school: ['夜校识字', (host, o) => runNightSchool(host, o)],
         candy: ['分糖', (host, o) => runCandy(host, o)],
         sentry: ['夜岗', (host, o) => runSentry(S.tonightPassword, host, o)],
+        gomoku: ['泥地五子棋', (host, o) => runGomoku(host, o)],
+        luding: ['飞夺泸定桥', (host, o) => runLuding(host, o)],
+        grab: ['陡坡 · 拽住他', (host, o) => runGrab(host, o)],
       };
       const spec = games[name];
       if (!spec) return false;
@@ -751,10 +753,10 @@ function bindSettings() {
         $('set-test-result').innerHTML = `
           <div class="muted sm">回声：${escapeHtml(probe.reply || '（内容为空）')}</div>
           ${u ? `<div class="muted sm">tokens：in ${u.prompt_tokens} / out ${u.completion_tokens}</div>` : ''}
-          ${probe.emptyContent ? '<div class="sm" style="color:#e07a5f">⚠ content 为空：多半是推理档位没设，或 max_tokens 不够</div>' : ''}`;
+          ${probe.emptyContent ? '<div class="sm txt-bad">⚠ content 为空：多半是推理档位没设，或 max_tokens 不够</div>' : ''}`;
       } else {
         $('set-status').textContent = `✗ 失败${probe.httpStatus ? '（HTTP ' + probe.httpStatus + '）' : ''}　${probe.latencyMs}ms`;
-        $('set-test-result').innerHTML = `<div class="sm" style="color:#e07a5f">${escapeHtml(probe.error || '未知错误')}</div>`;
+        $('set-test-result').innerHTML = `<div class="sm txt-bad">${escapeHtml(probe.error || '未知错误')}</div>`;
       }
     } catch (e) {
       $('set-status').textContent = '连通失败：' + e.message;
@@ -936,7 +938,7 @@ async function runFailure(fail, act) {
 function renderRelations() {
   const rows = [`出身：${originText()}`]
     .concat(COMPANIONS.map((c) => `${c.name}：${S[`好感_${c.name}`] ?? 40}`));
-  const lost = (S.losses || []).map((l) => `<span style="color:#e07a5f">${escapeHtml(l.who)} · ${escapeHtml(l.reason)}</span>`);
+  const lost = (S.losses || []).map((l) => `<span class="txt-bad">${escapeHtml(l.who)} · ${escapeHtml(l.reason)}</span>`);
   return rows.concat(lost).join('<br/>');
 }
 
@@ -1643,10 +1645,11 @@ async function doGomoku() {
   showScreen('screen-stage');
   setStageBanner('泥地五子棋', '/assets/scenes/camp_pano.jpg');
   setPortrait('两个小鬼', '泥地上的棋', '棋', '专注', '/assets/characters/xiaogui.png');
-  setStagePanel('<div id="gomoku-host"></div>');
-  markMini($('gomoku-host'), 'gomoku');
+  setStagePanel('');
   await say('红小鬼', '石子当子，泥地当盘。你要是输了，可不许说没吃饱。');
-  const op = await runGomoku($('gomoku-host'));
+  const board = openBoard({ title: '泥地五子棋', bg: '/assets/scenes/camp_pano.jpg' });
+  const op = await runGomoku(mountMini(board, 'gomoku', 'gomoku-host'), { stats: board.stats });
+  showScreen('screen-stage');
   markLine(S, 'gomoku');
   showThinking(true);
   let result;
@@ -1674,10 +1677,11 @@ async function doGrab() {
   showScreen('screen-stage');
   setStageBanner('陡坡上', sceneImage('/assets/scenes/snow_climb.jpg', '/assets/scenes/snow_pano.jpg'));
   setPortrait('你', '年轻战士', '你', '咬牙');
-  setStagePanel('<div id="grab-host"></div>');
-  markMini($('grab-host'), 'grab');
+  setStagePanel('');
   await say('你', '他的手在滑。前面的雪是硬的，下面是空的。');
-  const op = await runGrab($('grab-host'));
+  const board = openBoard({ title: '陡坡 · 拽住他', bg: sceneImage('/assets/scenes/snow_climb.jpg', '/assets/scenes/snow_pano.jpg') });
+  const op = await runGrab(mountMini(board, 'grab', 'grab-host'), { stats: board.stats });
+  showScreen('screen-stage');
   showThinking(true);
   let result;
   try {
@@ -1720,8 +1724,9 @@ async function doRoster() {
     });
     bumpAiCount(S);
     const box = $('stage-panel');
-    box.innerHTML = `<h3 class="mg-title">${escapeHtml(r.title || '这一路')}</h3>`
-      + (r.lines || []).map((l) => `<p style="line-height:1.9;color:var(--paper-dim);margin:8px 0">${escapeHtml(l)}</p>`).join('');
+    // 这里原先用 mg-title + 手写 style 的 paper-dim：那是"给暗底用的纸色"，落在浅墨纸卷上看不清（批五修）
+    box.innerHTML = `<h3 class="blk-title sm">${escapeHtml(r.title || '这一路')}</h3>`
+      + (r.lines || []).map((l) => `<p class="blk-body">${escapeHtml(l)}</p>`).join('');
     await say('叙事', (r.lines || []).join(' '));
     appendCampLog(S, '会师', (r.lines || [])[0] || '');
   } catch (err) {
@@ -1746,10 +1751,14 @@ function openBoard({ title = '', bg = '' } = {}) {
   $('board-kicker').textContent = act ? `${act.title} · 第 ${S?.day || 1} 日` : '玩法';
   $('board-title').textContent = title;
   $('board-bg').style.backgroundImage = bg ? `url('${bg}')` : '';
-  $('board-stats').innerHTML = '';
+  // 数值签容器每局换一个新节点：上一局若还有定时器/动画在跑，它持有的是旧节点，
+  // 写进去也落在已丢弃的 DOM 上，不会串写到这一局的板头（2026-09-13 体检抓到过串写）。
+  const oldStats = $('board-stats');
+  const statsHost = oldStats.cloneNode(false);
+  oldStats.replaceWith(statsHost);
   const body = $('board-body');
   body.innerHTML = '';
-  return { body, stats: $('board-stats') };
+  return { body, stats: statsHost };
 }
 
 /** 装一个玩法：板屏开好、host 就位、契约声明齐，交给 minigames.js 的 runXxx */
@@ -1913,10 +1922,11 @@ async function doLuding(act) {
   setStageBanner('飞夺泸定桥', sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg'));
   audio.playAmbient('luding');
   showNpc('突击队长', { role: '红四团', mood: '决绝' });
-  setStagePanel('<div id="luding-host"></div>');
-  markMini($('luding-host'), 'luding');
+  setStagePanel('');
   await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
-  const op = await runLuding($('luding-host'));
+  const board = openBoard({ title: '飞夺泸定桥', bg: sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg') });
+  const op = await runLuding(mountMini(board, 'luding', 'luding-host'), { stats: board.stats });
+  showScreen('screen-stage');
   S.ludingResult = op.detail || null;
   // 战友拉住的那一下，先落到状态里再交给模型写后果
   if (op.detail?.retry) applyEffects(S, { 体力: -10 });
@@ -2254,7 +2264,7 @@ async function runNightChoice(act) {
     bumpAiCount(S);
     applyEffects(S, res?.effects);
     renderStats(S);
-    body.innerHTML = '<p id="night-out" style="line-height:1.85;margin:10px 0;color:var(--paper-dim)"></p>';
+    body.innerHTML = '<p id="night-out" class="blk-body"></p>';   // 纸面用墨字，别用给暗底准备的纸色
     await typeText($('night-out'), res?.narrative || '当夜无事。');
     appendCampLog(S, '篝火夜', res?.narrative || choice.label);
   } catch (err) {

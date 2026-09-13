@@ -36,13 +36,11 @@
 - 沙盘：世界面板（人/粮/士气/体力/情报）、自由输入、语音输入（Web Speech）、建议行动、事件图卡、同伴语音
 
 ### 视觉（纸墨设计系统，逐批打磨 25 页）
-- 已完成：框架（7 模板 + 区块 + 5 标准动效 + 守卫 + 样板页）与批 1–4
+- 已完成：框架（7 模板 + 区块 + 5 标准动效 + 守卫 + 样板页）与批 1–5
   （标题/怎么玩/设置/过场；营地/手记/史实/岔路/回响；舞台对话/抉择/裁决/篝火菜单；
-  **新建 `tpl-board` 板屏** + 钓鱼+弯针/夜校/分糖/夜岗）
-- 待做：批 5–6（五子棋/泸定桥/陡坡/沙盘 → 答题/夜间/终局/记录）。**批五开工前先读
-  [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md) §五 的「批五开工前先读」**——那里列着同类的
-  "类名在、样式没了"欠账（`.grab-*` 三兄弟、`.mg-*`、`.score-line`）与玩法宿主的新规矩
-  （`openBoard()` + `mountMini()`）
+  **`tpl-board` 板屏 + 8 个玩法**；五子棋/泸定桥/陡坡/沙盘）
+- 待做：批 6（答题/夜间/终局/记录与答辩）。开工前先读
+  [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md) §五 的「批六开工前先读」
 - 进度表、每批交付口径与守卫命令都在 DESIGN-SYSTEM §五；改界面先读 §三 组件规范与 §二点五 区块表，
   别在页面里新写样式（`qa:frames` 会拦）
 
@@ -61,12 +59,12 @@ npm run qa:av        # 影音运行时审计：资源 404 / 立绘 / 环境床 /
 # 局部（多数不烧 AI，随时可跑）
 npm run test:unit    # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏
 npm run qa:smoke     # 标题→营地→一次互动→回设置
-npm run qa:board     # 玩法板体检 36 项（板屏壳 / 数值签 / 契约标记 / 第一步可点 / 离开清空）
+npm run qa:board     # 玩法板体检 57 项（8 个玩法的板屏壳 / 数值签 / 契约标记 / 离开清空）
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫：字面量 / 模板 / 纸面 / 动效
 npm run qa:handoff   # 交接文档与代码契约是否一致
 ```
 
-当前结果：unit 49/49 · smoke PASS · board 36/36 · motion 16/16 · e2e FULL PASS ·
+当前结果：unit 49/49 · smoke PASS · board 57/57 · motion 16/16 · e2e FULL PASS ·
 sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 全绿 ·
 `layout-audit --width 820` 与 1280 均零布局缺陷
 
@@ -76,7 +74,7 @@ sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 
 |--------|------|------|
 | P1 | 契约还差两处 | `runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职（建议走 `askChoice`）；`runRest` 只有一个「继续」，可直接 `waitContinue` |
 | P1 | 数值平衡未调 | 测量口径已建（`npm run qa:playtest` → `docs/PLAYTEST.md`），调参待做 |
-| P1 | 视觉批 5–6 | 五子棋/泸定桥/陡坡/沙盘 → 答题/夜间/终局/记录（欠账清单见 DESIGN-SYSTEM §五） |
+| P1 | 视觉批 6 | 答题/夜间/终局/记录与答辩（欠账清单见 DESIGN-SYSTEM §五「批六开工前先读」） |
 | P2 | 移动端不做 | 窄屏只保证到 **820**（已逐屏体检）；375 手机档明确不在交付范围 |
 | P2 | 沙盘多智能体偏轻 | NPC 有 goal 与 3 条记忆，但没有「目标推进」的主动事件 |
 | P2 | 操作音效仍是合成 | click/hook/echo 等由 WebAudio 合成；是否预录看路演音质要求 |
