@@ -115,17 +115,19 @@ body.overlay-open .path-zone { visibility: hidden; }
 }
 .title-bg::after {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(10,12,14,0.45), rgba(10,12,14,0.75));
+  background: linear-gradient(180deg, rgba(14,11,8,0.45), rgba(14,11,8,0.78));
 }
 .title-card { position: relative; z-index: 2; text-align: center; padding: 40px 28px; max-width: 620px; }
 .title-card h1 {
-  font-family: var(--font); font-size: clamp(36px, 6vw, 60px);
-  font-weight: 700; letter-spacing: 0.12em; line-height: 1.2;
+  /* 主标题用毛笔楷：全作唯一的"题字"位 */
+  font-family: var(--font-display); font-size: clamp(40px, 6vw, 64px);
+  font-weight: 400; letter-spacing: var(--ls-title); line-height: 1.2;
+  text-shadow: var(--shadow-text);
 }
-.title-card h1 span { color: var(--red-bright); margin: 0 0.06em; }
-.subtitle { margin: 10px 0 18px; color: var(--gold); font-family: var(--font); letter-spacing: 0.2em; }
-.tagline { color: var(--paper-dim); font-size: 14px; line-height: 1.85; margin-bottom: 28px; }
-.tagline strong { color: var(--gold); }
+.title-card h1 span { color: var(--red-bright); margin: 0 0.08em; }
+.subtitle { margin: 10px 0 18px; color: var(--gold); font-family: var(--font-kai); letter-spacing: 0.22em; }
+.tagline { color: var(--paper-dim); font-size: 14px; line-height: var(--lh-normal); margin-bottom: 28px; }
+.tagline strong { color: var(--paper); }
 .title-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .foot-note { margin-top: 32px; font-size: 12px; color: var(--muted); letter-spacing: 0.1em; }
 
@@ -159,15 +161,22 @@ body.overlay-open .path-zone { visibility: hidden; }
 }
 .cut-stage::after {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(8,10,12,0.25), rgba(8,10,12,0.72));
+  background: linear-gradient(180deg, rgba(14,11,8,0.22), rgba(14,11,8,0.72));
 }
 .cut-caption-wrap {
   position: relative; z-index: 2; text-align: center;
-  max-width: 560px; padding: 0 24px;
+  max-width: 640px; padding: var(--sp-5) var(--sp-6);
+  /* 字幕压在一片纸上：过场画面明暗不定，纸底才能保证任何一帧都读得清 */
+  background-color: var(--paper-1);
+  background-image: linear-gradient(180deg, rgba(255,252,244,0.5), rgba(214,200,172,0.35)), var(--paper-tex);
+  background-size: auto, cover;
+  color: var(--ink-0);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-float);
 }
 .cut-caption {
-  font-family: var(--font); font-size: 18px; line-height: 1.9; letter-spacing: 0.08em;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.65);
+  font-family: var(--font); font-size: 18px; line-height: var(--lh-loose); letter-spacing: 0.08em;
   min-height: 5.5em;
 }
 .cut-actions {
@@ -430,7 +439,12 @@ canvas.mini {
 }
 
 /* settings */
-.settings-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:12px 0 16px; }
+.settings-grid {
+  display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-3); margin: var(--sp-3) 0 var(--sp-4);
+}
+/* 展示开关那一栏独占一行：它是开关不是输入框，挤在网格里会显得零碎 */
+.settings-grid > div:has(#set-devtools) { grid-column: 1 / -1; }
 .settings-grid h3 { margin:0 0 6px; font-size:12px; color:var(--gold); letter-spacing:.1em; }
 .set-input {
   width:100%; background:rgba(255,251,242,0.72); border:1px solid var(--rule-strong);

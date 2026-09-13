@@ -460,14 +460,19 @@
 .mode-pick { display: flex; gap: 12px; justify-content: center; margin: 22px 0 18px; flex-wrap: wrap; }
 .mode-card {
   width: 220px; padding: 16px 18px; text-align: left; cursor: pointer;
-  border-radius: 14px; border: 1px solid rgba(232,220,200,0.2);
-  background: rgba(18,20,26,0.72); color: var(--paper);
-  transition: 0.2s; font-family: var(--font-ui);
+  /* 模式卡 = 纸片：与内容层同一材质，压在插画上也读得清 */
+  border-radius: var(--radius); border: 1px solid var(--rule-strong);
+  background-color: var(--paper-1);
+  background-image: linear-gradient(180deg, rgba(255,252,244,0.5), rgba(214,200,172,0.35)), var(--paper-tex);
+  background-size: auto, cover;
+  color: var(--ink-0);
+  box-shadow: var(--shadow-paper);
+  transition: var(--dur-fast) var(--ease-out); font-family: var(--font-ui);
 }
-.mode-card:hover { border-color: var(--gold); background: rgba(196,163,90,0.12); transform: translateY(-2px); }
-.mode-card b { display: block; font-family: var(--font); font-size: 16px; letter-spacing: 0.08em; margin-bottom: 6px; }
-.mode-card span { font-size: 12px; line-height: 1.6; color: var(--paper-dim); }
-.mode-card.march b { color: #e0a050; }
+.mode-card:hover { border-color: var(--seal); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(10,7,4,0.45); }
+.mode-card b { display: block; font-family: var(--font-kai); font-size: var(--fs-h3); letter-spacing: var(--ls-title); margin-bottom: 6px; }
+.mode-card span { font-size: var(--fs-micro); line-height: 1.65; color: var(--ink-2); }
+.mode-card.march b { color: var(--seal); }
 
 /* 损失提示 */
 .loss-toast {

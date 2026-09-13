@@ -1,0 +1,15 @@
+{
+  "colors": {
+    "cinema.css": 85,
+    "minigames.css": 19,
+    "sandbox.css": 18,
+    "style.css": 65
+  },
+  "fonts": {},
+  "radius": {
+    "cinema.css": 25,
+    "minigames.css": 8,
+    "sandbox.css": 9,
+    "style.css": 26
+  }
+}

@@ -44,6 +44,8 @@ app.use((req, res, next) => {
 const PUB = path.join(__dirname, '..', 'public');
 app.use('/assets', express.static(path.join(PUB, 'assets'), { maxAge: '7d' }));
 app.use('/audio', express.static(path.join(PUB, 'audio'), { maxAge: '7d' }));
+// 自托管字体：改动极少，给长缓存（woff2 本身已压缩，gzip 中间件只处理文本类型，不会重复压）
+app.use('/fonts', express.static(path.join(PUB, 'fonts'), { maxAge: '7d' }));
 app.use(express.static(PUB, { maxAge: '1h' }));
 
 app.post('/api/decide', async (req, res) => {
