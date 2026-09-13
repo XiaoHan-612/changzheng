@@ -4,32 +4,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { REQUIRED, missingFields } from '../server/schema.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOG_DIR = process.env.LOG_DIR || path.join(ROOT, 'logs');
 const OUT = path.join(ROOT, 'docs', 'LOG-AUDIT.md');
 // 本项目已移除 MOCK：默认只审计真调记录；加 --all 可连历史 MOCK 记录一起看
 const INCLUDE_LEGACY_MOCK = process.argv.includes('--all');
-
-// 每个 callType 的响应必需字段；用 | 表示"任一命中即可"
-const REQUIRED = {
-  scene_gen: ['title', 'atmosphere'],
-  choice_hint: ['hints'],
-  npc_chat: ['reply'],
-  share_judge: ['effects', 'narrative', 'choice'],
-  minigame_review: ['effects', 'narrative'],
-  branch_judge: ['effects', 'scene_text|narrative'],
-  quiz_generate: ['question', 'options', 'answer_index'],
-  quiz_answer_ai: ['answer_index'],
-  quiz_judge: ['human_score', 'ai_score'],
-  night_options: ['options'],
-  night_resolve: ['narrative'],
-  ending_review: ['ending_id', 'paragraphs'],
-  act_review: ['title', 'lines'],
-  failure_review: ['paragraphs'],
-  study_report: ['summary'],
-  sim_turn: ['narrative', 'feasible'],
-};
 
 function readLogs() {
   if (!fs.existsSync(LOG_DIR)) return [];
@@ -52,15 +33,6 @@ function readLogs() {
     }
   }
   return out;
-}
-
-function missingFields(callType, res) {
-  const need = REQUIRED[callType];
-  if (!need || !res) return [];
-  return need.filter((spec) => {
-    const keys = spec.split('|');
-    return !keys.some((k) => res[k] !== undefined && res[k] !== null);
-  });
 }
 
 function pct(arr, p) {
@@ -117,6 +89,7 @@ function main() {
   lines.push(`- model 分布：${Object.entries(byModel).map(([k, v]) => `${k}=${v}`).join('　')}`);
   lines.push(`- 字段缺失：**${violations.length}** 条　·　FALLBACK：**${fallbacks.length}** 条`);
   lines.push('- 说明：日志按日累积，可能混入旧版本产生的记录；判断当前版本是否合规，以本轮之后新增的记录为准。');
+  lines.push('- 自 2026-09-13 起，`server/schema.js` 的同一张表已在**服务端**逐次校验：缺必需字段会当次失败并重试，因此新记录不应再出现字段缺失。');
   if (legacyMock && !INCLUDE_LEGACY_MOCK) {
     lines.push(`- 已忽略历史 MOCK_AI 记录 **${legacyMock}** 条（本版本已移除 MOCK，如需查看加 \`--all\`）`);
   }

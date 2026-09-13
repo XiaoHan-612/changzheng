@@ -774,13 +774,16 @@ async function runFailure(fail, act) {
   } finally {
     showThinking(false);
   }
-  if (!end) {
-    end = {
-      title: '掉队',
-      paragraphs: ['你没能在天黑前跟上队伍。风声盖过了脚步声。', '但队伍还在往前走——他们把你没走完的路接了过去。'],
-      history_points: ['长征中的减员多发生在掉队、伤病与断粮之间。', '许多名字没有留在名册上。'],
-      personal: '这一局你没能走到终点。换一种选择，或许能。',
-    };
+  // 模型没给出结算就明说，不编造叙事（callAI 内部已给过「重试 / 跳过」）
+  if (!end || end._error) {
+    $('end-title').textContent = '结算未完成';
+    $('end-paras').innerHTML = '<p class="muted">模型没有返回这段失败结算。原因已记入日志，可在「设置 → 测试连接」复查 Key，或翻「记录」看失败详情。</p>';
+    $('end-history').innerHTML = '';
+    renderStats(S);
+    $('end-rel').innerHTML = renderRelations();
+    $('end-personal').textContent = '';
+    saveState(S);
+    return;
   }
   $('end-title').textContent = end.title || '掉队';
   for (const t of end.paragraphs || []) {

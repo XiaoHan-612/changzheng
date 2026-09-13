@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { logAiCall } from './logger.js';
+import { missingFields } from './schema.js';
 
 /**
  * 所有运行态智能决策必须走这里。禁止用独立算法替代模型判断。
@@ -151,6 +152,12 @@ export async function callGlm51(payload) {
       if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
         throw new Error('模型返回空 JSON（可能是 token 被占满或内容被过滤）');
       }
+      // 字段契约：缺必需字段就当次失败并重试（残缺对象比报错更难查，
+      // 例如 quiz 少了 answer_index，界面会照常渲染但没有正确答案）
+      const missing = missingFields(callType, parsed);
+      if (missing.length) {
+        throw new Error(`模型返回缺少必需字段：${missing.join('、')}`);
+      }
 
       logAiCall({
         scene,
@@ -215,7 +222,8 @@ call_type=choice_hint。为每个选项生成「倾向预告」——只写方�
     return `${base}
 call_type=failure_review。玩家在行军模式下失败（掉队/减员/断粮）。写一段克制的失败结算：不羞辱、不喊口号，写代价与队伍仍在前进。
 返回：
-{"title":"四个字内标题","paragraphs":["段1","段2"],"history_points":["史实要点1","要点2"],"personal":"一句给玩家的话"}`;
+{"title":"四个字内标题","paragraphs":["段1","段2"],"history_points":["史实要点1","要点2"],"personal":"一句给玩家的话"}
+四个字段都要写：paragraphs 2–3 段、history_points 2–3 条（失败屏有对应区块，留空会空着）。`;
   }
   if (callType === 'npc_chat') {
     return `${base}

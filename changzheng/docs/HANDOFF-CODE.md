@@ -104,15 +104,18 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 14. **自动化只认契约** —— `tests/e2e/full-run.mjs` 的驱动按 `body[data-step]` + `data-action`/`data-choice-index`/`data-mini-*` 操作，不认识任何中文标签或屏内元素 id。新增玩法时先声明契约，别再改驱动。
 15. **TTS 缓存靠"逐字一致"命中** —— 哈希是 `sha1(voiceId|text)`，所以：① 代码里 `say()` 的文本改了，就要同步改 `data/tts-lines.json` 并重跑 `npm run tts:manifest`，否则文件白做（曾 21/24 条不可达）；② `speak()` 的 voiceId 必须走 `audio.js` 的 `ACTOR_VOICE` 映射（中文角色名会被清洗成 `default`，哈希对不上）；③ 史实回响会念 `facts.json` 的标题，标题即 TTS 文本。验收：`npm run qa:tts` + 跑一局看 `ttsHits`（E2E 已断言 ≥5）。
 16. **立绘兜底不能反过来写** —— 旧代码 `comp.img || portraitImage(npc)` 里的 `comp` 是 `COMPANIONS.find(...) || COMPANIONS[0]`，于是任何**非同伴 NPC**（母亲、船工、宣传员、向导、新兵）都长出老班长的脸，10 张新立绘里 5 张永远不会出现（2026-09-13 修）。现在统一走 `showNpc(npc, { role, mood })`：专属立绘 → 同伴立绘 → 文字头像。热点/抉择集想立谁，就写 `npc` 字段（`acts.json` 的 `wounded`、`CHOICE_SETS.snow_help` 是样例）。回归用例在 `tests/e2e/asset-drop.mjs`（点开「母亲」热点，断言立绘必须是 `mother.png`）。
+17. **响应契约只有一张表** —— `server/schema.js` 的 `REQUIRED` 是唯一真源：`server/ai.js` 每次解析完就校验（缺必需字段 = 当次失败 → 走既有重试），`scripts/audit-logs.mjs` 用同一张表审计。别在别处再抄一份。起因是 2026-09-13 事故：模型把 `answer_index` 的键名写坏成 `",answer_index"`，由于只解析不校验，界面拿到"没有正确答案的题"照样往下跑 —— 只有日志审计能看出来，事后很难查。判定规则与回归用例见 `tests/unit/schema.test.js`。
+18. **失败结算不许编造** —— `runFailure()` 原本写了一段 `if (!end) { end = {...兜底文案} }`，但 `callAI()` 从不返回空值（失败时返回 `{_error:true}`），那一段是死代码；真失败时反而渲染出"只有标题、没有段落"的空结算屏。现在失败就显式写「结算未完成」并说明去哪看原因，内容一律不编造。同类"字段级中性兜底"（如 `result.narrative || ''`）保留，但**不许兜底出一段像模像样的叙事**。
 
 ## 六、下一步建议（按价值排序）
 
-1. **真调验证**：标准模式真调一局已跑通（57 次调用、`source=GLM`、无 ERROR）；`npm run qa:audit` 显示 15 类 callType 全部有真调记录。**只剩 `failure_review`（行军模式掉队结算）未验证** —— 需要故意把体力耗到 0 跑一次失败线。
+1. **真调验证已全覆盖**（2026-09-13）：标准模式 57 次调用全 `source=GLM`、无 ERROR；`failure_review` 由 `npm run qa:failure` 单独覆盖（注入"断粮+体力见底"走失败线，断言真调 1 次且渲染出标题/段落/史实要点）。16 类 callType 全部有真调记录。
 2. **契约扩散**：`runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto`、夜校小游戏的内层选项（`#school-opts`）目前靠 `data-choice-index` 兼职，建议也走 `askChoice`；`runRest` 只有一个「继续」，可直接 `waitContinue`。
 3. **数值平衡**：行军模式的失败条件现在是「体力≤0」或「粮食=0 且体力≤30」；建议真人试 3 局记录曲线。
 4. **素材已全清**（2026-09-13）：场景图 21/21、立绘 14/14、环境床 8 条 Ogg、TTS 缓存 20 条全部就位。唯一"备而未用"的是 `xianggui.png`（老乡）——现有「向导老乡」热点挂的是「向导」，要不要补一个老乡热点属于内容决策。
 5. **音频剩余项**：操作音效仍是 WebAudio 合成（click/hook/echo 等），是否需要预录由路演音质要求决定。
-6. **移动端专项**：目前只有 820/900px 两个断点，未逐屏验证 375 宽。
+6. **窄窗口已体检、手机档未适配**（2026-09-13 决策）：`node tests/e2e/layout-audit.mjs --width <宽>` 会逐屏报"页面横向溢出/控件出界/点按区<32px"。820 宽已清零（顺手修掉沙盘装饰层吃掉点击的 bug）。375 仍是已知项（横向溢出 543px、左侧 HUD 占 37% 宽、答辩面板文字出界），**故意不做手机适配**，除非演示要用手机。
+7. **封装交付**：见 [`DELIVERY.md`](DELIVERY.md)，演示前把"一键启动/离线可跑"定型。
 
 ## 七、验收清单
 

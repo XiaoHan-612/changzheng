@@ -4,13 +4,17 @@
 
 | 命令 | 覆盖 | 通过标准 |
 |------|------|----------|
-| `npm run test:unit` | 资源钳制、史实解锁、附身线门控、行动点、每日场景、失败判定 | 13/13 通过 |
+| `npm run test:unit` | 资源钳制、史实解锁、附身线门控、行动点、每日场景、失败判定、AI 响应契约 | 22/22 通过 |
 | `npm run qa:smoke` | 标题→营地→热点→回营地 | SMOKE PASS |
 | `npm run test:e2e` | 五幕**真调**通关 + 五个新玩法各 1 次 + 不重复结算 | E2E FULL PASS，`source=GLM`，无 pageerror |
 | `node tests/e2e/full-run.mjs --quick` | 快速模式通关 | E2E FULL PASS |
 | `npm run qa:sandbox` | 沙盘两回合 + 存档恢复 | SANDBOX PASS |
 | `npm run qa:regress` | 沙盘监听泄漏、存档回合 | REGRESS PASS |
-| `npm run qa:audit` | 日志 schema 审计 | 字段缺失 0、ERROR 可解释 |
+| `npm run qa:failure` | 行军模式失败线（`failure_review` 真调） | MARCH FAILURE PASS，失败屏有标题/段落/史实要点 |
+| `npm run qa:inspect` | 素材体检：格式/尺寸/时长/重复（含立绘） | 素材体检通过 |
+| `npm run qa:handoff` | 交接文档与代码契约一致（场景/环境床/TTS/立绘） | 可以交接 |
+| `node tests/e2e/layout-audit.mjs --width 820` | 逐屏布局硬伤（横向溢出/控件出界/点按区） | 820 宽 0 处横向溢出 |
+| `npm run qa:audit` | 日志 schema 审计 | 字段缺失 0（新记录）、FALLBACK 0 |
 
 ## 手工（真调）
 
