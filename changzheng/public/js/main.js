@@ -2279,13 +2279,13 @@ async function runEnding() {
   $('end-personal').textContent = end.personal || '';
   saveState(S);
 
-  // 研学报告（教育/党建）
+  // 研学报告（课后复盘用；对外不出现行业与场景口径，见 docs/PITCH.md）
   try {
     showThinking(true);
     const report = await callAI({
       scene: '研学报告',
       callType: 'study_report',
-      situation: '生成可给教师/党建干事的研学摘要',
+      situation: '生成可给带队者复盘的研学摘要',
       state: publicState(),
       extraContext: `结局=${end.ending_id}；史实解锁=${(S.unlockedFacts || []).join(',')}；对决=${S.quiz.human}:${S.quiz.ai}`,
     });
@@ -2312,7 +2312,6 @@ async function runEnding() {
         '史实：' + (r?.knowledge || []).join('；'),
         '价值：' + (r?.values || []).join('；'),
         r?.suggest || '',
-        '适用：课堂研学 / 党建学习 / 展馆讲解',
       ].join('\n');
       navigator.clipboard?.writeText(text).then(() => toast('报告已复制')).catch(() => toast('复制失败'));
     };

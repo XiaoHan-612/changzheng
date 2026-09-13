@@ -12,6 +12,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
 const BATCH = Number(process.argv[2] || 1);
+// 批次二以后要截深层屏（史实回响、岔路…），需要「展示开关」打开后才挂出的 __czScreens 钩子。
+// 批次一是对玩家的门面，必须用默认状态截——否则会把"评委演示 / 模型署名"这些调试入口拍进交付图（踩过）。
+const NEED_DEV_HOOK = BATCH >= 2;
 const OUT = path.join(ART, 'screens', `batch-${BATCH}`);
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -155,12 +158,12 @@ async function capture() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('dialog', (d) => d.accept().catch(() => {}));
   await page.goto(`${BASE}/?sheet=${Date.now()}`, { waitUntil: 'networkidle' });
-  // 打开展示开关：批次二之后要截的屏（岔路等）在很深的幕里，靠 __czScreens 直接摆出来。
-  // 开关只影响"多挂一个截图入口"，不改变任何屏的渲染与样式。
   await page.evaluate(() => {
     sessionStorage.clear();
-    localStorage.setItem('czjc_devtools', '1');
+    localStorage.removeItem('czjc_devtools');
   });
+  // 需要钩子时才打开展示开关（它只影响"多挂一个截图入口"，不改变任何屏的样式，但会露出调试入口）
+  if (NEED_DEV_HOOK) await page.evaluate(() => localStorage.setItem('czjc_devtools', '1'));
   await page.reload({ waitUntil: 'networkidle' });
 
   const shots = BATCHES[BATCH] || BATCHES[1];

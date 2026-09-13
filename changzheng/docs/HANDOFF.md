@@ -101,4 +101,7 @@ public/audio/reactions/  同伴反应语音
 - 密钥只在 `.env` 与 `runtime-config.json`，永不进前端
 - 小游戏手感判定算本地逻辑，**智能判断一律走 API**，答辩时按这条口径回答
 - 预置语音只覆盖固定台词；模型自由回复不发声（有意为之，避免成本与不可控）
+- **合作与场景口径不进界面**：对外只按"一款普通的长征叙事游戏"呈现。玩家可见的一切
+  （界面文案、页面 `meta`、可复制的研学报告、模型生成内容）不写合作方名称与行业场景，
+  这些口径统一放 [`PITCH.md`](PITCH.md) 与 [`SCORING.md`](SCORING.md)，答辩时口头讲。
 - 改动后请跑 `npm run test:unit && npm run qa:smoke && npm run test:e2e && npm run qa:sandbox`

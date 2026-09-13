@@ -311,7 +311,7 @@ call_type=act_review。根据玩家本幕行为写一段「幕间总评」，像
   }
   if (callType === 'study_report') {
     return `${base}
-call_type=study_report。生成面向教育场景的「研学报告」摘要，可给教师/党建干事看。
+call_type=study_report。生成一份「研学报告」摘要，供带队者课后复盘（不写行业、场景与合作方口径）。
 返回：
 {"summary":"120字内总评","knowledge":["掌握的史实点3-5条"],"values":["体现的精神价值2-3条"],"suggest":"一句延伸学习建议"}`;
   }
