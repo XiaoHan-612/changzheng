@@ -5,7 +5,7 @@
 
 ## 一、场景图（`public/assets/scenes/`）
 
-### 已有（15）
+**21 张全部就位（2026-09-13）**。前 15 张为初版，其余为加密轮补入；全部走「落盘即生效」约定，清单由 `npm run qa:handoff` 与代码里的预热表自动对齐。
 
 | 文件 | 用途 |
 |---|---|
@@ -24,14 +24,9 @@
 | `path_choice.jpg` | 岔路点选 |
 | `camp_evening.jpg` | 休息近景 |
 | `pond.jpg` | 备用池塘景 |
-
-### 本轮新增（占位，不阻塞）
-
-| 文件 | 用途 | 当前占位 | 状态 |
-|---|---|---|---|
-| `sentry_night.jpg` | 夜岗近景（暗夜营地边缘、树线、哨位） | 已产出 1280×872，军装为灰蓝（对齐 `night_fire.jpg`），纸纹毛边到位 | ✅ 已就位（返工后，2026-09-12） |
-| `sugar_close.jpg` | 分糖近景（火光下的手与三颗糖） | `camp_pano.jpg` | ✅ 已就位（2026-09-12） |
-| `snow_climb.jpg` | 雪山陡坡（拉人时机） | `snow_pano.jpg` | ✅ 已就位（2026-09-12） |
+| `sentry_night.jpg` | 夜岗近景（暗夜营地边缘、树线、哨位） |
+| `sugar_close.jpg` | 分糖近景（火光下的手与三颗糖） |
+| `snow_climb.jpg` | 雪山陡坡（拉人时机） |
 
 > 「落盘即生效」= 按文件名放进 `public/assets/scenes/` 就会被自动用上，不用改代码。
 > 完整清单（含 14 张自动生效的图）见 [`HANDOFF-ART.md`](HANDOFF-ART.md) 第四节；自检 `npm run qa:assets`。
@@ -87,7 +82,7 @@
 | 操作音效 | **合成兜底** | click / cast / hook / echo / correct / wrong / march / day 等，同上 |
 | 预录台词 | **已有 21 条** | `public/audio/voices/*.wav` + 索引 `public/audio/voice-lines.json` |
 | 同伴反应音 | **已有 6 条** | `public/audio/reactions/*.wav`（老班长赞成/反对、卫生员担忧、红小鬼嘴硬、向导建议、新兵自责） |
-| TTS 缓存 | **已就位 20 条（2026-09-12）** | `public/audio/cache/*.wav`（22050Hz 单声道，2.33MB）。清单见 [`TTS-MANIFEST.md`](TTS-MANIFEST.md)；验收 `npm run qa:tts`。真调一局实测命中 **17 次**（14 张史实卡标题 + 哨兵/泸定/分糖/篝火夜开场句） |
+| TTS 缓存 | **已就位 20 条（2026-09-12）** | `public/audio/cache/*.wav`（22050Hz 单声道，2.33MB）。清单见 [`TTS-MANIFEST.md`](TTS-MANIFEST.md)；验收 `npm run qa:tts`。真调一局实测命中 **20+ 次**（14 张史实卡标题 + 哨兵/泸定/分糖/篝火夜开场句 + 对话台词；`qa:av` 每次会报这个数） |
 
 ## 五、数据与配置（非素材，但属于交付面）
 

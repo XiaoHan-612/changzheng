@@ -33,16 +33,11 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 
 命名**必须**与 `design/asset-prompts.md` 表格一致（小写下划线），前端按文件名直接引用。
 
-## 三、本轮优先级
+## 三、当前进度（**无待生成项**）
 
-| 顺序 | 文件 | 说明 |
-|---|---|---|
-| P0 | `sentry_night.jpg` | 夜岗小游戏，当前用 `camp_pano.jpg` + CSS 暗角占位 |
-| P0 | `sugar_close.jpg` | 分糖小游戏，当前用 `camp_pano.jpg` 占位 |
-| P0 | `snow_climb.jpg` | 雪山陡坡（拉人时机），当前用 `snow_pano.jpg` 占位 |
-| P1 | `snow_camp.jpg`、`snow_let_clothes.jpg` | 把第四幕雪山日做扎实 |
-| P1 | `luding_bridge.jpg`、`jinsha_ferry.jpg` | 泸定桥小游戏与渡口 |
-| P2 | 其余 13 张场景 + 10 张立绘 | ✅ 已全部就位（2026-09-13），无待生成项 |
+**场景图 21/21、立绘 14/14、事件图 6/6 全部就位并接线**（2026-09-13）。本节历史上按 P0/P1/P2 排过优先级
+（夜岗/分糖/陡坡三张曾用 `camp_pano.jpg`、`snow_pano.jpg` 占位），现已全部补齐——清单与逐行用途见
+[`ASSETS.md`](ASSETS.md)，下一步若要补图（例如给新热点配近景），照 §二 的规格与 §四 的命名约定产出即可。
 
 ## 四、落盘即生效（不用改代码）
 
@@ -76,7 +71,7 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 场景图 **21/21 全部就位并接线**（2026-09-13），本表即完整清单；`qa:handoff` 会逐行核对"文档承诺自动生效"与"代码确实预热"是否一致。
 
 **立绘同样落盘即生效**：`public/assets/characters/` 下按约定名放就能自动替换文字头像（`main.js` 的 `PORTRAIT_FILE` 映射 + `showNpc()` 统一入口）：
-`mother`（母亲）· `xianggui`（老乡）· `guide`（向导）· `boatman`（船工）· `recruit`（新兵）· `straggler`（掉队战士）· `drummer`（宣传员）· `captain`（突击队长）· `teacher`（文化教员）· `wounded`（担架伤员）——**10 张已就位并接线（2026-09-13）**，规格 280×280 PNG、脸心居中偏上。
+`laoban`（老班长）· `zhiyuan`（指导员）· `xiaogui`（红小鬼）· `weisheng`（卫生员）· `mother`（母亲）· `xianggui`（老乡）· `guide`（向导）· `boatman`（船工）· `recruit`（新兵）· `straggler`（掉队战士）· `drummer`（宣传员）· `captain`（突击队长）· `teacher`（文化教员）· `wounded`（担架伤员）——**14 张全部就位并接线（2026-09-13）**，规格 280×280 PNG、脸心居中偏上。
 
 两个容易踩的点，返工时注意：
 

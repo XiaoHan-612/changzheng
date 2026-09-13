@@ -25,16 +25,20 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 
 | 文件 | 职责 | 改动注意 |
 |---|---|---|
-| `public/js/main.js` | 主线状态机：五幕、营地日、强制链、对决、失败/终局、篝火夜 | 最大的文件；热点用 `HOTSPOT_HANDLERS` 映射表分发，**加玩法只加一行** |
-| `public/js/step.js` | **交互契约**：`step()` / `askChoice()` / `waitContinue()` / `markMini()` | 新增玩法只要声明契约，测试与自动化无需改动；详见 ARCHITECTURE 的「交互契约」 |
-| `public/js/minigames.js` | 7 个小游戏：钓鱼/弯针/识字/分糖/夜岗/五子棋/泸定桥/陡坡 | 统一返回 `{score, detail, summary?}`，本地只判手感，结算走 `/api/decide` |
+| `public/js/main.js` | 主线状态机：五幕、营地日、强制链、对决、失败/终局、篝火夜；**玩法宿主** `openBoard()` + `mountMini()` | 最大的文件；热点用 `HOTSPOT_HANDLERS` 映射表分发，**加玩法只加一行**；玩法一律挂板屏（见第 27 条） |
+| `public/js/step.js` | **交互契约**：`step()` / `askChoice()` / **`choiceButton()`（选项唯一构建处）** / `waitContinue()` / `markMini()` | 新增玩法只要声明契约，测试与自动化无需改动；详见 ARCHITECTURE 的「交互契约」 |
+| `public/js/minigames.js` | **8 个玩法**：钓鱼/弯针/夜校识字/分糖/夜岗/五子棋/泸定桥/陡坡 | 统一返回 `{score, detail, summary?}`，本地只判手感，结算走 `/api/decide`；状态经 `stats(host, [...])` 写进板头数值签 |
 | `public/js/state.js` | 资源/好感/附身线/行动点/每日场景/失败判定 | 纯函数、可单测；新增资源维度要同时改 `applyEffects` 的钳制表 |
 | `public/js/origin.js` | 开场设定：出身三选一 + 出发前一问（纯数据 + 纯函数） | 三条出身的收益刻意对称（各 +5/−2），别加出唯一最优解；问答必须留在本地题库，开局第一屏不能依赖网络 |
 | `public/js/sandbox.js` | 自由行军沙盘（世界裁判 + 存档） | 表单监听只绑一次（`bindSandboxFormOnce`），别改回 `addEventListener` |
 | `public/js/audio.js` | 环境床/SFX 合成 + 预录 wav + TTS 缓存 | `speak()` 命中顺序：预录 → TTS 缓存 → 静默 |
-| `public/js/ui.js` | DOM 渲染与浮层 | 模型返回的文本一律走 `escapeHtml` |
+| `public/js/ui.js` | DOM 渲染与浮层 | 模型返回的文本一律走 `escapeHtml`；`showScreen()` 负责按模板选入场动效、并在离开舞台/板屏时清空内容 |
 | `server/ai.js` | VN 侧提示词 + 真调 + 重试 | 每个 callType 的返回 schema 必须与前端读取字段一致 |
-| `server/sim.js` | 沙盘世界裁判 | 同上 |
+| `server/sim.js` | 沙盘世界裁判 | 同上（2026-09-13 起也过契约表：数组响应按「整体不是对象」判失败） |
+| `server/schema.js` | 响应契约唯一真源（`REQUIRED` / `missingFields` / `contractStamp`） | 改字段只改这里；`audit-logs.mjs` 与单测同源 |
+| `server/logger.js` | JSONL 落库（按日文件 + 会话镜像 + 契约戳记 + 8MB 轮转） | 落库只有这一处，新增字段在这里加 |
+| `server/balance.js` | 数值护栏（单维单次上限 / 单次最多 3 维 / 信念只在关键抉择正向） | 改数值要同时改提示词与单测（第 25 条） |
+| `public/css/` | fonts → tokens（唯一值源）→ base → framework（模板 + 区块 + 动效）→ components | 页面不写样式（`qa:frames` 拦）；颜色/字号/圆角不许写死（`qa:tokens` 拦） |
 | `server/index.js` | 路由 + 静态 + gzip + 缓存头 | 新增数据文件记得加 `/api/data/*` 路由 |
 | `data/acts.json` | 五幕定义：热点、`dayScenes`、强制链、对决 | 改热点等于改玩法入口 |
 | `data/facts.json` | 史实卡 14 张（real/fiction 分栏） | 新增卡片要同步 `acts[].facts` |
@@ -48,7 +52,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
    ├─ 幕前抉择 runPrelude（仅第四幕：让棉衣）
    └─ mode==='quick' ? runQuickAct（1 次交谈 + 主玩法 + 对决）
                       : enterCampDay（暮色营地，逐日）
-                        热点 → HOTSPOT_HANDLERS[kind] → 小游戏/对话 → /api/decide → 史实回响
+                        热点 → HOTSPOT_HANDLERS[kind] → 小游戏（板屏）/对话（舞台）→ /api/decide → 史实回响
                         「启程」→ 天数用尽 → runForcedChain（强制链 + 对决）
    → finishAct（幕间总评 → 第四幕追加 runNightChoice → actIndex++ → 粮荒/失败结算）
    → 终局 runEnding（ending_review + 研学报告 study_report）
@@ -128,21 +132,30 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 
 1. **真调验证已全覆盖**（2026-09-13）：标准模式一局 76 次调用全 `source=GLM`、无 ERROR；`failure_review` 由 `npm run qa:failure` 单独覆盖（注入"断粮+体力见底"走失败线，断言真调 1 次且渲染出标题/段落/史实要点）。16 类 callType 全部有真调记录。
 2. **契约扩散（部分完成）**：夜校小游戏的内层选项已补 `data-mini-action="answer"`（2026-09-13，此前那一屏没有任何 `data-*` 标记，自动化只能干等）。仍待办：`runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职，建议走 `askChoice`；`runRest` 只有一个「继续」，可直接 `waitContinue`。
-3. **数值平衡（进行中）**：测量口径已建好 —— `npm run qa:playtest` 按人类节奏跑局，输出时长/分幕耗时/五维终值/AI 调用数，结果表落 `docs/PLAYTEST.md`。判定与调参（含把热点改成一次性）见批次二的计划；行军模式失败条件仍是「体力≤0」或「粮食=0 且体力≤30」。
-4. **素材已全清**（2026-09-13）：场景图 21/21、立绘 14/14、环境床 8 条 Ogg、TTS 缓存 20 条全部就位。唯一"备而未用"的是 `xianggui.png`（老乡）——现有「向导老乡」热点挂的是「向导」，要不要补一个老乡热点属于内容决策。
+3. **数值平衡（进行中）**：测量口径已建好 —— `npm run qa:playtest` 按人类节奏跑局，输出时长/分幕耗时/五维终值/AI 调用数，结果表落 `docs/PLAYTEST.md`。热点已是一次性（第 20 条）；行军模式失败条件是「体力≤0」或「粮食=0 且体力≤30」，调参待做。
+4. **素材已全清**（2026-09-13）：场景图 21/21、立绘 14/14、环境床 8 条 Ogg、TTS 缓存 20 条全部就位，**14 张立绘全部在用**（`xianggui.png` 由第三幕「老乡 · 问渡」热点接上）。
 5. **音频剩余项**：操作音效仍是 WebAudio 合成（click/hook/echo 等），是否需要预录由路演音质要求决定。
 6. **窄窗口已体检、手机档未适配**（2026-09-13 决策）：`node tests/e2e/layout-audit.mjs --width <宽>` 会逐屏报"页面横向溢出/控件出界/点按区<32px"。820 宽已清零（顺手修掉沙盘装饰层吃掉点击的 bug）。375 仍是已知项（横向溢出 543px、左侧 HUD 占 37% 宽、答辩面板文字出界），**故意不做手机适配**，除非演示要用手机。
 7. **封装交付**：见 [`DELIVERY.md`](DELIVERY.md)，演示前把"一键启动"定型（离线能力**不存在**，别按离线规划演示）。
 8. **离线回放（备选，未开发）**：现场无网／网关不可达／额度耗尽时的风险预案在 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)。它从日志（运行时的 `logs/ai-calls-*.jsonl` 或入库样本 `logs/sample-full-run.jsonl`）转换出回放包，服务端按指纹命中重放真实响应，日志标 `source=REPLAY`。**当前代码里没有任何回放能力，勿当成现有功能**；断网就是 `source=ERROR` + 界面重试提示。
 
-## 七、验收清单
+## 七、验收清单（每轮收尾跑这一套）
 
 ```powershell
-npm run test:unit && npm run test:e2e && npm run qa:sandbox && npm run qa:regress && npm run qa:audit
+# 全流程（真调；服务端改动后要看到测试输出 restarted，否则跑的是旧进程）
+npm run test:e2e && npm run qa:sandbox && npm run qa:regress && npm run qa:failure && npm run qa:av
+# 局部与守卫（多数不烧 AI）
+npm run test:unit && npm run qa:smoke && npm run qa:board
+npm run qa:tokens && npm run qa:frames && npm run qa:tone && npm run qa:motion && npm run qa:handoff
+# 改台词后
+npm run tts:manifest
 ```
 
-- [ ] unit 13/13
+- [ ] unit 49/49
 - [ ] 标准模式与 `--quick` 均 E2E FULL PASS，无 pageerror
 - [ ] 日志里 candy/sentry/gomoku/luding 各恰好 1 次，夜间 `night_options`+`night_resolve` 各 1 次
-- [ ] `style.css` 无死类残留，全站无乱码注释
+      （gomoku 只靠可选营地热点触发，偶尔落空——失败信息会带「营地历次热点 apN:[…]」）
+- [ ] 玩法板体检 36 项全 ✓（板屏壳 / 数值签 / 契约标记 / 离开清空）
+- [ ] 视觉守卫全绿；改了页面则出 1280/820 联系表
+- [ ] 页面上没有"用了但 CSS 里没定义"的类（`.choice-btn` 那类事故，见第 27 条）
 - [ ] 无 Key 时给出明确错误提示（不再静默、不编造内容）
