@@ -12,6 +12,7 @@
 //   5) 每幕至少一次环境床 play() 成功，且 src 指向 /audio/ambient/*
 //   6) 每个 /api/tts 返回的 url 必须 200 且能被浏览器解码出时长
 //   7) 音效链路活着：AudioContext 的振荡器/缓冲源创建次数达到阈值
+//   8) 无声率：/api/tts 未命中的台词里，哪些是"固定台词"（本该补音频），哪些是 AI 自由文本（结构性无声）
 //
 // 用法：npm run qa:av
 import { chromium } from 'playwright';
@@ -126,9 +127,9 @@ async function main() {
     try { const j = await r.json(); if (j.url) ttsUrls.add(j.url); } catch { /* 忽略 */ }
   });
 
-  // 页面加载前埋点：媒体播放与 WebAudio 音源创建
+  // 页面加载前埋点：媒体播放、WebAudio 音源、以及 /api/tts 的每一次请求与命中结果
   await page.addInitScript(() => {
-    window.__av = { media: [], sfx: 0 };
+    window.__av = { media: [], sfx: 0, tts: [] };
     const origPlay = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function patchedPlay() {
       const rec = { src: this.currentSrc || this.src || '', ok: null };
@@ -152,6 +153,22 @@ async function main() {
         };
       }
     }
+    // speak() 在"预录没命中"时才会请求 /api/tts；未命中返回 url:null —— 那一刻就是"玩家读得到、听不到"
+    const origFetch = window.fetch;
+    window.fetch = function patchedFetch(input, init) {
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      if (!url.includes('/api/tts')) return origFetch.apply(this, arguments);
+      let body = null;
+      try { body = init && init.body ? JSON.parse(init.body) : null; } catch { /* 忽略 */ }
+      const rec = { text: (body && body.text) || '', voiceId: (body && body.voiceId) || '', actorId: (body && body.actorId) || '', url: null, source: null };
+      window.__av.tts.push(rec);
+      return origFetch.apply(this, arguments).then((res) => {
+        try {
+          res.clone().json().then((j) => { rec.url = j.url; rec.source = j.source; }).catch(() => {});
+        } catch { /* 忽略 */ }
+        return res;
+      });
+    };
   });
 
   await page.goto(`${BASE}/?av=${Date.now()}`, { waitUntil: 'networkidle' });
@@ -216,6 +233,28 @@ async function main() {
   const ambientOk = ambientPlays.filter((m) => m.ok === true);
   const voicePlays = av.media.filter((m) => /\/audio\/(cache|voices)\//.test(m.src || ''));
 
+  // 8) 无声率：把 /api/tts 未命中的台词分类——固定台词（可预生成）vs AI 自由文本（结构性无声）
+  const fixedSources = [
+    fs.readFileSync(path.join(ROOT, 'public/js/main.js'), 'utf8'),
+    fs.readFileSync(path.join(ROOT, 'public/js/minigames.js'), 'utf8'),
+    fs.readFileSync(path.join(ROOT, 'public/js/ui.js'), 'utf8'),
+    fs.readFileSync(path.join(ROOT, 'data/tts-lines.json'), 'utf8'),
+  ].join('\n');
+  const ttsCalls = av.tts || [];
+  const ttsHit = ttsCalls.filter((t) => t.url);
+  const ttsMiss = ttsCalls.filter((t) => !t.url);
+  const missFixed = [];
+  const missDynamic = [];
+  for (const t of ttsMiss) {
+    const text = String(t.text || '').trim();
+    if (!text) continue;
+    // 固定台词：文本在源码/清单里逐字出现（说明它是写死的，可以预生成）
+    const isFixed = fixedSources.includes(text.slice(0, 24));
+    (isFixed ? missFixed : missDynamic).push({ text, voiceId: t.voiceId, actorId: t.actorId });
+  }
+  const uniqFixed = [...new Map(missFixed.map((x) => [x.text, x])).values()];
+  const uniqDynamic = [...new Map(missDynamic.map((x) => [x.text, x])).values()];
+
   // 6) TTS 逐个验证：200 且能解码出时长
   const ttsCheck = [];
   for (const u of ttsUrls) {
@@ -254,6 +293,11 @@ async function main() {
     语音播放次数: voicePlays.length,
     TTS命中地址数: ttsUrls.size,
     TTS全部可解码: ttsCheck.every((t) => t.status === 200) && Object.values(decodable).every(Boolean),
+    语音行数: ttsCalls.length,
+    TTS命中: ttsHit.length,
+    TTS未命中: ttsMiss.length,
+    未命中_固定台词: uniqFixed.length,
+    未命中_AI自由文本: uniqDynamic.length,
     音效音源数: av.sfx,
     资源请求失败数: badStatus.length,
     pageErrors: errs,
@@ -261,6 +305,30 @@ async function main() {
   };
   console.log(JSON.stringify(report, null, 2));
   fs.writeFileSync(path.join(ART, 'av-report.json'), JSON.stringify(report, null, 2), 'utf8');
+
+  // 把"该补音频的固定台词"落成清单，配额恢复后直接照着生成
+  const gaps = [
+    '# TTS 缺口清单（自动生成）',
+    '',
+    `> 由 \`npm run qa:av\` 生成于 ${new Date().toISOString().slice(0, 16).replace('T', ' ')}。`,
+    '> 口径：`speak()` 先查预录、再查 TTS 缓存；两者都没有时整句**无声**（玩家读得到、听不到）。',
+    '',
+    '## 一、可预生成的固定台词（应当补齐）',
+    '',
+    uniqFixed.length ? '| 台词 | 音色 |' + '\n|---|---|'
+      + '\n' + uniqFixed.map((x) => `| ${x.text.replace(/\|/g, '\\|')} | ${x.voiceId || '(默认 narr)'} |`).join('\n')
+      : '无 —— 所有固定台词都有音频。',
+    '',
+    '## 二、AI 自由文本（结构性无声，只能实时 TTS 或接受静音）',
+    '',
+    `本局共 ${uniqDynamic.length} 条不同文本。这类文本每次都不同，**不可能预生成**，属于设计限制：`,
+    '',
+    ...uniqDynamic.slice(0, 20).map((x) => `- ${x.text.slice(0, 48)}…`),
+    uniqDynamic.length > 20 ? `- …（另有 ${uniqDynamic.length - 20} 条）` : '',
+    '',
+  ].filter((l) => l !== '').join('\n');
+  fs.writeFileSync(path.join(ROOT, 'docs/TTS-GAPS.md'), gaps, 'utf8');
+
   if (errs.length) throw new Error('PAGE_ERRORS: ' + errs.join(' | '));
   if (problems.length) throw new Error(`影音审计发现 ${problems.length} 个问题（详见上表）`);
   console.log('AV AUDIT PASS');
