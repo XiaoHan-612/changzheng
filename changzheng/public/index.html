@@ -253,8 +253,8 @@
       <div class="night-bg" style="background-image:url('/assets/scenes/night_fire.jpg')"></div>
       <div class="panel wide glass night-panel">
         <h2 id="night-title">篝火 · 深夜</h2>
-        <p id="night-lead" class="muted"></p>
-        <div id="night-stats" class="stats big"></div>
+        <p id="night-lead" class="blk-lead"></p>
+        <div id="night-stats" class="blk-stat-row"></div>
         <div id="night-body"></div>
       </div>
     </section>
@@ -272,19 +272,19 @@
 
     <section id="screen-end" class="screen hidden tpl-panel">
       <div class="end-bg" style="background-image:url('/assets/scenes/huining_pano.jpg')"></div>
-      <div class="panel wide glass end-panel">
+      <div class="panel glass end-panel">
         <p class="eyebrow" id="end-eyebrow">终局</p>
         <h2 id="end-title">—</h2>
         <div id="end-paras"></div>
         <div class="end-grid">
           <div>
             <h3>史实要点</h3>
-            <ul id="end-history"></ul>
+            <ul id="end-history" class="blk-list"></ul>
           </div>
           <div>
             <h3>本局资源</h3>
-            <div id="end-stats" class="stats big"></div>
-            <h3 style="margin-top:12px">关系</h3>
+            <div id="end-stats" class="blk-stat-row"></div>
+            <h3>关系</h3>
             <div id="end-rel"></div>
           </div>
         </div>
@@ -295,16 +295,16 @@
           <div class="report-cols">
             <div>
               <h4>史实要点</h4>
-              <ul id="report-knowledge"></ul>
+              <ul id="report-knowledge" class="blk-list"></ul>
             </div>
             <div>
               <h4>精神价值</h4>
-              <ul id="report-values"></ul>
+              <ul id="report-values" class="blk-list"></ul>
             </div>
           </div>
           <p id="report-suggest" class="muted sm"></p>
         </div>
-        <div class="end-actions">
+        <div class="blk-actions">
           <button type="button" id="btn-end-logs" class="btn ghost">行军记录</button>
           <button type="button" id="btn-end-facts" class="btn ghost">史实档案</button>
           <button type="button" id="btn-copy-report" class="btn">复制报告</button>

@@ -425,6 +425,18 @@ function exposeSheetHooks() {
       showOverlay('screen-fire');
       renderFireMenu(currentActDef());
     },
+    // 答题 / 篝火夜 / 终局：都太长（要走到深幕），截图时直接跑各自的**真实流程**，
+    // 由截图脚本在中途等（不另写一套渲染，理由同 fire）。
+    quiz: () => { if (S) runQuiz(currentActDef()); },
+    night: () => {
+      if (!S) return;
+      // 篝火夜的门槛是"点亮 ≥3 条附身线"；截图只需要过门槛，内容仍由模型现场生成
+      S.linesDone = ['fishing', 'candy', 'sentry'];   // linesDone 是数组（markLineDone 往里 push）
+      runNightChoice(currentActDef());
+    },
+    end: () => { if (S) runEnding(); },
+    logs: () => $('btn-logs').click(),
+    defense: () => $('btn-defense').click(),
     // 玩法板同理：四个玩法都在幕深处，截图/体检直接把它们摆到板屏上
     mini: (name) => {
       if (!S) return false;
@@ -499,7 +511,7 @@ function bindChrome() {
     if (e.key.toLowerCase() === 'j' && S) { openJournal(); return; }
     const n = Number(e.key);
     if (n >= 1 && n <= 9) {
-      const rows = [...document.querySelectorAll('.choice-row:not(.hidden) .blk-choice:not([disabled]), #stage-panel .blk-choice:not([disabled]), #fire-opts .blk-choice:not([disabled]), .quiz-opt:not([disabled]), .path-zone')]
+      const rows = [...document.querySelectorAll('.choice-row:not(.hidden) .blk-choice:not([disabled]), #stage-panel .blk-choice:not([disabled]), #fire-opts .blk-choice:not([disabled]), #quiz-body .blk-choice:not([disabled]), .path-zone')]
         .filter((el) => el.offsetParent !== null);
       if (rows[n - 1]) {
         audio.playSfx('click');
@@ -2071,11 +2083,13 @@ async function runQuiz(act) {
     showThinking(false);
   }
   body.innerHTML = `
-    <p class="quiz-q">${escapeHtml(q.question || '题目')}</p>
-    <div class="quiz-opts" id="quiz-opts"></div>
-    <div id="quiz-feedback" class="quiz-result"></div>
-    <button type="button" class="btn ghost sm" id="quiz-auto" data-action="quiz-auto" style="margin-top:10px">看两个 AI 对答（ai_vs_ai）</button>
-    <button type="button" class="btn primary" id="quiz-next" data-action="continue" style="margin-top:12px;display:none">继续</button>
+    <p class="blk-body">${escapeHtml(q.question || '题目')}</p>
+    <div class="blk-choice-list" id="quiz-opts"></div>
+    <div id="quiz-feedback" class="blk-note"></div>
+    <div class="blk-actions">
+      <button type="button" class="btn ghost sm" id="quiz-auto" data-action="quiz-auto">看两个 AI 对答（ai_vs_ai）</button>
+      <button type="button" class="btn primary hidden" id="quiz-next" data-action="continue">继续</button>
+    </div>
   `;
   const optsBox = $('quiz-opts');
   const opts = Array.isArray(q.options) && q.options.length >= 2
@@ -2149,8 +2163,8 @@ async function runQuiz(act) {
         applyEffects(S, judge.effects || { 士气: humanRight ? 3 : -1 });
         audio.playSfx(humanRight ? 'correct' : 'wrong');
         $('quiz-feedback').innerHTML = `
-          <div>${auto ? '激进派小张' : '你'}：<b>${humanRight ? '正确' : '错误'}</b> · 稳健派老李：<b>${aiRight ? '正确' : '错误'}</b></div>
-          <div style="margin-top:6px">${escapeHtml(answerKnown ? (q.explain || judge.explain || '') : '本题标准答案解析失败，双方均不计分。')}</div>
+          <div>${auto ? '激进派小张' : '你'}：<b>${humanRight ? '正确' : '错误'}</b> · 稳健派老李：<b>${aiRight ? '正确' : '错误'}</b><br/>
+          ${escapeHtml(answerKnown ? (q.explain || judge.explain || '') : '本题标准答案解析失败，双方均不计分。')}</div>
         `;
       } finally {
         showThinking(false);
@@ -2163,7 +2177,7 @@ async function runQuiz(act) {
       const next = $('quiz-next');
       await new Promise((r) => {
         next.onclick = () => { next.onclick = null; r(); };
-        next.style.display = 'inline-block';
+        next.classList.remove('hidden');
       });
       await afterJudge({
         narrative: `${auto ? '小张' : '你'}答：${opts[humanAns] ?? '（未作答）'}。标准答案：${opts[ans] ?? '（本题答案缺失）'}。${q.explain || ''}`,
@@ -2171,11 +2185,8 @@ async function runQuiz(act) {
       resolveQuiz();
     };
     opts.forEach((text, i) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'quiz-opt';
-      b.dataset.choiceIndex = String(i);
-      b.textContent = `${String.fromCharCode(65 + i)}. ${text}`;
+      // 选项一律走唯一的构建处（批三起的口径）：序号进徽章，键盘位自动带上
+      const b = choiceButton({ label: text, icon: String.fromCharCode(65 + i), index: i });
       b.onclick = () => finish(i);
       optsBox.appendChild(b);
     });

@@ -253,6 +253,88 @@ const BATCHES = {
       },
     },
   ],
+  6: [
+    // 答题：同一次真实流程里取「出题」与「判分」两态（选项现在是 blk-choice，判分态 .correct/.wrong）
+    {
+      name: '01-quiz',
+      setup: async (p) => {
+        await intoCamp(p);
+        await p.evaluate(() => window.__czScreens.quiz());
+        for (let i = 0; i < 40; i++) {
+          if (await p.locator('#quiz-opts .blk-choice').count()) break;
+          await p.waitForTimeout(400);
+        }
+        await p.waitForTimeout(400);
+      },
+    },
+    {
+      name: '02-quiz-result',
+      setup: async (p) => {
+        await p.locator('#quiz-opts .blk-choice').first().click({ force: true });
+        for (let i = 0; i < 60; i++) {              // 判分要 2–3 次真调
+          if (await p.locator('#quiz-feedback').innerText().catch(() => '')) {
+            if ((await p.locator('#btn-continue').count())) break;
+          }
+          await p.waitForTimeout(400);
+        }
+        await p.waitForTimeout(400);
+      },
+    },
+    // 篝火夜：同样两态（模型出选项 → 选完写「当夜之后」）
+    {
+      name: '03-night',
+      setup: async (p) => {
+        await p.click('#btn-continue', { force: true }).catch(() => {});   // 关掉上一步的回响/继续
+        for (let i = 0; i < 30; i++) {
+          if (await p.locator('#btn-echo-ok').count()) { await p.click('#btn-echo-ok', { force: true }).catch(() => {}); }
+          if (await p.locator('#screen-camp').isVisible().catch(() => false)) break;
+          await p.waitForTimeout(300);
+        }
+        await p.evaluate(() => window.__czScreens.night());
+        for (let i = 0; i < 40; i++) {
+          if (await p.locator('#night-body .blk-choice').count()) break;
+          await p.waitForTimeout(400);
+        }
+        await p.waitForTimeout(400);
+      },
+    },
+    {
+      name: '04-night-result',
+      setup: async (p) => {
+        await p.locator('#night-body .blk-choice').first().click({ force: true });
+        for (let i = 0; i < 60; i++) {
+          if (await p.locator('#night-out').innerText().catch(() => '')) break;
+          await p.waitForTimeout(400);
+        }
+        await p.waitForTimeout(600);
+      },
+    },
+    // 终局：真调 ending_review + study_report，等报告落盒
+    {
+      name: '05-end',
+      fresh: true,
+      setup: async (p) => {
+        await intoCamp(p);
+        await p.evaluate(() => window.__czScreens.end());
+        for (let i = 0; i < 90; i++) {
+          if (await p.locator('#end-report:not(.hidden)').count()) break;
+          await p.waitForTimeout(400);
+        }
+        await p.waitForTimeout(600);
+      },
+    },
+    // 记录 / 答辩：两个浮层面板（都是现成入口）
+    { name: '06-logs', setup: async (p) => { await p.evaluate(() => window.__czScreens.logs()); await p.waitForTimeout(500); } },
+    {
+      name: '07-defense',
+      setup: async (p) => {
+        await p.click('#btn-logs-close', { force: true }).catch(() => {});
+        await p.waitForTimeout(300);
+        await p.evaluate(() => window.__czScreens.defense());
+        await p.waitForTimeout(500);
+      },
+    },
+  ],
 };
 
 async function capture() {

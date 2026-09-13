@@ -154,6 +154,9 @@
 .blk-choice:hover:not(:disabled), .blk-choice.is-hover:not(:disabled) { background-color: var(--paper-0); border-color: var(--seal); transform: translateX(4px); box-shadow: var(--shadow-lift); }
 .blk-choice:disabled { opacity: 0.5; cursor: not-allowed; }
 .blk-choice[aria-selected="true"] { border-color: var(--seal); box-shadow: 0 0 0 1px var(--seal) inset; }
+/* 判分态（答题用）：只改描边与底纹——与 .blk-stat 的 .warn/.good 同一个口径，不换字号不换字色 */
+.blk-choice.correct { border-color: var(--ok); background-image: linear-gradient(var(--ok-veil), var(--ok-veil)); }
+.blk-choice.wrong { border-color: var(--bad); background-image: linear-gradient(var(--bad-veil), var(--bad-veil)); }
 .blk-choice .ic {
   width: 34px; height: 34px; display: grid; place-items: center; flex-shrink: 0;
   border: 1px solid var(--rule-strong); border-radius: var(--radius-inset);

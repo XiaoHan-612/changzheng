@@ -17,7 +17,7 @@
 /* 小片纸：只上色与描边，省性能（一处定义） */
 .jr-chip, .mood-chip, .fact-card, .log-item,
 .def-card, .ev-card, .target-card, .sentry-box, .sb-scene-tag, .echo-col, .hs-card,
-.quiz-opt, .set-input, .sb-form input, .chat-row input {
+.set-input, .sb-form input, .chat-row input {
   background-color: var(--paper-0);
   border: 1px solid var(--rule-strong);
   color: var(--ink-0);
@@ -136,7 +136,7 @@
 .panel.wide { width: min(var(--panel-w-wide), 94vw); }
 .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-2); }
 .panel h2 { font-family: var(--font-display); font-size: var(--fs-h2); letter-spacing: var(--ls-title); color: var(--ink-0); margin-bottom: var(--sp-3); }
-.panel h3 { font-family: var(--font-kai); font-size: var(--fs-label); letter-spacing: var(--ls-title); color: var(--seal); margin: var(--sp-3) 0 var(--sp-2); }
+.panel h3, .report-cols h4 { font-family: var(--font-kai); font-size: var(--fs-label); letter-spacing: var(--ls-title); color: var(--seal); margin: var(--sp-3) 0 var(--sp-2); }
 .panel.glass { /* 旧类名保留，无额外样式 */ }
 .how-list { margin: var(--sp-3) 0 var(--sp-4) var(--sp-5); line-height: var(--lh-normal); color: var(--ink-1); }
 .how-list strong { color: var(--ink-0); }
@@ -290,7 +290,7 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 
 /* 数字统一用等宽数字：数值变化时不会左右跳动 */
 /* 等宽数字：数值签的 .blk-stat b 在 framework.css 里已经声明过，别在这里重复（区块样式只允许在 framework） */
-.comp-aff, .hud-sub b, .quiz-result b, .def-card .v, .fact-card .date { font-variant-numeric: tabular-nums; }
+.comp-aff, .hud-sub b, .def-card .v, .fact-card .date { font-variant-numeric: tabular-nums; }
 
 .hud-bottom { position: absolute; left: 190px; right: var(--sp-4); bottom: var(--sp-4); z-index: var(--z-hud); display: flex; align-items: center; gap: var(--sp-3); pointer-events: none; }
 .hud-bottom .camp-log { flex: 1; pointer-events: none; max-height: 24px; overflow: hidden; padding: 3px 10px; font-size: 12px; color: var(--paper-dim); background: var(--ink-bg); border: 1px solid var(--line-soft); border-radius: var(--radius-inset); }
@@ -335,17 +335,12 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 /* ───────── 答题 / 岔路 / 夜间 / 终局 ───────── */
 .quiz-panel { width: min(var(--panel-w), 92vw); max-height: var(--panel-h); overflow: auto; }
 .night-panel { width: min(var(--panel-w), 92vw); max-height: var(--panel-h); overflow: auto; text-align: left; }
-.end-panel { width: min(var(--panel-w-wide), 94vw); max-height: 90vh; overflow: auto; }
+/* 终局面板与其他面板同一档次（原先是 700 宽 × 90vh，纸面实测 49.3% 超预算；
+   内容长就滚动读——一屏纸面 ≤35% 的规则对终局同样成立）。 */
+.end-panel { width: min(var(--panel-w), 92vw); max-height: var(--panel-h); overflow: auto; }
 .end-panel h2 { font-size: var(--fs-h1); color: var(--seal); }
-.quiz-q { font-family: var(--font); font-size: 18px; line-height: var(--lh-tight); margin: var(--sp-3) 0 var(--sp-4); }
-.quiz-opts { display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-3); }
-.quiz-opt { padding: var(--sp-3) var(--sp-4); text-align: left; border-radius: var(--radius); border: 1px solid var(--rule-strong); background-color: var(--paper-0); color: var(--ink-0); font-family: var(--font); font-size: 15px; cursor: pointer; transition: transform var(--dur-fast) var(--ease-out); }
-.quiz-opt:hover:not(:disabled) { border-color: var(--seal); transform: translateX(3px); }
-.quiz-opt:disabled { cursor: default; }
-.quiz-opt.correct { border-color: var(--ok); background-color: var(--ok-veil); }
-.quiz-opt.wrong { border-color: var(--bad); background-color: var(--bad-veil); }
-.quiz-result { font-size: var(--fs-label); line-height: var(--lh-normal); color: var(--ink-1); margin-top: var(--sp-2); }
-.quiz-result b { color: var(--seal); }
+/* 答题屏：题面 blk-body、选项 blk-choice（判分态 .correct/.wrong）、反馈 blk-note、动作 blk-actions。
+   原先的 .quiz-q / .quiz-opts / .quiz-opt / .quiz-result 是第二套选项实现，已删（批六，2026-09-13）。 */
 #quiz-next { width: 100%; margin-top: var(--sp-3); padding: 12px 20px; }
 
 /* 岔路：整页走 tpl-title，点位层用模板给的 .tpl-layer（相对整屏定位）。
@@ -376,7 +371,6 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .end-grid, .echo-grid, .report-cols, .defense-grid { display: grid; gap: var(--sp-3); }
 .end-grid, .report-cols { grid-template-columns: 1fr 1fr; }
 .end-report h3 { font-family: var(--font-kai); color: var(--seal); margin-bottom: var(--sp-2); }
-.end-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-4); }
 .personal { font-family: var(--font); font-style: normal; line-height: var(--lh-normal); color: var(--ink-1); }
 
 /* ───────── 史实回响（tpl-drawer）───────── */
@@ -420,8 +414,12 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .fact-card .fic { font-size: var(--fs-micro); color: var(--ink-2); margin-top: 4px; }
 .logs-panel .log-item { padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-inset); border: 1px solid var(--rule); background-color: var(--paper-0); font-size: 12px; color: var(--ink-1); }
 .logs-panel .log-item .row { display: flex; gap: var(--sp-2); align-items: baseline; }
-.logs-panel .log-item .tag { font-family: var(--font-num); color: var(--seal); }
-.logs-panel .log-item .src-glm { font-family: var(--font-num); color: var(--ok); }
+/* 记录屏：行内四段（类型 / 来源 / 时间 / 耗时）+ 叙事 + 原始响应。
+   来源标签的颜色按"值"给类（src-glm / src-fallback），与 .risk.r-low 同一种命名约定。 */
+.logs-panel .log-item .type { font-family: var(--font-kai); color: var(--ink-0); }
+.logs-panel .log-item .src { font-family: var(--font-num); color: var(--ink-2); }
+.logs-panel .log-item .src-glm { color: var(--ok); }
+.logs-panel .log-item .src-fallback { color: var(--bad); }
 .logs-panel .log-item pre { margin-top: 6px; white-space: pre-wrap; word-break: break-word; font-size: var(--fs-micro); color: var(--ink-2); }
 .defense-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); margin-top: var(--sp-2); }
 .def-card { padding: var(--sp-3); border-radius: var(--radius-inset); border: 1px solid var(--rule); background-color: var(--paper-0); }

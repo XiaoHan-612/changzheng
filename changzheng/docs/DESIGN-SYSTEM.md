@@ -97,7 +97,7 @@
 |---|---|---|
 | 墨字对纸底 | ≥7:1 | 8.41:1 |
 | 纸面对插画暗部 | ≤9:1 | 7.75:1 |
-| 纸面占屏（逐页） | ≤35%（1280 桌面档） | 批一：标题 0% · 怎么玩 19.0% · 设置 33.5% · 过场 9.1%　／　批二：营地 0% · 手记 22.4% · 史实 33.5% · 回响 33.5% · 岔路 0%　／　批三：交谈 29.7% · 抉择 29.7% · 裁决 29.7% · 篝火 21.2%　／　批五：五子棋 27.7% · 泸定桥 26.8% · 陡坡 15.9% · 沙盘 19.9% |
+| 纸面占屏（逐页） | ≤35%（1280 桌面档） | 批一：标题 0% · 怎么玩 19.0% · 设置 33.5% · 过场 9.1%　／　批二：营地 0% · 手记 22.4% · 史实 33.5% · 回响 33.5% · 岔路 0%　／　批三：交谈 29.7% · 抉择 29.7% · 裁决 29.7% · 篝火 21.2%　／　批五：五子棋 27.7% · 泸定桥 26.8% · 陡坡 15.9% · 沙盘 19.9%　／　批六：出题 33.5% · 判分 33.5% · 篝火夜 30.2% · 当夜之后 21.2% · 终局 29.7% · 记录 33.5% · 答辩 33.5% |
 
 面积这一项的两把尺子分开存：`tone-report.json` 是 `qa:screens` 在 1280 真机上量的**逐页预算**（`qa:tone` 只认这一份），
 `tone-report-templates.json` 是 `qa:proof` 量的模板缩略图估算（缩略只有 400×250，比例必然被放大，只用于模板之间横向比较）。
@@ -117,6 +117,7 @@
 | `.blk-rule` | 分隔线（唯一实现） | 1px `rule`；`.rule-ink` 是它的旧重复实现，已删（全仓无人引用） |
 | `.blk-seal` | 印章、钤记（唯一实现） | 朱红描边圆形，仅小面积；回响页的 `.echo-seal` 只负责**放在哪儿 + 钤印动效**，长相全走这个区块（`.seal-mark` 是旧重复实现，已删） |
 | `.btn` / `.btn.primary` / `.btn.ghost` | 纸片 / 印章 / 幽灵 | 纸面里的按钮用纸片态；朱红只给"确认类"动作 |
+| `.panel-head` / `.panel h2` / `.panel h3` | **面板系共用件**：中央面板的标题行 / 面板大标题 / 面板小标题 | 批六定：8 个 `tpl-panel` 屏（怎么玩、设置、史实、记录、答辩、答题、夜间、终局）共用这一份，**不要再各自换成 `blk-title`**——要么全换，要么都不换；半换就是两套（`report-cols h4` 已并入 `.panel h3`） |
 
 排版角色：标题位用 `display`，说话人 / 选项 / 数值签标签用 `kai`，长叙事用 `serif`，数字与型号用 `num`（`tabular-nums`，数值切换时不左右跳动）。
 数值签是"骨架"不是"内容"：它恒为墨纱系，不因为落在纸上就变回纸片——纸面只留给要读长文的地方。
@@ -142,7 +143,7 @@
 | 3 | 舞台对话、抉择、回响、篝火菜单 | ✅ 已完成（见 `screen-sheet-3.png` / `screen-sheet-3-820.png`） |
 | 4 | 钓鱼+弯针、夜校、分糖、夜岗（+ 新建 `tpl-board` 板屏） | ✅ 已完成（见 `screen-sheet-4.png` / `screen-sheet-4-820.png`） |
 | 5 | 五子棋、泸定桥、陡坡、自由行军沙盘 | ✅ 已完成（见 `screen-sheet-5.png` / `screen-sheet-5-820.png`） |
-| 6 | 答题、夜间、终局、记录/答辩 | ⏳ 待做 |
+| 6 | 答题、夜间、终局、记录/答辩 | ✅ 已完成（见 `screen-sheet-6.png` / `screen-sheet-6-820.png`） |
 
 每批交付：该批代码 + `qa:tokens` 无新增 + 1280/820 截图 + 联系表 `screen-sheet-<n>.png`（820 档是 `screen-sheet-<n>-820.png`）。
 命令：`npm run qa:screens -- <批次号>`、`node tests/manual/screen-sheet.mjs <批次号> --width 820`、`npm run qa:tokens`、`npm run qa:fonts`、`npm run qa:motion`；
@@ -188,13 +189,24 @@
 
 **⑤ 顺手修的两处对比度**：会师清点的 `mg-title + paper-dim` 与篝火夜结算的 `paper-dim`——都是"给暗底准备的纸色落在浅纸面上"，改成区块后是墨字。三处写死的告警色 `#e07a5f` 换成 `.txt-bad`（`--bad`）。
 
-### 批六开工前先读（答题 / 夜间 / 终局 / 记录与答辩）
+### 批六做了什么（答题 / 夜间 / 终局 / 记录与答辩）
 
-- 四个屏都在 `tpl-panel`（中央面板），`#quiz-body` / `#night-body` / `#end-*` / `.logs-panel` 的样式现在散在 components.css 的「答题 / 岔路 / 夜间 / 终局」「史实清单 / 记录 / 答辩」两段。
-- 已知欠账：`runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职（建议走 `askChoice`）；`runRest` 只有一个「继续」，可直接 `waitContinue`；答题屏里还有几处内联 `style="margin-top:…"`。
-- `.narr` 也出现在 `ui.js` 的行军记录里（批五已给它样式）——批六看记录屏时留意它和 `.log-item pre` 的关系。
-- **又一处同类事故**：记录屏的来源标签 JS 输出 `class="src glm"`（两个类），而 CSS 写的是 `.src-glm` / `.src-fallback`（一个类）——对不上，所以 GLM/ERROR 的来源颜色一直没生效。批六连同记录屏一起定：要么 CSS 改 `.src.glm`，要么 JS 改成 `src-${cls}`。
-- `index.html` 里有几个**纯语义标记类**（`.hotspots` / `.path-zones` / `.play` / `.sandbox`），它们没有自己的样式、由 id 或父类负责外观——这是有意的，别当成"漏了样式"去补。
-- 面板类屏的共用件是 `.panel` / `.panel-head` / `.panel h2`：批六要么把它们收成区块（`blk-title` 系列），要么在文档里明确"面板头是共用件"——**别只改一半**。
+**① 答题屏：选项归位到唯一实现**
+- `#quiz-opts` 改成 `blk-choice-list`，选项由 `choiceButton()` 产出（序号进 `.ic` 徽章、键盘位自动带上）；
+  题面走 `.blk-body`、反馈走 `.blk-note`、「看两个 AI 对答 / 继续」进 `.blk-actions`（继续键用 `.hidden` 显隐，不再写 `style.display`）。
+- 判分态是**区块状态**：`.blk-choice.correct` / `.blk-choice.wrong`（只改描边与底纹，与 `.blk-stat.warn/.good` 同一口径）。
+- `.quiz-q` / `.quiz-opts` / `.quiz-opt*` / `.quiz-result` 全部删除；键盘导航的选择器跟着换成 `#quiz-body .blk-choice`。
+
+**② 终局屏：唯一一个突破面积预算的屏**
+- `.end-panel` 原先 `700 宽 × 90vh`（纸面实测 **49.3%**，全站唯一超 35% 的页）。现与夜间/答题同档：`--panel-w × --panel-h` + 内容滚动 → **29.7%**。
+- 动作行 `.end-actions` → `.blk-actions`；`.stats.big` 里的 `big` 是空类（早没实现），去掉；`.report-cols h4` 并入 `.panel h3`（面板小标题只有一条规则）。
+
+**③ 记录与答辩**
+- 修掉一处**类名对接错误**：来源标签 JS 输出的是 `class="src glm"`（两个类），CSS 写的是 `.src-glm`（一个类）——对不上，所以 `source=GLM` 一直是普通灰字。现在 JS 输出 `src src-glm`（约定与 `.risk.r-low` 一致），并补上 `.type` 的排版与 `.src-fallback` 的告警色。
+- 记录行的第一段原先写 `class="head"` 而 CSS 等的是 `.row`（同样对不上，四段挤成一行）——改成 `.row`；顺手删掉没人用的 `.tag`。
+
+**④ 面板头（批六定案）**：8 个中央面板共用 `.panel-head` / `.panel h2` / `.panel h3`，**不换区块**——理由写在 §三 组件表里：要么全换要么不换，半换就是两套实现。
+
+**批六的装备**：`__czScreens` 增 `quiz / night / end / logs / defense` 五个钩子（长流程不另写渲染：钩子起真实流程，截图脚本在中途等）；`screen-sheet.mjs` 的 `BATCHES[6]` 取七屏（出题、判分、篝火夜、当夜之后、终局、记录、答辩）。
 
 **目标环境**：Chromium 桌面；窄屏只保证到 **820**（平板 / 展馆触屏一体机），手机（375）不在交付范围内。

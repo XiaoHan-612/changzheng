@@ -328,9 +328,9 @@ export function renderLogs(logs) {
       const narr = l.response?.narrative || l.response?.reply || l.response?.scene_text || l.response?.title || '';
       const effects = l.appliedEffects && Object.keys(l.appliedEffects).length ? JSON.stringify(l.appliedEffects) : '';
       return `<div class="log-item">
-        <div class="head">
+        <div class="row">
           <span class="type">${escapeHtml(l.callType || l.scene || 'decide')}</span>
-          <span class="src ${cls}">${escapeHtml(l.source || '—')}</span>
+          <span class="${cls ? `src src-${cls}` : 'src'}">${escapeHtml(l.source || '—')}</span>
           <span class="muted">${escapeHtml((l.timestamp || '').slice(11, 19))}</span>
           <span class="muted">${l.durationMs ?? '—'}ms</span>
         </div>
