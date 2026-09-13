@@ -18,6 +18,7 @@
     "qa:assets": "node tests/e2e/asset-drop.mjs",
     "qa:inspect": "node scripts/inspect-assets.mjs",
     "qa:tts": "node scripts/check-tts.mjs",
+    "qa:look": "node tests/manual/asset-look.mjs",
     "qa:handoff": "node scripts/check-handoff.mjs",
     "tts:manifest": "node scripts/tts-manifest.mjs",
     "check:glm": "node scripts/check-glm.mjs",

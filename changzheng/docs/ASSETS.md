@@ -45,8 +45,10 @@
 | 二幕 | `zunyi_room` ✅（门缝旁听，人物背对无面孔）· `map_desk` ✅（油灯地图桌，无可读文字）· `zunyi_street` ✅（雨巷空无一人） |
 | 三幕 | `jinsha_ferry` ✅ · `luding_bridge` ✅（铁索压中段，适配横版小游戏）· `luding_run` ✅（湿脚印 + 丢下的草鞋 + 远处火把） |
 | 四幕 | `snow_camp` ✅ · `snow_let_clothes` ✅ 均已就位（2026-09-12，返工后双手为自然肤色，红军红只留帽徽） |
-| 五幕 | `lazikou_cliff`、`huining_flag`、`huining_crowd` |
-| 通用 | `map_route`、`echo_paper` |
+| 五幕 | `lazikou_cliff` ✅（陡壁 + 藤蔓岩缝，无人物）· `huining_flag` ✅（褪色破损红旗，旗面无徽记文字）· `huining_crowd` ✅（黄土塬两路汇合，远处看面孔不可辨） |
+| 通用 | `map_route` ✅（做旧路线图，虚线路标 + 空白标记框，无可读地名）· `echo_paper` ✅（纯做旧纸纹理，无主体） |
+
+> **场景图 21/21 全部就位**（2026-09-13）。`map_route` 用作手记（回望）底图、`echo_paper` 用作史实回响卡底纹，两者都叠了一层深色渐变保证文字可读；实机截图见 `tests/e2e/artifacts/look-journal.png` 与 `look-echo.png`（`npm run qa:look` 可重跑）。
 
 ## 二、角色立绘（`public/assets/characters/`）
 
