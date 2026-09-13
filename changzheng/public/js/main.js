@@ -1943,7 +1943,8 @@ function renderPathZones(host, onPick) {
     b.style.top = z.y + '%';
     b.style.width = z.w + '%';
     b.style.height = z.h + '%';
-    b.innerHTML = `<b>${z.label}</b><span>${z.sub}</span>`;
+    // 选区本身不铺底色（否则三块墨底把插画压死），标签单独坐在一小片墨纱上
+    b.innerHTML = `<span class="pz-chip"><b>${z.label}</b><span>${z.sub}</span></span>`;
     b.onclick = () => onPick(z);
     host.appendChild(b);
   });

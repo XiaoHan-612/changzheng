@@ -202,7 +202,7 @@
 
     <!-- 史实回响：盖章仪式 -->
     <section id="screen-echo" class="screen overlay hidden tpl-drawer">
-      <div class="echo-cinema">
+      <div class="echo-cinema tpl-body">
         <div class="echo-seal" aria-hidden="true">史实</div>
         <div class="echo-head">
           <span class="echo-tag">回响</span>
@@ -225,10 +225,11 @@
 
     <section id="screen-path" class="screen hidden tpl-title">
       <div class="path-bg" style="background-image:url('/assets/scenes/path_choice.jpg')"></div>
-      <div class="path-ui">
-        <h2>前面岔开了三条路</h2>
-        <p class="muted sm">没有标准答案，只有代价。</p>
-        <div id="path-zones" class="path-zones"></div>
+      <div id="path-zones" class="path-zones tpl-layer"></div>
+      <div class="path-head ink-surface">
+        <span class="blk-kicker">过草地</span>
+        <h2 class="blk-title md">前面岔开了三条路</h2>
+        <p class="blk-lead">没有标准答案，只有代价。选一条走。</p>
       </div>
     </section>
 
@@ -323,26 +324,26 @@
 
     <!-- 手记（回望） -->
     <section id="screen-journal" class="screen overlay hidden tpl-drawer">
-      <div class="journal">
+      <div class="journal tpl-body">
         <header class="journal-head">
           <div>
-            <p class="eyebrow">回望</p>
-            <h2>这一路，你做过什么</h2>
+            <span class="blk-kicker">回望</span>
+            <h2 class="blk-title md flush">这一路，你做过什么</h2>
           </div>
           <button type="button" id="btn-journal-close" class="btn primary sm">合上手记</button>
         </header>
         <div class="journal-route" id="journal-route"></div>
         <div class="journal-cols">
           <div>
-            <h3>抉择</h3>
-            <ol id="journal-choices" class="journal-list"></ol>
+            <h3 class="blk-title sm">抉择</h3>
+            <ol id="journal-choices" class="blk-list journal-list"></ol>
           </div>
           <div>
-            <h3>史实</h3>
-            <ul id="journal-facts" class="journal-list"></ul>
+            <h3 class="blk-title sm">史实</h3>
+            <ul id="journal-facts" class="blk-list journal-list"></ul>
           </div>
         </div>
-        <p class="muted sm" id="journal-foot"></p>
+        <p class="blk-note" id="journal-foot"></p>
       </div>
     </section>
 

@@ -56,6 +56,9 @@
 .screen {
   position: absolute; inset: 0; z-index: 10;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
+  /* 屏幕自己裁边：装饰层（标题卡的暗场 ::before 等）可以往外扩，但不能把文档撑出横向滚动条。
+     layout-audit 在 820 量到过 scrollWidth 845 就是这类装饰导致的（踩过）。 */
+  overflow: hidden;
 }
 .screen.overlay { background: var(--scrim); z-index: var(--z-overlay); }
 .pano-img, .title-bg, .cut-stage, .quiz-bg, .night-bg, .end-bg, .path-bg, .sandbox-bg {
@@ -121,7 +124,9 @@
 .btn.ghost:hover { background: var(--gold-soft); }
 .btn.gold { background: var(--gold); border-color: var(--gold); color: var(--ink-0); }
 .btn.lg { padding: 12px 28px; font-size: 15px; }
-.btn.sm { padding: 6px 12px; font-size: 12px; }
+/* 小按钮：高度必须 ≥32px——触屏体检（layout-audit ≤820）会量点按区，
+   原先 6px 内边距只有 29px 高，顶栏与沙盘一排按钮全被判不合格。 */
+.btn.sm { padding: 8px 12px; font-size: 12px; }
 .btn.block { width: 100%; margin-top: var(--sp-3); }
 
 /* ───────── 面板（tpl-panel / tpl-drawer 的内容面）───────── */
@@ -362,13 +367,30 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .quiz-result b { color: var(--seal); }
 #quiz-next { width: 100%; margin-top: var(--sp-3); padding: 12px 20px; }
 
-.path-ui { position: relative; z-index: 2; text-align: center; }
-.path-ui h2 { font-family: var(--font-display); letter-spacing: var(--ls-title); text-shadow: var(--shadow-text); }
-.path-zones { position: absolute; inset: 0; }
-.path-zone { position: absolute; border: 1px dashed var(--gold-soft); border-radius: var(--radius); background: var(--scrim-soft); color: var(--paper); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; transition: border-color var(--dur-fast) var(--ease-out); }
-.path-zone:hover { border-color: var(--gold); }
-.path-zone b { font-family: var(--font-kai); font-size: var(--fs-h3); letter-spacing: var(--ls-title); text-shadow: var(--shadow-text); }
-.path-zone span { font-size: var(--fs-micro); color: var(--paper-dim); text-shadow: var(--shadow-text); }
+/* 岔路：整页走 tpl-title，点位层用模板给的 .tpl-layer（相对整屏定位）。
+   题字条借 .ink-surface 声明"坐在墨色上"，区块颜色由 framework.css 的墨纱适配接管。 */
+.path-head {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 3;
+  display: flex; flex-direction: column; align-items: center;
+  padding: var(--sp-5) var(--sp-5) var(--sp-6);
+  background: linear-gradient(180deg, var(--ink-bg-2), var(--ink-bg) 46%, transparent);
+  border: none; text-align: center; pointer-events: none;
+}
+.path-zone {
+  position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  border: 1px dashed var(--gold-soft); border-radius: var(--radius);
+  /* 选区只在插画上压一层极淡的墨（8%），让"整块可点"看得出来，又不把画压死 */
+  background: var(--ink-veil); color: var(--paper); cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.path-zone:hover, .path-zone:focus-visible { border-color: var(--gold); transform: translateY(-2px); }
+.path-zone .pz-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 4px 12px; border-radius: var(--radius-inset);
+  background: var(--ink-bg); box-shadow: var(--shadow-ink);
+}
+.path-zone .pz-chip b { font-family: var(--font-kai); font-size: var(--fs-h3); letter-spacing: var(--ls-title); }
+.path-zone .pz-chip span { font-family: var(--font); font-size: var(--fs-micro); color: var(--paper-dim); }
 
 .end-grid, .echo-grid, .report-cols, .defense-grid { display: grid; gap: var(--sp-3); }
 .end-grid, .report-cols { grid-template-columns: 1fr 1fr; }
@@ -377,7 +399,7 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .personal { font-family: var(--font); font-style: normal; line-height: var(--lh-normal); color: var(--ink-1); }
 
 /* ───────── 史实回响（tpl-drawer）───────── */
-.echo-cinema { position: relative; width: min(var(--panel-w-wide), 94vw); max-height: 90vh; overflow: auto; padding: var(--sp-6) var(--sp-6) var(--sp-5); border-radius: var(--radius); animation: fade-in var(--dur-slow) var(--ease-out) both; }
+.echo-cinema { position: relative; border-radius: var(--radius); animation: fade-in var(--dur-slow) var(--ease-out) both; }
 .echo-seal { position: absolute; right: 28px; top: 24px; width: 60px; height: 60px; display: grid; place-items: center; border: 2px solid var(--seal); border-radius: 50%; color: var(--seal); font-family: var(--font-display); font-size: var(--fs-h3); letter-spacing: 0.12em; animation: seal-stamp var(--dur-base) var(--ease-stamp) 0.12s both; pointer-events: none; }
 .echo-head { margin-bottom: var(--sp-4); padding-right: 76px; }
 .echo-head h2 { font-family: var(--font-display); font-size: var(--fs-h1); letter-spacing: var(--ls-title); color: var(--ink-0); margin-top: var(--sp-2); }
@@ -392,20 +414,19 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .echo-cinema .btn.primary { width: 100%; padding: 12px 20px; letter-spacing: 0.18em; }
 
 /* ───────── 手记（tpl-drawer）───────── */
-.journal { width: min(var(--panel-w-wide), 94vw); max-height: 88vh; overflow: auto; padding: var(--sp-6); border-radius: var(--radius); }
+.journal { border-radius: var(--radius); }
+/* 手记已改用区块排印：标题 blk-title、列表 blk-list、脚注 blk-note，
+   这里只剩"手记专属"的结构：头部两端对齐、路线签、两栏、空态。 */
 .journal-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--sp-4); }
-.journal-head h2 { font-family: var(--font-display); font-size: 25px; letter-spacing: var(--ls-title); margin-top: 6px; }
 .journal-route { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--sp-5); }
 .journal-route .jr-chip { padding: 3px 11px; border-radius: var(--radius-inset); border: 1px solid var(--rule-strong); background-color: var(--paper-0); font-size: 12px; color: var(--ink-2); }
 .journal-route .jr-chip.done { border-color: var(--ok); color: var(--ok); }
 .journal-route .jr-chip.now { border-color: var(--seal); color: var(--seal); }
 .journal-cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); }
-.journal-cols h3 { font-family: var(--font-kai); font-size: 12px; letter-spacing: 0.18em; color: var(--seal); margin-bottom: var(--sp-2); }
 .journal-list { margin: 0; padding-left: var(--sp-4); }
-.journal-list li { font-family: var(--font); font-size: var(--fs-label); line-height: var(--lh-normal); color: var(--ink-1); margin-bottom: 6px; }
 .journal-list li b { color: var(--ink-0); font-weight: 600; }
 .journal-list li.empty { list-style: none; margin-left: calc(var(--sp-4) * -1); color: var(--ink-2); }
-#journal-foot { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px dashed var(--rule-strong); font-size: 12px; color: var(--ink-1); }
+#journal-foot { margin-top: var(--sp-4); }
 
 /* ───────── 史实清单 / 记录 / 答辩 ───────── */
 .facts-list, .logs-list { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 60vh; overflow: auto; }

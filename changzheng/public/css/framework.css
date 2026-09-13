@@ -5,9 +5,13 @@
 
 /* ─────────────── 模板 ─────────────── */
 
-/* 1 全屏题字：标题页——插画满屏，内容居中 */
+/* 1 全屏题字：标题页、过场、岔路——插画满屏，内容居中 */
 .tpl-title { display: grid; place-items: center; }
 .tpl-title .tpl-body { max-width: 640px; text-align: center; padding: var(--sp-6) var(--sp-5); }
+/* 整屏层：压在插画上的可点区/装饰层（岔路点位这一类）。
+   它必须相对**整屏**定位；一旦放进 .tpl-body 这类居中内容盒，`inset: 0` 的参照系就变成内容盒，
+   整层会塌成内容尺寸、百分比坐标挤成一团（踩过）。 */
+.tpl-title .tpl-layer { position: absolute; inset: 0; z-index: 2; }
 
 /* 2 中央面板：怎么玩、设置、史实、记录、答辩 */
 .tpl-panel { display: grid; place-items: center; }
@@ -53,8 +57,10 @@
 /* 6 抽屉浮层：手记、回响、篝火菜单 */
 .tpl-drawer { display: grid; place-items: center; }
 .tpl-drawer .tpl-body {
+  /* 抽屉与中央面板共用同一套面积预算（--panel-w-wide / --panel-h）：
+     回响卡的高度原先只受 88vh 约束，文案一长就把纸面推到 35% 以上（实测 35.2%）。 */
   width: min(var(--panel-w-wide), 94vw);
-  max-height: 88vh; overflow: auto;
+  max-height: var(--panel-h); overflow: auto;
   padding: var(--sp-6) var(--sp-6) var(--sp-5);
 }
 
@@ -78,6 +84,8 @@
 .blk-title { font-family: var(--font-display); font-size: var(--fs-h1); letter-spacing: var(--ls-title); line-height: 1.3; margin: 0 0 var(--sp-3); }
 .blk-title.md { font-size: var(--fs-h2); }
 .blk-title.sm { font-family: var(--font-kai); font-size: var(--fs-h3); letter-spacing: var(--ls-label); }
+/* 与上方的 kicker 紧贴成一行时用（手记头部、抽屉标题）：去掉块级默认的下外边距 */
+.blk-title.flush { margin: var(--sp-1) 0 0; }
 .blk-lead { font-family: var(--font); font-size: var(--fs-body); line-height: var(--lh-normal); color: var(--ink-1); margin: 0 0 var(--sp-4); }
 .blk-body { font-family: var(--font); font-size: var(--fs-body); line-height: var(--lh-loose); color: var(--ink-0); margin: 0 0 var(--sp-3); }
 .blk-note {
@@ -117,6 +125,14 @@
 .blk-stat.warn { border-color: var(--seal); background-image: linear-gradient(var(--seal-veil), var(--seal-veil)); }
 .blk-stat.good { border-color: var(--gold); }
 .blk-stat[aria-disabled="true"], .blk-stat.off { opacity: 0.45; }
+
+/* 区块落在墨纱上（顶栏、岔路题字、世界面板）：墨字换成纸色系。
+   靠 .ink-surface 声明"这一块坐在墨色骨架里"，与 .blk-stat 落在纸面上自动换浅纱是同一个思路。 */
+.ink-surface .blk-kicker { color: var(--gold); border-bottom-color: var(--gold-soft); }
+.ink-surface .blk-title, .ink-surface .blk-body { color: var(--paper); }
+.ink-surface .blk-lead, .ink-surface .blk-note { color: var(--paper-dim); }
+.ink-surface .blk-lead { margin: 0; }        /* 题字条里不需要段落下边距 */
+.ink-surface .blk-note { border-left-color: var(--gold-soft); }
 
 .blk-choice-list { display: flex; flex-direction: column; gap: var(--sp-2); }
 .blk-choice {

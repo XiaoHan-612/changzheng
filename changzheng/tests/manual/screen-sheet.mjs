@@ -171,11 +171,22 @@ async function capture() {
   for (const s of shots) {
     if (s.fresh) await page.reload({ waitUntil: 'networkidle' });
     await s.setup(page);
+    // 截交付图前先摘掉 dev 标记，只留玩家能看到的样子（钩子是 boot 时挂的，摘标记不影响它）
+    await page.evaluate(() => document.body.classList.remove('dev-tools'));
     await page.screenshot({ path: path.join(OUT, `${s.name}.png`) });
     tone[s.name] = { paperRatio: await measurePaper(page) };
     console.log('shot', s.name, `纸面 ${(tone[s.name].paperRatio * 100).toFixed(1)}%`);
   }
-  fs.writeFileSync(path.join(ART, 'tone-report.json'), JSON.stringify({ generatedAt: new Date().toISOString(), batch: BATCH, pages: tone }, null, 2), 'utf8');
+  // 逐页面积**累加**写入：qa:tone 要能一次看到所有已测过的页面，
+  // 否则跑完第二批就把第一批的记录顶掉，等于"最后跑哪批只查哪批"。
+  const REPORT = path.join(ART, 'tone-report.json');
+  const prev = fs.existsSync(REPORT) ? JSON.parse(fs.readFileSync(REPORT, 'utf8')) : {};
+  const batches = { ...(prev.batches || {}), [BATCH]: Object.keys(tone) };
+  fs.writeFileSync(REPORT, JSON.stringify({
+    generatedAt: new Date().toISOString(),
+    batches,
+    pages: { ...(prev.pages || {}), ...tone },
+  }, null, 2), 'utf8');
   await browser.close();
 }
 
