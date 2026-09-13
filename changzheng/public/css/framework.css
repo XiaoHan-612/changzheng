@@ -30,10 +30,13 @@
 
 /* 4 侧栏手记 + 画面：营地（同时匹配语义类 tpl-rail 与既有 DOM 类 .hud-left） */
 .tpl-side .tpl-rail, .tpl-side .hud-left {
-  /* 贴合内容而不是从顶贯到底：画面留给插画，信息只在左上角一小块 */
+  /* 柔性框架：高度随内容行数伸缩（贴合内容），只设一个上限并允许滚动，
+     既不会像固定高度那样空洞，也不会被长文本撑出屏幕 */
   position: absolute; left: var(--sp-3); top: 60px; bottom: auto;
   width: 138px; padding: var(--sp-3);
   display: flex; flex-direction: column; gap: var(--sp-2);
+  max-height: calc(100vh - 150px);
+  overflow: auto;
   z-index: var(--z-hud);
 }
 
@@ -91,7 +94,7 @@
   color: var(--ink-1); font-size: 12px;
   box-shadow: var(--shadow-ink);
 }
-.blk-stat b { font-family: var(--font-num); font-weight: 700; color: var(--ink-0); }
+.blk-stat b { font-family: var(--font-num); font-weight: 700; color: var(--ink-0); font-variant-numeric: tabular-nums; }
 .blk-stat.warn { background-color: var(--paper-warn); }
 .blk-stat.good b { color: var(--ok); }
 .blk-stat[aria-disabled="true"], .blk-stat.off { opacity: 0.45; }

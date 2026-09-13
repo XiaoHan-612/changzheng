@@ -252,27 +252,32 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
   box-shadow: 0 10px 28px var(--scrim);
 }
 .hud-day { display: flex; flex-direction: column; gap: 2px; }
-.hud-label { font-family: var(--font-kai); font-size: var(--fs-h3); letter-spacing: var(--ls-title); color: var(--paper); }
-.hud-sub { display: block; font-size: var(--fs-micro); color: var(--paper-dim); margin-top: 4px; }
-.hud-sub b { font-family: var(--font-num); font-size: 18px; color: var(--gold); }
+.hud-label { font-family: var(--font-kai); font-size: 17px; line-height: 1.3; letter-spacing: 0.14em; color: var(--paper); }
+.hud-sub { display: block; font-size: var(--fs-micro); letter-spacing: 0.06em; color: var(--paper-dim); margin-top: 4px; }
+.hud-sub b { font-family: var(--font-num); font-size: 15px; color: var(--gold); margin: 0 1px; }
 .ap-runes { display: flex; gap: var(--sp-2); }
 .ap-runes .ap-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--gold-soft); }
 .ap-runes .ap-dot.on { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 8px var(--gold-soft); }
 .ap-dots { display: flex; gap: 6px; }
 .ap-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--rule-strong); background: transparent; }
 .ap-dot.on { background: var(--gold); }
-/* 提示语由模型生成、长度不定：限制行数，避免把栏体撑高（全文仍在底部营地日志里） */
+/* 提示语由模型生成、长度不定：栏体随行数伸缩（柔性框架），不做硬裁；
+   极限长度由栏的 max-height + 滚动兜底，全文仍在底部营地日志里 */
 .hud-hint {
-  font-size: var(--fs-micro); line-height: 1.7; color: var(--paper-dim);
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
-  overflow: hidden;
+  font-size: 12px; line-height: 1.75; letter-spacing: 0.02em; color: var(--paper-dim);
 }
 /* 同伴改成两列小头像：竖排四行太占高度 */
 .companion-rail { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 .comp-item { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: var(--radius-inset); background: var(--ink-veil); border: 1px solid var(--line-soft); }
 .comp-ava { width: 24px; height: 24px; border-radius: 50%; background-size: cover; background-position: center; border: 1px solid var(--gold-soft); box-shadow: 0 0 0 1px var(--seal-veil); flex-shrink: 0; }
 .comp-meta { display: none; }
-.comp-aff { font-family: var(--font-num); font-size: var(--fs-micro); color: var(--paper-dim); }
+.comp-aff { font-family: var(--font-num); font-size: 12px; color: var(--paper-dim); min-width: 20px; text-align: right; }
+.comp-aff.low { color: var(--seal-bright); }
+.comp-aff.high { color: var(--gold); }
+
+/* 数字统一用等宽数字：数值变化时不会左右跳动 */
+.stat b, .comp-aff, .hud-sub b, .score-line, .luding-hud,
+.quiz-result b, .def-card .v, .fact-card .date { font-variant-numeric: tabular-nums; }
 
 .hud-bottom { position: absolute; left: 190px; right: var(--sp-4); bottom: var(--sp-4); z-index: var(--z-hud); display: flex; align-items: center; gap: var(--sp-3); pointer-events: none; }
 .hud-bottom .camp-log { flex: 1; pointer-events: none; max-height: 24px; overflow: hidden; padding: 3px 10px; font-size: 12px; color: var(--paper-dim); background: var(--ink-bg); border: 1px solid var(--line-soft); border-radius: var(--radius-inset); }

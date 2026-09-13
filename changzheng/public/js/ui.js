@@ -89,13 +89,15 @@ export function renderCompanions(state) {
   box.innerHTML = COMPANIONS.map((c) => {
     const key = `好感_${c.name}`;
     const aff = state[key] ?? 40;
+    // 好感档位：低（<30 朱红）/ 常规 / 高（>65 金），并给无障碍标签
+    const band = aff < 30 ? ' low' : aff > 65 ? ' high' : '';
     const ava = c.img
       ? `<div class="comp-ava img" style="background-image:url('${c.img}')" title="${c.name}"></div>`
       : `<div class="comp-ava">${c.ava}</div>`;
-    return `<div class="comp-item" title="${c.name} ♥${aff}">
+    return `<div class="comp-item" title="${c.name} · 好感 ${aff}" aria-label="${c.name}，好感 ${aff}">
       ${ava}
       <div class="comp-meta"><b>${c.name}</b><span>${c.role}</span></div>
-      <div class="comp-aff">${aff}</div>
+      <div class="comp-aff${band}">${aff}</div>
     </div>`;
   }).join('');
 }
