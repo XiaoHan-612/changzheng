@@ -2,11 +2,11 @@
 
 > 由 node scripts/audit-logs.mjs 生成 · 日志目录 logs
 
-- 总记录：**2848** 条（带契约戳记 11 条）
+- 总记录：**2933** 条（带契约戳记 96 条）
 - 覆盖 callType：**16** 类
-- 平均耗时：2507ms　·　p95：4842ms　·　最慢：12933ms
-- source 分布：GLM-5.1=54　GLM=2794
-- model 分布：glm-5.3-flash=2848
+- 平均耗时：2503ms　·　p95：4833ms　·　最慢：12933ms
+- source 分布：GLM-5.1=54　GLM=2879
+- model 分布：glm-5.3-flash=2933
 - 字段缺失（**本版本**，带戳记）：**0** 条　·　FALLBACK：**0** 条
 - 字段缺失（历史，无戳记）：**14** 条 —— 详见文末「历史记录」，成因已逐条可解释，不拦当前版本。
 - 已忽略历史 MOCK_AI 记录 **903** 条（本版本已移除 MOCK，如需查看加 `--all`）
@@ -20,22 +20,22 @@
 
 | callType | 次数 | 平均耗时 | 最慢 | 缺失（本版本） | 缺失（历史） |
 |---|---:|---:|---:|---:|---:|
-| scene_gen | 537 | 2875ms | 12118ms | 0 | 1 |
-| branch_judge | 388 | 2756ms | 12340ms | 0 | 6 |
-| choice_hint | 341 | 1939ms | 6362ms | 0 | 0 |
-| quiz_generate | 268 | 2356ms | 10742ms | 0 | 2 |
-| act_review | 256 | 2790ms | 8559ms | 0 | 1 |
-| quiz_answer_ai | 247 | 1114ms | 4833ms | 0 | 0 |
-| quiz_judge | 247 | 1580ms | 5826ms | 0 | 0 |
-| minigame_review | 182 | 2964ms | 8759ms | 0 | 0 |
-| share_judge | 129 | 2762ms | 6499ms | 0 | 0 |
+| scene_gen | 551 | 2879ms | 12118ms | 0 | 1 |
+| branch_judge | 400 | 2757ms | 12340ms | 0 | 6 |
+| choice_hint | 352 | 1932ms | 6362ms | 0 | 0 |
+| quiz_generate | 275 | 2344ms | 10742ms | 0 | 2 |
+| act_review | 264 | 2786ms | 8559ms | 0 | 1 |
+| quiz_answer_ai | 254 | 1108ms | 4833ms | 0 | 0 |
+| quiz_judge | 254 | 1576ms | 5826ms | 0 | 0 |
+| minigame_review | 191 | 2951ms | 8759ms | 0 | 0 |
+| share_judge | 134 | 2763ms | 6499ms | 0 | 0 |
 | npc_chat | 74 | 2216ms | 5476ms | 0 | 3 |
 | sim_turn | 52 | 6238ms | 12933ms | 0 | 1 |
-| night_options | 33 | 2930ms | 3888ms | 0 | 0 |
-| night_resolve | 33 | 2998ms | 4894ms | 0 | 0 |
-| ending_review | 32 | 5495ms | 8011ms | 0 | 0 |
-| study_report | 26 | 3379ms | 5140ms | 0 | 0 |
-| failure_review | 3 | 4010ms | 4672ms | 0 | 0 |
+| night_options | 34 | 2934ms | 3888ms | 0 | 0 |
+| night_resolve | 34 | 2990ms | 4894ms | 0 | 0 |
+| ending_review | 33 | 5489ms | 8011ms | 0 | 0 |
+| study_report | 27 | 3373ms | 5140ms | 0 | 0 |
+| failure_review | 4 | 3771ms | 4672ms | 0 | 0 |
 
 ## 字段缺失明细（本版本，带戳记）
 
