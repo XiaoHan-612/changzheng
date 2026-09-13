@@ -251,7 +251,7 @@ export async function clickChoice(page, index, preferRisk = '') {
  */
 export async function playThrough(page, {
   mode = 'study', speed = 'fast', strategy = 'balanced',
-  onSnapshot = null, onAct = null, maxMs = 45 * 60 * 1000,
+  onSnapshot = null, onAct = null, maxMs = 45 * 60 * 1000, resume = false,
 } = {}) {
   const policy = STRATEGIES[strategy] || STRATEGIES.balanced;
   const t0 = Date.now();
@@ -263,7 +263,10 @@ export async function playThrough(page, {
   let lastProgress = Date.now();
   let currentAct = '';
 
-  await page.click(mode === 'quick' ? '#btn-mode-quick' : mode === 'march' ? '#btn-mode-march' : '#btn-mode-study');
+  // resume=true 用于"注入存档后从中途续跑"的场景（调用方已自己回到营地）
+  if (!resume) {
+    await page.click(mode === 'quick' ? '#btn-mode-quick' : mode === 'march' ? '#btn-mode-march' : '#btn-mode-study');
+  }
 
   for (;;) {
     const s = await snap(page);
