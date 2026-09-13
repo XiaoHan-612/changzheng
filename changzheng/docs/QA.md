@@ -4,11 +4,11 @@
 
 | 命令 | 覆盖 | 通过标准 |
 |------|------|----------|
-| `npm run test:unit` | 资源钳制、史实解锁、附身线门控、行动点、每日场景、失败判定、AI 响应契约 | 47/47 通过 |
+| `npm run test:unit` | 资源钳制、史实解锁、附身线门控、行动点、每日场景、失败判定、AI 响应契约、减员规则、数值护栏 | **49/49** 通过 |
 | `npm run qa:tokens` · `qa:frames` · `qa:tone` · `qa:motion` | 设计系统守卫：颜色/字体/圆角无新增字面量、页面只用模板与区块、纸面面积在预算内、五个标准动效真的挂上 | 全部通过（口径见 [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md)） |
 | `npm run qa:screens -- <批次>` | 逐页截图 + 纸面占比 + 联系表（加 `--width 820` 出窄屏版） | 该批页面逐张出图，占比 ≤35% |
 | `npm run qa:smoke` | 标题→营地→热点→回营地 | SMOKE PASS |
-| `npm run test:e2e` | 五幕**真调**通关 + 五个新玩法各 1 次 + 不重复结算 | E2E FULL PASS，`source=GLM`，无 pageerror |
+| `npm run test:e2e` | 五幕**真调**通关（约 76 次调用）+ 各玩法恰好 1 次 + 不重复结算 | E2E FULL PASS，`source=GLM`，无 pageerror（gomoku 偶尔落空时失败信息会带「营地历次热点」） |
 | `node tests/e2e/full-run.mjs --quick` | 快速模式通关 | E2E FULL PASS |
 | `npm run qa:sandbox` | 沙盘两回合 + 存档恢复 | SANDBOX PASS |
 | `npm run qa:regress` | 沙盘监听泄漏、存档回合 | REGRESS PASS |
@@ -19,8 +19,9 @@
 | `npm run qa:audio` | **音频逐个体检**（55 个）：容器 vs 扩展名、HTTP 200、MIME、浏览器逐条解码、以及"能否被代码路径引用到" | AUDIO PASS，报告落 `docs/AUDIO-REPORT.md` |
 | `npm run qa:inspect` | 素材体检：格式/尺寸/时长/重复（含立绘） | 素材体检通过 |
 | `npm run qa:handoff` | 交接文档与代码契约一致（场景/环境床/TTS/立绘） | 可以交接 |
-| `node tests/e2e/layout-audit.mjs --width 820` | 逐屏布局硬伤（横向溢出/控件出界/点按区） | 820 宽 0 处横向溢出 |
-| `npm run qa:board` | **玩法板体检**：五个玩法逐屏摆到板屏上（板屏壳/数值签/契约标记/第一步可点/离开清空） | 36 项全 ✓ |
+| `node tests/e2e/layout-audit.mjs [--width 820]` | 逐屏布局硬伤（横向溢出/控件出界/点按区<32px），含**玩法板五屏**巡屏 | 1280 与 820 均 0 处问题 |
+| `npm run qa:board` | **玩法板体检**：几个玩法逐屏摆到板屏上（板屏壳/数值签/契约标记/第一步可点/离开清空） | 36 项全 ✓ |
+| `npm run qa:assets` | 素材落盘即生效：立绘兜底顺序（如「母亲」必须是 `mother.png`）等回归断言 | ASSETS PASS |
 | `npm run qa:audit` | 日志 schema 审计（按 `contractOk` 戳记分「本版本 / 历史」两拨算账） | 本版本字段缺失 0、FALLBACK 0；历史违约单列并注明成因 |
 
 ## 手工（真调）
