@@ -15,6 +15,13 @@ body {
 .hidden { display: none !important; }
 /* 展示开关：关掉"评委演示/答辩/记录/模型标签"，只留纯游戏界面（见 js/features.js） */
 body:not(.dev-tools) .dev-only { display: none !important; }
+/* 浮层打开时隐藏底层的"纸面"（对话面板、营地手记栏、热点），但保留背景插画。
+   只靠压暗遮罩在纸面方案下不够——回响/手记后面会透出纸条与叙事文字，像渲染错乱。 */
+body.overlay-open .sheet,
+body.overlay-open .hud-left,
+body.overlay-open .hud-bottom,
+body.overlay-open #hotspots,
+body.overlay-open .path-zone { visibility: hidden; }
 .set-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--paper); cursor: pointer; }
 .set-check input { width: 16px; height: 16px; accent-color: var(--gold); }
 .muted { color: var(--muted); }
@@ -75,8 +82,13 @@ body:not(.dev-tools) .dev-only { display: none !important; }
 }
 .btn:hover { background: rgba(255, 252, 245, 0.95); transform: translateY(-1px); box-shadow: 0 3px 10px rgba(36,29,20,0.2); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-.btn.primary { background: var(--seal); border-color: var(--seal-deep); color: #f6ede0; }
-.btn.primary:hover { background: var(--seal-bright); }
+/* 印章按钮：一层极轻的渐变和内高光，避免大块死红 */
+.btn.primary {
+  background: linear-gradient(180deg, #a8352a, #87251e);
+  border-color: var(--seal-deep); color: #f7efe3;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+}
+.btn.primary:hover { background: linear-gradient(180deg, #b83a2c, #9b2d24); }
 /* 幽灵态：颜色继承所在容器（顶栏是浅字，纸面是墨字），只留一道细边 */
 .btn.ghost {
   background: rgba(255, 251, 242, 0.06); color: inherit;

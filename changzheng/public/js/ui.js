@@ -26,10 +26,24 @@ export function showScreen(id) {
 
 export function showOverlay(id) {
   $(id)?.classList.remove('hidden');
+  syncOverlayState();
 }
 
 export function hideOverlay(id) {
   $(id)?.classList.add('hidden');
+  syncOverlayState();
+}
+
+/**
+ * 浮层打开时把底层屏幕整体隐掉。
+ *
+ * 为什么不能只靠"压暗遮罩"：改成纸面之后，底层与浮层都是米黄纸，
+ * 半透明遮罩压不住——回响卡后面会透出选项纸条和叙事文字，看起来像渲染错乱（踩过）。
+ * 这里用 body.overlay-open 让 CSS 直接隐藏非浮层屏幕，浮层关闭后自动恢复。
+ */
+function syncOverlayState() {
+  const anyOpen = [...document.querySelectorAll('.screen.overlay')].some((s) => !s.classList.contains('hidden'));
+  document.body.classList.toggle('overlay-open', anyOpen);
 }
 
 export function setTopbar(on) {
