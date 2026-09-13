@@ -110,3 +110,27 @@ test('本轮新增：二幕「油灯下的地图」独立热点已挂上且不�
   const sameSpot = act2.hotspots.filter((h) => h.x === lamp.x && h.y === lamp.y);
   assert.equal(sameSpot.length, 1, '油灯地图与其他热点坐标重叠');
 });
+
+test('每幕的可点热点数 ≥ 行动点预算（否则玩家会"有行动点却无事可做"）', () => {
+  for (const id of acts.order) {
+    const a = acts.acts[id];
+    const budget = a.apDays * a.apPerDay;
+    const count = eachDay(a).reduce((n, d) => n + d.hotspots.filter((h) => h.kind !== 'march').length, 0);
+    assert.ok(count >= budget,
+      `${id}：行动点 ${budget} 但只有 ${count} 个可点热点 —— 加天数时别忘了补内容`);
+  }
+});
+
+test('新增热点的坐标不与同幕其他热点重叠', () => {
+  for (const id of acts.order) {
+    const a = acts.acts[id];
+    for (const day of eachDay(a)) {
+      const seen = new Map();
+      for (const h of day.hotspots) {
+        const key = `${h.x},${h.y}`;
+        assert.ok(!seen.has(key), `${id}/${day.label}：${h.id} 与 ${seen.get(key)} 坐标重叠（${key}）`);
+        seen.set(key, h.id);
+      }
+    }
+  }
+});

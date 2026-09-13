@@ -102,7 +102,13 @@ async function run() {
   assert((await page.locator('#set-url').count()) === 1, '接口地址输入');
   assert((await page.locator('#btn-set-test').count()) === 1, '测试连通键');
   assert((await page.locator('#btn-set-save').count()) === 1, '保存键');
-  console.log('设置面板 OK · 模式标签 =', await page.locator('#ai-mode').innerText());
+  assert((await page.locator('#set-devtools').count()) === 1, '展示开关（评委/调试工具）');
+  // 顶栏模型标签属于调试工具、默认隐藏，所以模型口径直接读配置接口
+  console.log('设置面板 OK · 模型 =', cfg.model, '· 展示开关默认',
+    (await page.locator('#set-devtools').isChecked()) ? '开' : '关');
+  assert(!(await page.locator('#ai-mode').isVisible().catch(() => false)), '默认应隐藏模型标签（纯游戏界面）');
+  assert(!(await page.locator('#btn-judge').isVisible().catch(() => false)), '默认应隐藏评委演示');
+  assert(!(await page.locator('#btn-defense').isVisible().catch(() => false)), '默认应隐藏答辩');
   await page.click('#btn-settings-close');
   await page.waitForTimeout(200);
 

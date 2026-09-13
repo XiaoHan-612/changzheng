@@ -28,12 +28,12 @@
       <div class="top-actions">
         <div id="stats" class="stats compact"></div>
         <button type="button" id="btn-facts" class="btn ghost sm">史实</button>
-        <button type="button" id="btn-logs" class="btn ghost sm">记录 <span id="ai-count" class="pill">0</span></button>
+        <button type="button" id="btn-logs" class="btn ghost sm dev-only">记录 <span id="ai-count" class="pill">0</span></button>
         <button type="button" id="btn-settings" class="btn ghost sm">设置</button>
         <button type="button" id="btn-mute" class="btn ghost sm" title="开关声音">🔊</button>
         <button type="button" id="btn-journal" class="btn ghost sm" title="手记">手记</button>
-        <button type="button" id="btn-defense" class="btn ghost sm" title="答辩数据">答辩</button>
-        <span id="ai-mode" class="mode-tag">—</span>
+        <button type="button" id="btn-defense" class="btn ghost sm dev-only" title="答辩数据">答辩</button>
+        <span id="ai-mode" class="mode-tag dev-only">—</span>
       </div>
     </header>
 
@@ -67,11 +67,11 @@
         </div>
         <div class="title-actions">
           <button type="button" id="btn-continue-run" class="btn primary lg hidden">继续上一局</button>
-          <button type="button" id="btn-judge" class="btn gold lg">评委演示</button>
+          <button type="button" id="btn-judge" class="btn gold lg dev-only">评委演示</button>
           <button type="button" id="btn-how" class="btn ghost lg">怎么玩</button>
           <button type="button" id="btn-settings2" class="btn ghost lg">设置</button>
         </div>
-        <p class="foot-note">模型 <strong id="title-model">—</strong> · 赛道二 AI 游戏 · 可演示真调日志</p>
+        <p class="foot-note dev-only">模型 <strong id="title-model">—</strong> · 赛道二 AI 游戏 · 可演示真调日志</p>
       </div>
     </section>
 
@@ -114,6 +114,14 @@
           <div>
             <h3>接口地址</h3>
             <input id="set-url" class="set-input" type="text" />
+          </div>
+          <div>
+            <h3>展示</h3>
+            <label class="set-check">
+              <input type="checkbox" id="set-devtools" />
+              <span>显示评委演示与调试工具</span>
+            </label>
+            <p class="muted sm">关闭时只保留玩法本身（评委演示 / 答辩 / 记录 / 模型标签都会隐藏）。默认关闭。</p>
           </div>
         </div>
         <div class="set-actions">

@@ -114,6 +114,8 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 23. **`text-avatar` 是设计的一部分，不是缺陷** —— 没有专属立绘的 NPC（目前是「湘江老兵」）会退回文字头像，影音审计按 `PORTRAIT_FILE` 的键判断"本该有立绘"，因此不会误报；要给他补立绘时，往 `PORTRAIT_FILE` 加一行即可自动生效。
 24. **测试会复用旧服务，让服务端改动"假绿"** —— 早先每个 e2e 脚本各写一份 `ensureServer()`，只判断端口上有没有服务。于是一个几小时前启动的进程会被一直复用：**服务端代码改了，测试却还在跑旧代码**，绿灯是假的（本人在数值护栏上踩过：日志里单次 +15，钳制明明写了却"没生效"）。现在统一走 `tests/e2e/lib/server.mjs`：服务端在 `/api/config` 暴露 `pid` 与 `codeStamp`（`server/*.js` 最新 mtime），测试启动前比对，代码比进程新就杀掉重启；迁移期旧服务不暴露 pid 时按端口反查监听进程。改服务端代码后跑测试，看到 `restarted` 才算真跑。
 25. **数值改动要同时改三处** —— ①`server/balance.js` 的钳制表（单维单次上限 + 单次最多 3 维 + 信念只允许在 `branch_judge`/`night_resolve` 正向增长）；②`server/ai.js` 提示词里的【数值】段落；③`tests/unit/balance.test.js`。只改其一会出现"提示词说 ±8、实际还能 +15"这类不一致。实测口径：一局 AI 净变化应为体力 −20～−30、信念 +5 左右，终局落在体力 20–45 / 信念 50–85。
+26. **评委/调试入口由「设置 → 展示」控制** —— `public/js/features.js` 的 `FEATURES.devTools` 是默认值（当前 false），运行时开关写在 localStorage（`czjc_devtools`）。关掉时 `body` 没有 `.dev-tools`，CSS 隐藏所有 `.dev-only` 元素：标题页「评委演示」与模型署名、顶栏「答辩」「记录」与模型标签。**答辩/路演要展示真调日志时，在设置里勾一下即可**，不必改代码。相关测试已改成不依赖这些入口（full-run 直接读 `/api/logs` 计数）。
+27. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
 
 ## 六、下一步建议（按价值排序）
 

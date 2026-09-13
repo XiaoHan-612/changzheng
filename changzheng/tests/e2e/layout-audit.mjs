@@ -187,11 +187,13 @@ async function main() {
     await page.click('#btn-journal-close');
   }
 
-  // 答辩面板
-  await page.click('#btn-defense');
-  await page.waitForTimeout(400);
-  await shot(page, '10-defense');
-  await page.click('#btn-defense-close');
+  // 答辩面板属于调试工具，默认隐藏；只有展示开关打开时才截图（避免把隐藏按钮当可见）
+  if (await page.locator('#btn-defense').isVisible().catch(() => false)) {
+    await page.click('#btn-defense');
+    await page.waitForTimeout(400);
+    await shot(page, '10-defense');
+    await page.click('#btn-defense-close');
+  }
 
   // 沙盘
   await page.goto(`${BASE}/?layout2=${Date.now()}`, { waitUntil: 'networkidle' });

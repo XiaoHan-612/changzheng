@@ -13,6 +13,10 @@ body {
 }
 #app { height: 100%; position: relative; }
 .hidden { display: none !important; }
+/* 展示开关：关掉"评委演示/答辩/记录/模型标签"，只留纯游戏界面（见 js/features.js） */
+body:not(.dev-tools) .dev-only { display: none !important; }
+.set-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--paper); cursor: pointer; }
+.set-check input { width: 16px; height: 16px; accent-color: var(--gold); }
 .muted { color: var(--muted); }
 .muted.sm, .sm { font-size: 12px; }
 .eyebrow { font-size: 12px; letter-spacing: 0.28em; color: var(--gold); margin-bottom: 12px; }

@@ -29,13 +29,15 @@
       "date": "1934年11月",
       "pano": "/assets/scenes/xiangjiang_pano.jpg",
       "cutAlt": "/assets/scenes/xiangjiang_night.jpg",
-      "apDays": 2,
+      "apDays": 3,
       "apPerDay": 2,
       "theme": "队伍为何还在",
       "hotspots": [
         { "id": "escort", "label": "担架队", "sub": "护送伤员", "x": 18, "y": 55, "kind": "choice", "action": "escort" },
         { "id": "veteran", "label": "沉默的老兵", "sub": "说话", "x": 42, "y": 50, "kind": "talk", "npc": "湘江老兵", "img": "/assets/scenes/xiangjiang_wreck.jpg" },
         { "id": "share", "label": "干粮", "sub": "分给担架队", "x": 62, "y": 52, "kind": "share" },
+        { "id": "medic", "label": "卫生员", "sub": "包扎伤口", "x": 52, "y": 68, "kind": "talk", "npc": "卫生员", "img": "/assets/scenes/xiangjiang_night.jpg" },
+        { "id": "stretcher", "label": "担架上的伤员", "sub": "听他说一句", "x": 30, "y": 68, "kind": "talk", "npc": "担架伤员", "img": "/assets/scenes/xiangjiang_wreck.jpg" },
         { "id": "rest", "label": "背囊", "sub": "休息", "x": 78, "y": 48, "kind": "rest" },
         { "id": "march", "label": "北岸小路", "sub": "行军 →", "x": 90, "y": 50, "kind": "march" }
       ],
@@ -49,7 +51,7 @@
       "subtitle": "方向",
       "date": "1935年1月",
       "pano": "/assets/scenes/zunyi_pano.jpg",
-      "apDays": 2,
+      "apDays": 3,
       "apPerDay": 2,
       "theme": "往哪里走",
       "hotspots": [
@@ -72,13 +74,15 @@
       "date": "1935年5月",
       "pano": "/assets/scenes/jinsha_pano.jpg",
       "cutAlt": "/assets/scenes/luding_run.jpg",
-      "apDays": 2,
+      "apDays": 3,
       "apPerDay": 2,
       "theme": "把不可能做成",
       "hotspots": [
         { "id": "boatman", "label": "老船工", "sub": "问夜渡", "x": 22, "y": 55, "kind": "talk", "npc": "船工" },
         { "id": "ferry", "label": "木筏", "sub": "摆渡抉择", "x": 45, "y": 58, "kind": "choice", "action": "ferry" },
         { "id": "wounded", "label": "岸边伤员", "sub": "让他先渡", "x": 65, "y": 50, "kind": "share", "npc": "担架伤员" },
+        { "id": "xianggui", "label": "老乡", "sub": "问渡口", "x": 58, "y": 70, "kind": "talk", "npc": "老乡", "img": "/assets/scenes/jinsha_ferry.jpg" },
+        { "id": "bridgehead", "label": "铁索桥头", "sub": "怎么过桥", "x": 78, "y": 68, "kind": "choice", "action": "luding_plan", "img": "/assets/scenes/luding_bridge.jpg" },
         { "id": "rest", "label": "背囊", "sub": "休息", "x": 78, "y": 52, "kind": "rest" },
         { "id": "march", "label": "东岸路", "sub": "奔泸定 →", "x": 90, "y": 46, "kind": "march" }
       ],

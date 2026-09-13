@@ -209,10 +209,8 @@ async function run() {
   }
   await page.screenshot({ path: path.join(ART, 'e2e-end.png') });
 
-  if (ended) await page.click('#btn-end-logs').catch(() => {});
-  else await page.click('#btn-logs').catch(() => {});
-  await page.waitForTimeout(250);
-  const logCount = await page.locator('.log-item').count();
+  // 「记录」面板属于调试工具（设置里默认关闭），所以直接读服务端计数，不依赖界面入口
+  const logCount = (await (await fetch(`${BASE}/api/logs`)).json()).count ?? 0;
 
   // 终局之后还会异步生成「研学报告」（study_report），等它落盘再统计
   {

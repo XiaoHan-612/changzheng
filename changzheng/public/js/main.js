@@ -2,6 +2,7 @@ import { COMPANIONS, PATH_ZONES } from './data.js';
 import { createState, applyEffects, unlockFact, saveState, checkFailure, addLoss, applyStarvation,
   markLineDone, linesDoneCount, canNight, apPerDay, dayScene, loadState, resolveLoss } from './state.js';
 import { ORIGINS, ORIGIN_QUIZ, applyOrigin, applyOriginQuiz, findOrigin } from './origin.js';
+import { applyFeatures, setDevTools, isDevToolsOn } from './features.js';
 import { decide, fetchConfig, fetchLogs, fetchFacts, fetchActs, saveConfig, testConfig, clearLogs } from './ai-client.js';
 
 let judgeMode = false;
@@ -336,10 +337,22 @@ const CHOICE_SETS = {
     ],
     factId: 'h_zunyi',
   },
+  luding_plan: {
+    title: '铁索桥头',
+    callType: 'branch_judge',
+    img: '/assets/scenes/luding_bridge.jpg',
+    options: [
+      { label: '先派人试探铁索', sub: '稳，但探路的人最险', risk: 'high' },
+      { label: '等天色再暗些', sub: '隐蔽，但耗时间', risk: 'mid' },
+      { label: '一次冲过去', sub: '快，铁索上没处躲', risk: 'high' },
+    ],
+    factId: 'h_luding',
+  },
 };
 
 // ─── boot ───
 async function boot() {
+  applyFeatures();               // 先按本机开关决定"纯游戏界面"还是含调试/答辩入口
   config = await fetchConfig();
   setAiMode(config);
   $('title-model').textContent = config.model;
@@ -560,10 +573,11 @@ function bindTitle() {
   if (quick) quick.onclick = () => startRun('quick');
   const judge = $('btn-judge');
   if (judge) {
-    judge.onclick = () => {
+    // 只在展示开关打开时绑定：关掉后按钮不可见，也不该有任何入口能触发答辩实况
+    judge.onclick = isDevToolsOn() ? () => {
       setJudgeMode(true);
       startRun('study');
-    };
+    } : null;
   }
   $('btn-how').onclick = () => showOverlay('screen-how');
   $('btn-how-back').onclick = () => hideOverlay('screen-how');
@@ -635,6 +649,8 @@ async function openSettings() {
   }
   $('set-key').value = '';
   $('set-url').value = cfg.apiUrl?.replace('/***', '/chat/completions') || '';
+  const devToggle = $('set-devtools');
+  if (devToggle) devToggle.checked = isDevToolsOn();
   renderSettingsStatus(cfg);
   $('set-status').textContent = '';
   $('set-test-result').innerHTML = '';
@@ -643,6 +659,14 @@ async function openSettings() {
 
 function bindSettings() {
   $('btn-settings-close').onclick = () => hideOverlay('screen-settings');
+  // 展示开关：评委演示 / 答辩 / 记录 / 模型标签的显隐，本机记住
+  const devToggle = $('set-devtools');
+  if (devToggle) {
+    devToggle.onchange = () => {
+      const on = setDevTools(devToggle.checked);
+      toast(on ? '已显示评委演示与调试工具' : '已切回纯游戏界面');
+    };
+  }
   $('btn-set-save').onclick = async () => {
     const body = settingsForm();
     const key = $('set-key').value.trim();
@@ -1322,6 +1346,8 @@ async function doTalk(act, h) {
   await say(npcName, npcName.includes('老班') ? '来了。坐下，别踩了水花。'
     : npcName.includes('指导') ? '坐。有话慢慢说。'
     : npcName.includes('小鬼') ? '你也睡不着？火边还有位置。'
+    : npcName.includes('卫生') ? '先按住伤口。有我在。'
+    : npcName.includes('老乡') ? '路我认得，跟紧些。'
     : '（他看了你一眼。）',
     npcName.includes('老班') ? 'laoban_hello'
     : npcName.includes('指导') ? 'zhiyuan_hello'
