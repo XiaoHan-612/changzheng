@@ -56,6 +56,7 @@
         { "id": "listen", "label": "小楼门口", "sub": "旁听争论", "x": 28, "y": 52, "kind": "talk", "npc": "指导员", "img": "/assets/scenes/zunyi_room.jpg" },
         { "id": "map", "label": "地图桌", "sub": "辨路抉择", "x": 52, "y": 48, "kind": "choice", "action": "direction" },
         { "id": "message", "label": "一封密信", "sub": "送或不送", "x": 70, "y": 42, "kind": "choice", "action": "message" },
+        { "id": "oillamp", "label": "油灯下的地图", "sub": "看清路再走", "x": 62, "y": 62, "kind": "choice", "action": "oillamp", "img": "/assets/scenes/map_desk.jpg" },
         { "id": "school", "label": "夜校摊", "sub": "认字", "x": 18, "y": 60, "kind": "school" },
         { "id": "rest", "label": "背囊", "sub": "休息", "x": 72, "y": 55, "kind": "rest" },
         { "id": "march", "label": "出城小路", "sub": "行军 →", "x": 90, "y": 48, "kind": "march" }
@@ -122,7 +123,7 @@
         }
       ],
       "hotspots": [
-        { "id": "pond", "label": "池塘边", "sub": "钓鱼", "x": 13, "y": 54, "kind": "fishing" },
+        { "id": "pond", "label": "池塘边", "sub": "钓鱼", "x": 13, "y": 54, "kind": "fishing", "action": "fishing" },
         { "id": "candy", "label": "红小鬼的糖", "sub": "分糖", "x": 26, "y": 57, "kind": "candy" },
         { "id": "school", "label": "夜校", "sub": "认字学口令", "x": 38, "y": 50, "kind": "school" },
         { "id": "gomoku", "label": "两个小鬼", "sub": "泥地五子棋", "x": 46, "y": 60, "kind": "gomoku" },

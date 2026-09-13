@@ -10,6 +10,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { passOrigin } from './lib/driver.mjs';
 
 const PORT = process.env.PORT || 3001;
 const BASE = `http://localhost:${PORT}`;
@@ -114,6 +115,11 @@ async function main() {
   // 进入主线
   await page.click('#btn-mode-study');
   await page.waitForTimeout(200);
+  // 开场出身设定也要逐屏体检（本轮新增屏）
+  if ((await page.evaluate(() => document.body.dataset.step || '')).startsWith('origin')) {
+    await shot(page, '01b-origin');
+    await passOrigin(page);
+  }
   try { await page.click('#btn-cut-skip'); } catch { /* ok */ }
   await page.waitForTimeout(500);
   await shot(page, '02-camp');

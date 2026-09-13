@@ -1,6 +1,7 @@
 import { COMPANIONS, PATH_ZONES } from './data.js';
 import { createState, applyEffects, unlockFact, saveState, checkFailure, addLoss, applyStarvation,
   markLineDone, linesDoneCount, canNight, apPerDay, dayScene, loadState } from './state.js';
+import { ORIGINS, ORIGIN_QUIZ, applyOrigin, applyOriginQuiz, findOrigin } from './origin.js';
 import { decide, fetchConfig, fetchLogs, fetchFacts, fetchActs, saveConfig, testConfig, clearLogs } from './ai-client.js';
 
 let judgeMode = false;
@@ -320,6 +321,17 @@ const CHOICE_SETS = {
     ],
     factId: 'h_zunyi',
   },
+  oillamp: {
+    title: '油灯下的地图',
+    callType: 'branch_judge',
+    img: '/assets/scenes/map_desk.jpg',
+    options: [
+      { label: '照着地图找渡口', sub: '信图上的墨线' },
+      { label: '出门问当地的老乡', sub: '信活人' },
+      { label: '按原路折回一段', sub: '稳，但多耗体力' },
+    ],
+    factId: 'h_zunyi',
+  },
 };
 
 // ─── boot ───
@@ -469,7 +481,8 @@ function openJournal() {
     : '<li class="empty">还没有照亮史实。</li>';
 
   $('journal-foot').textContent =
-    `体力 ${S.体力} · 粮食 ${S.粮食} · 士气 ${S.士气} · 信念 ${S.信念} · 民心 ${S.民心}`
+    `出身 ${originText()}　｜　`
+    + `体力 ${S.体力} · 粮食 ${S.粮食} · 士气 ${S.士气} · 信念 ${S.信念} · 民心 ${S.民心}`
     + `　｜　附身线 ${linesDoneCount(S)}/${LINES_TOTAL}`
     + `　｜　对决 ${S.quiz?.human ?? 0}:${S.quiz?.ai ?? 0}`
     + `　｜　模型 ${config.model}`;
@@ -732,7 +745,49 @@ async function startRun(mode = 'study') {
   $('ai-count').textContent = '0';
   toast(mode === 'march' ? '行军模式：资源与抉择都可能真的带不走一些人' : '研学模式：不会失去战友', 3200);
   if (mode === 'quick') toast('快速演示：每幕只跑主玩法与对决', 3200);
+  // 快速模式按定义要短，跳过开场设定；标准/行军模式走一次出身与出发前一问
+  if (mode !== 'quick') await runOrigin();
   await runActIntro();
+}
+
+/**
+ * 开场设定：出身三选一 + 一道固定问答（本地题库，不调模型）。
+ * 只影响起始五维，写入 S.origin / S.originQuiz，手记与终局关系面板会展示。
+ */
+async function runOrigin() {
+  step('origin', 'choice');
+  showScreen('screen-stage');
+  setStageBanner('你从哪里来', sceneImage('/assets/scenes/depart_crowd.jpg', ''));
+  setPortrait('你', '年轻战士', '你', '平静');
+  setStagePanel('<p class="hint">队伍就要出发了。先说说你自己——这一条只决定你的起点。</p>'
+    + '<div class="choices" id="origin-opts"></div>');
+  const picked = await askChoice($('origin-opts'), ORIGINS.map((o) => ({ label: o.label, sub: o.sub })));
+  const { origin, changes } = applyOrigin(S, ORIGINS[picked.index]?.id);
+  if (!origin) return;                      // 理论上不会发生：选项由 ORIGINS 生成
+  flashEffects(changes);
+  renderStats(S);
+  appendCampLog(S, '出发', `你是${origin.label}：${origin.sub}。`);
+  logChoice({ title: '出发前' }, `出身：${origin.label}`, '设定');
+  saveState(S);
+
+  // 出发前一问：答对加信念，答错不扣（第一屏不给挫败感）
+  step('origin:quiz', 'choice');
+  setStagePanel(`<p class="hint">${escapeHtml(ORIGIN_QUIZ.question)}</p><div class="choices" id="origin-quiz"></div>`);
+  const ans = await askChoice($('origin-quiz'), ORIGIN_QUIZ.options.map((label) => ({ label })));
+  const quiz = applyOriginQuiz(S, ans.index);
+  if (quiz.right) flashEffects(quiz.changes);
+  setStagePanel(`<p class="hint">${quiz.right ? '答对了。' : '记住了。'}${escapeHtml(ORIGIN_QUIZ.explain)}</p>`);
+  appendCampLog(S, '出发', `${quiz.right ? '答对' : '答错'}：${ORIGIN_QUIZ.explain}`);
+  renderStats(S);
+  saveState(S);
+  await waitContinue('进入于都河');
+}
+
+/** 出身显示文案：手记与终局关系面板共用 */
+function originText() {
+  const o = findOrigin(S?.origin);
+  if (!o) return '未设定';
+  return S.originQuiz ? `${o.label}（出发前一问${S.originQuiz.right ? '答对' : '答错'}）` : o.label;
 }
 
 /** 成败与粮荒结算：返回 true 表示已进入失败流程 */
@@ -799,7 +854,8 @@ async function runFailure(fail, act) {
 }
 
 function renderRelations() {
-  const rows = COMPANIONS.map((c) => `${c.name}：${S[`好感_${c.name}`] ?? 40}`);
+  const rows = [`出身：${originText()}`]
+    .concat(COMPANIONS.map((c) => `${c.name}：${S[`好感_${c.name}`] ?? 40}`));
   const lost = (S.losses || []).map((l) => `<span style="color:#e07a5f">${escapeHtml(l.who)} · ${escapeHtml(l.reason)}</span>`);
   return rows.concat(lost).join('<br/>');
 }
@@ -1107,8 +1163,6 @@ const HOTSPOT_HANDLERS = {
   roster: () => doRoster(),
   choice: async (act, h) => {
     await doChoice(act, h.action);
-    // 热点做过的抉择，强制链不再重播
-    if (h.action) markDone(act.id, h.action);
   },
 };
 
@@ -1158,6 +1212,10 @@ async function onHotspot(act, h) {
 
     const handler = HOTSPOT_HANDLERS[h.kind];
     if (handler) await handler(act, h);
+    // 热点与幕末强制链是同一段内容的两个入口：在营地做过的，强制链不再重播。
+    // 键优先取 action（与 forced 里的 id 对齐），没有 action 就用热点 id。
+    const doneKey = h.action || h.id;
+    if (doneKey) markDone(act.id, doneKey);
 
     renderStats(S);
     renderCompanions(S);

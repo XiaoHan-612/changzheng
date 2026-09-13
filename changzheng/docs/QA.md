@@ -11,6 +11,7 @@
 | `npm run qa:sandbox` | 沙盘两回合 + 存档恢复 | SANDBOX PASS |
 | `npm run qa:regress` | 沙盘监听泄漏、存档回合 | REGRESS PASS |
 | `npm run qa:failure` | 行军模式失败线（`failure_review` 真调） | MARCH FAILURE PASS，失败屏有标题/段落/史实要点 |
+| `npm run qa:playtest` | 自动试玩：人类节奏下的单局时长与资源曲线（`--mode/--strategy/--runs/--speed/--doc`） | PLAYTEST DONE，`docs/PLAYTEST.md` 落表 |
 | `npm run qa:inspect` | 素材体检：格式/尺寸/时长/重复（含立绘） | 素材体检通过 |
 | `npm run qa:handoff` | 交接文档与代码契约一致（场景/环境床/TTS/立绘） | 可以交接 |
 | `node tests/e2e/layout-audit.mjs --width 820` | 逐屏布局硬伤（横向溢出/控件出界/点按区） | 820 宽 0 处横向溢出 |

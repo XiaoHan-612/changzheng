@@ -7,13 +7,14 @@
  *   测试脚本必须认识每个屏的元素 id 等一串问题。
  *
  * 约定（写入 DOM，人和自动化都读它）：
- *   body[data-step]        当前步骤 id，如 act2:direction / act4:candy / camp / quiz
+ *   body[data-step]        当前步骤 id，如 origin（开场出身）/ act2:direction / act4:candy / camp / quiz
  *   body[data-step-kind]   步骤类型：choice | minigame | talk | quiz | camp | cutscene | echo | end
  *   body[data-step-state]  awaiting | busy | done
  *   交互元素统一带：
  *     [data-action="continue|pick|hotspot|march|skip"]   通用动作
  *     [data-choice-index="N"]                            选项（askChoice 产出）
  *     [data-mini-action="..."]                           小游戏内的操作
+ *                                                        （fishing/needle/candy/sentry/school/gomoku/luding/grab）
  *   小游戏容器：host[data-mini="gomoku"] + host[data-mini-state="player|ai|done"]
  *
  * 结果：新增玩法只需声明契约；测试驱动只看契约，不认具体元素 id。

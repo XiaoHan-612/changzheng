@@ -28,6 +28,8 @@ export function createState() {
     sentryScore: 0,
     ludingResult: null,
     nightChoice: '',
+    origin: null,          // 开场出身（origin.js 的 ORIGINS.id）
+    originQuiz: null,      // 开场问答结果 { picked, right }
     phase: 'title',
     busy: false,
     doneKeys: {},

@@ -7,6 +7,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { passOrigin } from './lib/driver.mjs';
 
 const PORT = process.env.PORT || 3001;
 const BASE = `http://localhost:${PORT}`;
@@ -105,6 +106,7 @@ async function main() {
   // ── 立绘接线回归：非同伴 NPC 必须立自己的立绘，不能一律显示老班长的脸
   //    （2026-09-13 修复：同伴兜底写在专属立绘之前，导致母亲/船工/宣传员等全显示老班长）
   await page.click('#btn-mode-study');
+  await passOrigin(page);              // 开场出身设定：本用例只关心立绘接线，直接过
   const skipBtn = page.locator('#btn-cut-skip');
   await skipBtn.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
   if (await skipBtn.isVisible()) await skipBtn.click();

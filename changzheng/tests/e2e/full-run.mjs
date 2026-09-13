@@ -8,6 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { snap as snapOf, tap as tapOf, applyMiniAction, pickHotspot } from './lib/driver.mjs';
 
 const PORT = process.env.PORT || 3001;
 const BASE = `http://localhost:${PORT}`;
@@ -101,50 +102,16 @@ async function run() {
   // ─── 状态驱动循环 ───
   // 真调每次 1.5–8s，又慢又不能靠固定选择器顺序硬试：每轮先读一次「当前屏幕快照」，
   // 再按屏幕决定点哪里；40s 没有进展就 dump 现场并失败，避免再次静默卡死。
-  const snap = () => page.evaluate(() => {
-    const live = (sel) => [...document.querySelectorAll(sel)].filter((e) => e.offsetParent !== null && !e.disabled);
-    const body = document.body;
-    const mini = [...document.querySelectorAll('[data-mini]')].find((e) => e.offsetParent !== null) || null;
-    return {
-      screens: [...document.querySelectorAll('.screen')].filter((s) => !s.classList.contains('hidden')).map((s) => s.id),
-      // ── 步骤契约（step.js 写入）──
-      step: body.dataset.step || '',
-      kind: body.dataset.stepKind || '',
-      state: body.dataset.stepState || '',
-      // ── 通用交互契约 ──
-      choices: live('[data-choice-index]').length,
-      cont: live('[data-action="continue"]').length,
-      echoOk: live('[data-action="echo-ok"]').length,
-      aiRetry: live('[data-action="ai-retry"]').length,
-      talkEnd: live('[data-action="talk-end"]').length,
-      hotspots: live('[data-action="hotspot"]').map((e) => e.dataset.hotspotLabel || ''),
-      march: live('[data-action="march"]').length,
-      // ── 小游戏契约 ──
-      mini: mini ? mini.dataset.mini : '',
-      miniState: mini ? (mini.dataset.miniState || '') : '',
-      miniActions: mini ? [...mini.querySelectorAll('[data-mini-action]')].filter((e) => !e.disabled).map((e) => e.dataset.miniAction) : [],
-      act: (document.getElementById('act-title')?.textContent || '').trim(),
-    };
-  });
-  const tap = async (sel) => {
-    // 必须按"可见"挑元素：契约元素可能残留在隐藏屏里（如过场按钮）
-    const loc = page.locator(sel);
-    const n = await loc.count().catch(() => 0);
-    for (let i = 0; i < n; i++) {
-      const el = loc.nth(i);
-      const ok = (await el.isVisible().catch(() => false)) && !(await el.isDisabled().catch(() => false));
-      if (ok && (await el.getAttribute('aria-disabled').catch(() => null)) === 'true') continue;
-      if (ok) {
-        await el.click({ force: true, timeout: 400 }).catch(() => {});
-        return true;
-      }
-    }
-    return false;
-  };
+  // 快照与点击走共用件（tests/e2e/lib/driver.mjs），与 playtest 保持同一套契约口径
+  const snap = () => snapOf(page);
+  const tap = (sel) => tapOf(page, sel);
 
   const seenActs = [];
+  const seenSteps = new Set();
   let lastAct = '';
   let didGomoku = false;
+  let didOillamp = false;
+  const visitedHotspots = new Set();
   let lastSig = '';
   let lastProgress = Date.now();
   const trace = [];
@@ -154,8 +121,10 @@ async function run() {
   while (Date.now() - started < MAX_MS) {
     const s = await snap();
     if (s.act && s.act !== lastAct) { lastAct = s.act; seenActs.push(s.act); console.log('act', s.act); }
+    if (s.step) seenSteps.add(s.step.split(':')[0]);
     // 进入五子棋步骤就记下来（比"点了热点后 300ms 内看元素"可靠）
     if (s.step === 'gomoku') didGomoku = true;
+    if (s.step === 'act2:oillamp') didOillamp = true;
     if (s.screens.includes('screen-end')) break;
 
     const sig = [s.screens.join(), s.act, s.step, s.state, s.choices, s.cont, s.mini, s.miniState].join('|');
@@ -186,61 +155,32 @@ async function run() {
     // 步骤状态为 busy = 正在等模型，什么都别点
     if (s.state === 'busy') { await page.waitForTimeout(400); continue; }
 
-    // 1) 小游戏：只按 mini 契约操作（新增玩法只需在这里加一条）
+    // 1) 小游戏：策略在共用件里（新增玩法只需在那张 switch 加一条）
     if (s.mini) {
-      const a = s.miniActions;
-      const has = (x) => a.includes(x);
-      switch (s.mini) {
-        case 'fishing':
-          if (has('cast')) { log('fish-cast'); await tap('[data-mini-action="cast"]'); }
-          else if (has('hook')) { log('fish-hook'); await tap('[data-mini-action="hook"]'); }
-          else await page.waitForTimeout(250);
-          break;
-        case 'needle':
-          if (has('bend')) { log('needle'); await tap('[data-mini-action="bend"]'); }
-          await page.waitForTimeout(220);
-          break;
-        case 'candy':
-          if (has('candy') && has('target')) {
-            log('candy-give');
-            await tap('[data-mini-action="candy"]');
-            await page.waitForTimeout(40);
-            await tap('[data-mini-action="target"]');
-          } else if (has('confirm')) { log('candy-ok'); await tap('[data-mini-action="confirm"]'); }
-          await page.waitForTimeout(80);
-          break;
-        case 'sentry':
-          if (has('answer')) { log('sentry'); await tap('[data-mini-action="answer"]'); }
-          await page.waitForTimeout(120);
-          break;
-        case 'gomoku':
-          if ((s.miniState === 'player' || s.miniState === 'awaiting') && has('cell')) { log('gomoku-move'); await tap('[data-mini-action="cell"]'); }
-          else await page.waitForTimeout(220);
-          break;
-        case 'luding':
-          log('luding');
-          if (has('jump')) await tap('[data-mini-action="jump"]');
-          if (has('right')) await tap('[data-mini-action="right"]');
-          await page.waitForTimeout(320);
-          break;
-        case 'grab':
-          if (has('grab')) { log('grab'); await tap('[data-mini-action="grab"]'); }
-          await page.waitForTimeout(420);
-          break;
-        default:
-          await page.waitForTimeout(250);
-      }
+      const label = await applyMiniAction(page, s);
+      if (label) log(label);
       continue;
     }
 
-    // 2) 通用选项（抉择 / 预热 / 分汤 / 分享 / 夜校 / 篝火菜单 / 答题 / 岔路）
-    if (s.choices) { log('choice:' + s.kind); await tap('[data-choice-index]'); await page.waitForTimeout(120); continue; }
-
-    // 3) 交谈：直接结束（问句是可选的）
+    // 2) 交谈：直接结束。必须排在通用选项之前 —— 交谈屏的快捷问句也带 data-choice-index，
+    //    它们只是可选话题；先走通用分支会在同一屏反复提问，把额度烧光并永远走不出去。
     if (s.talkEnd) { log('talk-end'); await tap('[data-action="talk-end"]'); await page.waitForTimeout(150); continue; }
 
-    // 4) 营地：先点亮可选线（五子棋），再启程
+    // 3) 通用选项（抉择 / 预热 / 分汤 / 分享 / 夜校 / 篝火菜单 / 答题 / 岔路）
+    if (s.choices) { log('choice:' + s.kind); await tap('[data-choice-index]'); await page.waitForTimeout(120); continue; }
+
+    // 4) 营地：先把行动点花在热点上（真实玩法），花完再启程
     if (s.screens.includes('screen-camp')) {
+      // 二幕的可选热点：只点一次，保证「油灯下的地图」有真调覆盖
+      if (!didOillamp && s.hotspots.includes('油灯下的地图')) {
+        const o = page.locator('[data-action="hotspot"]', { hasText: '油灯下的地图' }).first();
+        if ((await o.count().catch(() => 0)) && (await o.isVisible().catch(() => false))) {
+          log('oillamp-open');
+          await o.click({ force: true, timeout: 400 }).catch(() => {});
+          await page.waitForTimeout(250);
+          continue;
+        }
+      }
       if (!didGomoku && s.hotspots.includes('两个小鬼')) {
         const g = page.locator('[data-action="hotspot"]', { hasText: '两个小鬼' }).first();
         if ((await g.count().catch(() => 0)) && (await g.isVisible().catch(() => false))) {
@@ -250,9 +190,28 @@ async function run() {
           continue;
         }
       }
+      if (s.apOn > 0 && s.hotspots.length) {
+        const keyOf = (l) => `${s.act}|${l}`;
+        const label = pickHotspot(s.hotspots, { visited: visitedHotspots, keyOf });
+        const el = page.locator('[data-action="hotspot"]', { hasText: label }).first();
+        if ((await el.count().catch(() => 0)) && (await el.isVisible().catch(() => false))) {
+          visitedHotspots.add(keyOf(label));
+          log('camp:' + label);
+          await el.click({ force: true, timeout: 400 }).catch(() => {});
+          await page.waitForTimeout(200);
+          continue;
+        }
+      }
       if (s.march) { log('march'); await tap('[data-action="march"]'); await page.waitForTimeout(250); continue; }
     }
-    if (s.hotspots.length) { log('hotspot'); await tap('[data-action="hotspot"]'); await page.waitForTimeout(150); continue; }
+    if (s.hotspots.length) {
+      const label = pickHotspot(s.hotspots);
+      log('hotspot:' + label);
+      await page.locator('[data-action="hotspot"]', { hasText: label }).first()
+        .click({ force: true, timeout: 400 }).catch(() => {});
+      await page.waitForTimeout(150);
+      continue;
+    }
     await page.waitForTimeout(200);
   }
 
@@ -296,11 +255,14 @@ async function run() {
   const gomokuTimes = allLogs.filter((l) => l.operation?.type === 'gomoku' || l.scene === '泥地五子棋').length;
   const ludingTimes = allLogs.filter((l) => l.operation?.type === 'luding' || /泸定桥/.test(l.scene || '')).length;
   const nightTimes = allLogs.filter((l) => l.callType === 'night_options' || l.callType === 'night_resolve').length;
+  // 本轮新增内容：二幕「油灯下的地图」（取 branch_judge 那一次，choice_hint 同场景不计）
+  const oillampTimes = allLogs.filter((l) => l.scene === '遵义·油灯下的地图' && l.callType === 'branch_judge').length;
   const sources = [...new Set(allLogs.map((l) => l.source))];
 
   console.log(JSON.stringify({
     ended, endTitle, acts: seenActs, logCount, ttsHits: ttsHits.length,
-    soupTimes, fishTimes, candyTimes, sentryTimes, gomokuTimes, ludingTimes, nightTimes,
+    soupTimes, fishTimes, candyTimes, sentryTimes, gomokuTimes, ludingTimes, nightTimes, oillampTimes,
+    seenSteps: [...seenSteps],
     sources, errs: errs.slice(0, 5),
   }, null, 2));
 
@@ -317,6 +279,9 @@ async function run() {
   if (!QUICK && gomokuTimes !== 1) throw new Error(`五子棋未按预期触发: ${gomokuTimes} 次`);
   if (ludingTimes !== 1) throw new Error(`泸定桥未按预期触发: ${ludingTimes} 次`);
   if (nightTimes !== 2) throw new Error(`夜间抉择应有 night_options + night_resolve 两条: ${nightTimes}`);
+  // 快速模式跳过开场设定与营地日
+  if (!QUICK && !seenSteps.has('origin')) throw new Error('开场出身设定（step=origin）未出现');
+  if (!QUICK && oillampTimes !== 1) throw new Error(`二幕「油灯下的地图」未按预期触发: ${oillampTimes} 次`);
   if (sources.some((s) => s !== 'GLM')) throw new Error('出现非真调来源（已移除 MOCK）: ' + sources.join(','));
   if (ttsHits.length < 5) throw new Error(`语音缓存命中过少（${ttsHits.length}），检查 say() 的文本与 voiceId 是否与 TTS 清单一致`);
 

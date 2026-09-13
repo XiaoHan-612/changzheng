@@ -7,6 +7,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { passOrigin } from './lib/driver.mjs';
 
 const PORT = process.env.PORT || 3001;
 const BASE = `http://localhost:${PORT}`;
@@ -68,6 +69,7 @@ async function run() {
   await page.goto(`${BASE}/?smoke=${Date.now()}`, { waitUntil: 'networkidle' });
   await page.click('#btn-mode-study');
   await page.waitForTimeout(200);
+  await passOrigin(page);              // 开场出身设定：冒烟只关心主流程
   try { await page.click('#btn-cut-skip'); } catch { /* optional */ }
   await page.waitForTimeout(500);
 
