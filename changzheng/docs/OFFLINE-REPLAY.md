@@ -27,7 +27,7 @@
 回放包由**已有日志**离线转换得到，录制期间不需要改动任何运行时代码——这是选这个方案的关键理由。
 
 - 构建脚本（实施时才写）：`scripts/build-replay.mjs`
-- 输入：`logs/ai-calls-*.jsonl`，只取 `source === 'GLM'` 且 `response` 存在的记录
+- 输入：运行时日志 `logs/ai-calls-*.jsonl` 或入库样本 `logs/sample-full-run.jsonl`，只取 `source === 'GLM'` 且 `response` 存在的记录
 - 输出：`data/replay/pack-<YYYY-MM-DD>.json`
 - 每条记录保留：`key`（§4）、`callType`、`scene`、`response`、`recordedAt`、`model`
 

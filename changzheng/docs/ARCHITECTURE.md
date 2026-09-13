@@ -60,7 +60,8 @@ changzheng/
     ASSETS.md           # 素材清单
     TTS-MANIFEST.md     # 生成物
     LOG-AUDIT.md        # 生成物
-  logs/                 # AI 调用 JSONL（单文件 8MB 轮转）
+  logs/                 # AI 调用 JSONL：入库只有一份样本（sample-full-run.jsonl）
+                        # 运行时写 ai-calls-<日期>.jsonl（不入库、8MB 轮转）见 logs/README.md
 ```
 
 ## 运行时数据流
@@ -97,7 +98,7 @@ UI 事件 → main.js(withLock) → ai-client → POST /api/decide
 | 约束 | 实现 |
 |------|------|
 | AI 决策必须走指定模型 | 仅 `/api/decide`，禁止前端独立裁决算法 |
-| 每次调用有日志 | `logs/*.jsonl` + 游戏内记录 |
+| 每次调用有日志 | 运行时 `logs/ai-calls-<日期>.jsonl` + 游戏内记录；入库样本 `logs/sample-full-run.jsonl` |
 | 一局可完整通关 | 五幕 + 终局 |
 | 算法对抗 | 每幕知识对决 human vs AI |
 | 流程不重入 | `state.busy` + `withLock` |

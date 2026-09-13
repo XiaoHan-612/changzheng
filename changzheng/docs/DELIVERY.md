@@ -13,7 +13,7 @@
 | 静态资源 | `public/` 20MB（场景 7.8 + 音频 8.8 + 立绘 1.8 + 事件图 1.5） | 全部本地文件，无 CDN |
 | 配置 | `.env` → `runtime-config.json` → 环境变量（后者覆盖前者） | 设置界面写入的是 `runtime-config.json`，**明文存 Key** |
 | 端口 | `CONFIG.PORT`，默认 3001 | 被占用时现在会直接起不来 |
-| 日志 | `logs/`，按日文件 + 8MB 轮转 | 目录必须可写 |
+| 日志 | `logs/`，按日文件 `ai-calls-<日期>.jsonl` + 8MB 轮转（运行产物，不入库） | 目录必须可写；仓库里另有一份入库样本 `logs/sample-full-run.jsonl` 供离线查看 |
 | 网络 | **必需** | AI 调用走网关；已删 MOCK，断网即报错并写 `source=ERROR` |
 
 ## 二、三种封装形态
@@ -55,4 +55,5 @@
   data/                 ← 五幕/史实/视觉映射/TTS 清单
   docs/                 ← 交接与验收文档（可留，便于现场排查）
   logs/                 ← 运行日志（演示后可见 aiCount / source；可清空）
+                          ← 另含 sample-full-run.jsonl：一份真实全程样本，随包走
 ```

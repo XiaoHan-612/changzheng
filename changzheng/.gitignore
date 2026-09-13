@@ -7,7 +7,13 @@ runtime-config.json
 
 # 测试运行产物
 tests/e2e/artifacts/
+
+# 日志是运行产物：逐日变动会把 diff 冲成噪音，8MB 轮转还会把当天最早的记录裁掉。
+# 仓库里只留 logs/sample-full-run.jsonl 一份真实全程样本（见 logs/README.md）。
+logs/ai-calls-*.jsonl
 logs/session-full.jsonl
+logs/server-out.txt
+logs/archive/
 
 # 环境床的 WAV 兼容格式：能用，但体积约为 Ogg 的 10 倍。
 # 等音频模型按同名导出 Ogg Vorbis 后再入库（代码优先用 .ogg）。

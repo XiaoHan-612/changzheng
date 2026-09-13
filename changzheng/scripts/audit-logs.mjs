@@ -1,11 +1,11 @@
-// 日志审计：读 logs/*.jsonl，按 callType 校验响应必需字段，
-// 统计 source / model / 耗时 / FALLBACK，产出 docs/LOG-AUDIT.md。
+// 日志审计：读 logs/*.jsonl（不递归，所以本机留存的 logs/archive/ 不进来），
+// 按 callType 校验响应必需字段，统计 source / model / 耗时 / FALLBACK，产出 docs/LOG-AUDIT.md。
 // 用法：node scripts/audit-logs.mjs（真调一局后跑一次，作为「AI 调用深度」的证据）
 //
-// 账怎么算：logs/ 是逐日累积的，里头必然混着守卫上线前的旧记录（旧标注 GLM-5.1、
-// 旧进程写下的数组响应……）。所以按 **契约戳记**（`contractOk`，由 server/logger.js 落库时盖）
-// 把记录分成两拨：带戳记 = 本版本产生，不合规就红灯（exit 1）；不带戳记 = 历史，
-// 只在报告里如实列出并注明成因，不拦今天的测试。想只看本版本，用 LOG_DIR=<空目录> 单独跑一局再审计。
+// 账怎么算：仓库里入库的是 logs/sample-full-run.jsonl 一份真实全程样本（见 logs/README.md），
+// 运行时的 ai-calls-<日期>.jsonl 不入库。记录按 **契约戳记**（`contractOk`，由 server/logger.js 落库时盖）
+// 分两拨：带戳记 = 本版本产生，不合规就红灯（exit 1）；不带戳记 = 本仓库入库样本之外的旧记录，
+// 只可能是本机遗留的日志目录，如实列出并注明成因，不拦当前版本。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -109,9 +109,10 @@ function main() {
   }
   lines.push('');
   lines.push('**账怎么算**：`contractOk` 戳记由 `server/logger.js` 在落库时盖（用 `server/schema.js` 的同一张表判定）。');
-  lines.push('带戳记 = 本版本产生的记录，一有不合规就是红灯（脚本 exit 1）；不带戳记 = 本版本之前的旧记录（旧标注 `GLM-5.1`、旧进程写入的数组响应等），后续再跑多少局都不会新增。');
-  lines.push('服务端的拦截在调用点：`server/ai.js` 与 `server/sim.js` 解析完都过同一张表，缺必需字段就当次失败并重试，不落 `source=GLM` 的记录。');
-  lines.push('想只看本版本，用空目录单独跑一局：`LOG_DIR=<临时目录> npm start` + `LOG_DIR=<临时目录> node scripts/audit-logs.mjs`（报告会写进那个目录）。');
+  lines.push('带戳记 = 本版本产生的记录，一有不合规就是红灯（脚本 exit 1）；不带戳记 = 本仓库入库样本之外的旧记录，只会出现在本机遗留的日志目录里，不会由当前代码产生。');
+  lines.push('历史上不带戳记的违约一共 14 条，成因三类：旧标注 `GLM-5.1`（本版本只写 `GLM`，模型看 `model`）、守卫上线（2026-09-13 09:38）前"只解析不校验"、以及"代码已更新、进程还是旧的"窗口期写入的数组响应——相关旧日志已移出仓库（本机在 `logs/archive/`，历史版本在 git 里）。');
+  lines.push('服务端的拦截在调用点：`server/ai.js` 与 `server/sim.js` 解析完都过同一张表，缺必需字段就当次失败并重试，不落 `source=GLM` 的记录；入库样本见 `logs/sample-full-run.jsonl`（说明在 `logs/README.md`）。');
+  lines.push('想把某一局单独看清，用空目录跑：`LOG_DIR=<临时目录> npm start` + `LOG_DIR=<临时目录> node scripts/audit-logs.mjs`（报告会写进那个目录）。');
   lines.push('');
   lines.push('## 按 callType');
   lines.push('');

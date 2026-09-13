@@ -54,7 +54,7 @@
 | `tpl-panel` 中央面板 | 怎么玩、设置、史实、记录、答辩、答题、夜间、终局 | 19.0%（怎么玩）· 33.5%（设置）· 33.5%（史实档案） |
 | `tpl-stage` 舞台 + 底部纸卷 | 对白、抉择、结果 | — |
 | `tpl-side` 侧栏手记 + 画面 | 营地 | 0%（营地侧栏改墨纱后不再计纸面） |
-| `tpl-board` 玩法板 | 钓鱼、夜校、分糖、夜岗、五子棋、泸定桥、陡坡 | — |
+| `tpl-board` 玩法板 | ⚠️ **还没有接线**：小游戏现在都挂在舞台屏的 `#stage-panel` 里（`runXxx($('xxx-host'))`）。批四/批五要么给它一个真板屏（题名 + 数值签 + 玩法区，样板页就是这么画的），要么删掉这个模板——开工时定，别继续挂着 | — |
 | `tpl-drawer` 抽屉浮层 | 手记、史实回响、篝火菜单 | 22.4%（手记）· 33.5%（回响） |
 | `tpl-world` 世界面板 | 自由行军沙盘 | 27.8%（缩略） |
 
@@ -150,5 +150,27 @@
 
 批三同时把「选项」收成了单一实现：区块 `.blk-choice`（样式在 `framework.css`）+ `step.js` 的 `choiceButton()`（**唯一**构建处，`askChoice` / 篝火菜单 / 交谈快捷句 / 夜校内层选项都走它）。
 `.btn.choice`、`.sheet-portrait` 已删除；代价预告（`.trend` 模型倾向 + `.risk` 作者风险标注）随选项块挪进 framework，避免再长出第二套选项。篝火菜单的属性（标题 / 退回键）仍是 `.panel` 系共用件，随批六的面板一起收。
+
+### 批四清单（钓鱼+弯针 / 夜校 / 分糖 / 夜岗）——开工前先读这一节
+
+代码位置：`public/js/minigames.js`（`runFishing` 35 · `runNightSchool` 267 · `runCandy` 329 · `runSentry` 440 · `runBendNeedle` 541）+ `public/js/main.js` 的宿主（`doSchool` 1528 / `doCandy` 1561 / `doSentry` 1595 / 钓鱼 1725、1731，都 `setStagePanel('<div id="xxx-host">')` 后再 `runXxx($('xxx-host'))`）。样式现在散在 `components.css` 的「玩法板 / 分糖 / 夜岗 / 泸定桥」几段。
+
+**必须先修的四条**（都是"类名在，样式没了"——框架推倒重做时删掉 `minigames.css`，这几个类没跟着搬过来，渲染出来是裸元素）：
+
+| 位置 | 问题 | 处理 |
+|---|---|---|
+| 夜岗三个处置键（`minigames.js:456`） | `class: 'choice-btn'`，**CSS 里没有这个类** → 浏览器默认按钮 | 走 `choiceButton()`（批三已备好）或区块 `.blk-choice` |
+| 分糖 / 夜岗 / 弯针的提示行 | `class: 'mg-hint'` 无定义 → 默认字体字号 | 换成区块或 `.hint`（择一，别两套） |
+| 分糖目标卡 | `.t-desc` / `.t-count` 无定义（只有 `.t-name` 有样式） | 补进 `.target-card` 段，字号取 `--fs-micro` |
+| 钓鱼屏 | 内联 `style="display:flex;gap:8px;justify-content:center"` 等；canvas 里写死 `#1e3a44 / #c4a35a / #8b2e2e` 等旧色值 | 布局改类；画布色值要么对齐 `tokens.css`（JS 读 CSS 变量），要么在注释里明确豁免 |
+
+**开工时先定的一个决策**：小游戏要不要一个真正的 `tpl-board` 板屏（题名 + 数值签 + 玩法区 + 动作区，样板页就是这么画的）？
+- 现状：所有小游戏都塞在舞台屏 `#stage-panel`（`--panel-w` 620px 宽、深墨底、上面还有立绘头部），`tpl-board` 模板**没有任何页面在用**（只有样板页与 `ui.js` 的 ENTRANCE 表提到它）。
+- 尺寸不构成理由：最大画布 460×220、五子棋网格 9×28+间隙 ≈ 284px，620px 的面板放得下。
+- 建议：**给一个板屏**——玩法不该顶着人物立绘头，且样板页的设计（游戏名 + 鱼篓/咬钩数值签 + 动作区）现在无处落地；批五的五子棋/泸定桥/陡坡沿用同一屏。若决定不做，就把 `tpl-board` 从 framework.css、`ui.js` 的 ENTRANCE、本节模板表里一起删掉，别挂着。
+
+**截图与体检要走的路**：这四个玩法都在第一/四幕营地深处，为此 `main.js` 的 `__czScreens` 需要再加一个钩子（像批三的 `fire` 那样：`mini: (name) => { showScreen('screen-stage'); setStagePanel('<div id="…-host">'); markMini(...); runXxx($('…-host')) }`），否则 `qa:screens 4` 得跑一整幕。记得同时改 `screen-sheet.mjs` 的 `BATCHES[4]` 与 `qa-motion.mjs`（如果有新动效）。
+
+**验收口径照旧**：`npm run qa:screens -- 4` + `--width 820`、`qa:tokens`、`qa:motion`、`qa:smoke`，再补一次 `qa:av`（玩法屏的图/音走同一条链路）。
 
 **目标环境**：Chromium 桌面；窄屏只保证到 **820**（平板 / 展馆触屏一体机），手机（375）不在交付范围内。

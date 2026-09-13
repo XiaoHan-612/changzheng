@@ -98,7 +98,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
    `check-glm.mjs` 早先没带 `reasoning_effort` 且只给 64 tokens，结果自检报"失败"而游戏其实是好的——现已与服务端请求体对齐（默认 `reasoning_effort=low`、`max_tokens=256`），并在 `finish=length` 时直接提示"是参数太紧，不是接口坏了"。
    2026-09-13 实测同一网关：`glm-5.3-flash` 2.6s / 37 tokens 正常返回；`glm-5.1` **不认 `reasoning_effort=low`**，要 `max_tokens≥2000` 才吐 content，单次 ~11s。也就是说 glm-5.1 在这里能真调，但慢一个数量级——答辩前若要用指定模型，务必按 11s/次估时。
 9. **真调可能等 10 秒以上** —— 「思考中」指示器会显示秒数；失败会弹出原因与「重试」键（不再有兜底文案）。
-10. **日志审计要按 id 去重** —— 同一条调用会同时写进「按日文件」和 `session-full.jsonl`；`audit-logs.mjs` 已去重。`docs/LOG-AUDIT.md` 里的「字段缺失」混有旧版本历史记录；想只看当前版本，用 `LOG_DIR=<临时目录>` 单独跑一局再审计（当前版本 MOCK 全流程字段缺失为 0）。
+10. **日志审计按 id 去重、按契约戳记分账** —— 同一条调用会同时写进「按日文件」和 `session-full.jsonl`，`audit-logs.mjs` 已去重；记录再按 `contractOk`（`server/logger.js` 落库时盖）分出「本版本」与「入库样本之外的旧记录」两拨，前者违约才红灯。**日志不入库**：仓库里只有一份真实全程样本 `logs/sample-full-run.jsonl`（96 条、16 类、见 `logs/README.md`），运行时的 `ai-calls-<日期>.jsonl` 被 .gitignore 挡住——早先逐日入库，结果 diff 被日志噪音冲烂、8MB 轮转还把当天最早的记录裁掉（2026-09-13 改）。想把某一局单独看清：`LOG_DIR=<临时目录> npm start` 跑一局，再 `LOG_DIR=<临时目录> node scripts/audit-logs.mjs`（报告写进那个目录）。
 11. **素材是「探测式」接入** —— 图片走 `sceneImage(新图, 占位图)`（`main.js` 顶部 + boot 里的 `preloadScenes()`），音频走 `AMBIENT_FILE` 映射（`audio.js`）。生图/音频模型把文件按约定名字落盘就自动生效，**不需要改代码**；加新素材时同步更新 `preloadScenes()` 与 `AMBIENT_FILE` 两张表即可。自检：`npm run qa:assets`。
 12. **静态资源找不到必须 404** —— SPA 兜底只对页面路由生效（`server/index.js` 里排除了 `/assets`、`/audio`、`/css`、`/js`）。如果让缺图回 index.html（200），前端的素材探测和 `qa:assets` 都会被骗过。
 13. **契约标记要随状态撤销** —— 过场按钮是静态 DOM，结束后必须 `delete dataset.action`；已用掉的糖/已落子的格必须移除 `data-mini-action` 或置 `aria-disabled`，否则"当前可交互项"会撒谎（这几条都是踩过的坑）。
@@ -128,7 +128,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 5. **音频剩余项**：操作音效仍是 WebAudio 合成（click/hook/echo 等），是否需要预录由路演音质要求决定。
 6. **窄窗口已体检、手机档未适配**（2026-09-13 决策）：`node tests/e2e/layout-audit.mjs --width <宽>` 会逐屏报"页面横向溢出/控件出界/点按区<32px"。820 宽已清零（顺手修掉沙盘装饰层吃掉点击的 bug）。375 仍是已知项（横向溢出 543px、左侧 HUD 占 37% 宽、答辩面板文字出界），**故意不做手机适配**，除非演示要用手机。
 7. **封装交付**：见 [`DELIVERY.md`](DELIVERY.md)，演示前把"一键启动"定型（离线能力**不存在**，别按离线规划演示）。
-8. **离线回放（备选，未开发）**：现场无网／网关不可达／额度耗尽时的风险预案在 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)。它从现有 `logs/ai-calls-*.jsonl` 转换出回放包，服务端按指纹命中重放真实响应，日志标 `source=REPLAY`。**当前代码里没有任何回放能力，勿当成现有功能**；断网就是 `source=ERROR` + 界面重试提示。
+8. **离线回放（备选，未开发）**：现场无网／网关不可达／额度耗尽时的风险预案在 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)。它从日志（运行时的 `logs/ai-calls-*.jsonl` 或入库样本 `logs/sample-full-run.jsonl`）转换出回放包，服务端按指纹命中重放真实响应，日志标 `source=REPLAY`。**当前代码里没有任何回放能力，勿当成现有功能**；断网就是 `source=ERROR` + 界面重试提示。
 
 ## 七、验收清单
 
