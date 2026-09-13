@@ -1,7 +1,10 @@
 // 逐页截图 + 联系表：把一批页面截成统一尺寸，拼成一张对照图，用于"逐页打磨"时比对风格。
 //
-// 用法：node tests/manual/screen-sheet.mjs [批次号 1-6]
+// 用法：node tests/manual/screen-sheet.mjs [批次号 1-6] [--width 1280]
 // 产物：tests/e2e/artifacts/screens/batch-<n>/<页名>.png 与 screen-sheet-<n>.png
+//       非 1280 宽度加后缀：screens/batch-<n>-<宽>/ 与 screen-sheet-<n>-<宽>.png
+// 交付口径是 1280/820 两档：1280 出联系表并写逐页纸面占比（qa:tone 只认它），
+// 820 只出图（纸面占比在别的视口量出来会顶掉 1280 的记录，所以不写）。
 import { chromium } from 'playwright';
 import { ensureServer, BASE } from '../e2e/lib/server.mjs';
 import { passOrigin } from '../e2e/lib/driver.mjs';
@@ -12,10 +15,13 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ART = path.join(ROOT, 'tests/e2e/artifacts');
 const BATCH = Number(process.argv[2] || 1);
+const wArg = process.argv.indexOf('--width');
+const WIDTH = Number(wArg >= 0 ? process.argv[wArg + 1] : 0) || 1280;
+const SUFFIX = WIDTH === 1280 ? '' : `-${WIDTH}`;
 // 批次二以后要截深层屏（史实回响、岔路…），需要「展示开关」打开后才挂出的 __czScreens 钩子。
 // 批次一是对玩家的门面，必须用默认状态截——否则会把"评委演示 / 模型署名"这些调试入口拍进交付图（踩过）。
 const NEED_DEV_HOOK = BATCH >= 2;
-const OUT = path.join(ART, 'screens', `batch-${BATCH}`);
+const OUT = path.join(ART, 'screens', `batch-${BATCH}${SUFFIX}`);
 fs.mkdirSync(OUT, { recursive: true });
 
 /** 在实机页面上量纸面占比：视口内网格采样，判断该点是否落在纸面元素上 */
@@ -49,6 +55,24 @@ async function measurePaper(page) {
 }
 
 /**
+ * 等动画落定再截图。
+ * 交付图拍到"动画中途"会被当成样式问题（实测过：#sheet 还在 sheet-rise 时纸面发虚、透明度 0.95）。
+ * 无限循环的动画（余烬那类）不算在内，否则永远等不到。
+ */
+async function settle(page, timeout = 3000) {
+  const t0 = Date.now();
+  for (;;) {
+    const running = await page.evaluate(() => document.getAnimations().filter((a) => {
+      const it = a.effect?.getTiming?.().iterations;
+      return a.playState === 'running' && it !== Infinity;
+    }).length);
+    if (!running) return true;
+    if (Date.now() - t0 > timeout) return false;
+    await page.waitForTimeout(80);
+  }
+}
+
+/**
  * 每批要截的页面：{ name, setup }。setup 把页面摆到该屏，返回后立刻截图。
  *
  * 为什么是函数而不是"关键字 + if 链"：批次越往后页面越深（沙盘、终局、小游戏），
@@ -68,7 +92,7 @@ async function intoCamp(page) {
 async function intoEcho(page) {
   await page.locator('.hotspot').filter({ hasText: '浮桥' }).click({ force: true });
   await page.waitForTimeout(1200);
-  await page.locator('#ch-opts .btn.choice').first().click({ force: true });
+  await page.locator('#ch-opts .blk-choice').first().click({ force: true });
   for (let i = 0; i < 20; i++) {          // 等模型裁决 + 叙事打字
     if (await page.locator('#btn-continue').isVisible().catch(() => false)) break;
     await page.waitForTimeout(400);
@@ -150,12 +174,63 @@ const BATCHES = {
       },
     },
   ],
+  3: [
+    // 舞台屏三态共用 tpl-stage：交谈 → 抉择 → 裁决结果
+    {
+      name: '01-talk',
+      setup: async (p) => {
+        await intoCamp(p);
+        await p.locator('.hotspot').filter({ hasText: '母亲' }).click({ force: true });
+        for (let i = 0; i < 30; i++) {           // 等模型回话与"结束交谈"键
+          if (await p.locator('[data-action="talk-end"]').count()) break;
+          await p.waitForTimeout(400);
+        }
+      },
+    },
+    {
+      name: '02-choice',
+      setup: async (p) => {
+        await p.locator('[data-action="talk-end"]').click({ force: true }).catch(() => {});
+        await p.waitForTimeout(600);
+        await p.locator('.hotspot').filter({ hasText: '浮桥' }).click({ force: true });
+        for (let i = 0; i < 40; i++) {
+          if (await p.locator('#ch-opts .blk-choice').count()) break;
+          await p.waitForTimeout(400);
+        }
+      },
+    },
+    {
+      name: '03-result',
+      setup: async (p) => {
+        await p.locator('#ch-opts .blk-choice').first().click({ force: true });
+        for (let i = 0; i < 40; i++) {
+          if (await p.locator('#btn-continue').count()) break;
+          await p.waitForTimeout(400);
+        }
+        await p.waitForTimeout(500);             // 等把正文打完
+      },
+    },
+    {
+      name: '04-fire',
+      setup: async (p) => {
+        await p.click('#btn-continue', { force: true }).catch(() => {});   // 关掉回响，回到营地
+        for (let i = 0; i < 20; i++) {
+          if (await p.locator('#btn-echo-ok').count()) break;
+          await p.waitForTimeout(300);
+        }
+        await p.click('#btn-echo-ok', { force: true }).catch(() => {});
+        await p.waitForTimeout(600);
+        await jump(p, 'screen-fire', 'fire');
+      },
+    },
+  ],
 };
 
 async function capture() {
   await ensureServer();
   const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  // 1280 沿用 800 高（逐页纸面占比是在这个尺寸量的，别改）；窄屏跟 layout-audit 对齐成 1000 高，两套 820 图好对照
+  const page = await browser.newPage({ viewport: { width: WIDTH, height: WIDTH === 1280 ? 800 : 1000 } });
   page.on('dialog', (d) => d.accept().catch(() => {}));
   await page.goto(`${BASE}/?sheet=${Date.now()}`, { waitUntil: 'networkidle' });
   await page.evaluate(() => {
@@ -171,6 +246,7 @@ async function capture() {
   for (const s of shots) {
     if (s.fresh) await page.reload({ waitUntil: 'networkidle' });
     await s.setup(page);
+    await settle(page);                       // 等动效落定，别把"动画中途"拍进交付图
     // 截交付图前先摘掉 dev 标记，只留玩家能看到的样子（钩子是 boot 时挂的，摘标记不影响它）
     await page.evaluate(() => document.body.classList.remove('dev-tools'));
     await page.screenshot({ path: path.join(OUT, `${s.name}.png`) });
@@ -179,14 +255,17 @@ async function capture() {
   }
   // 逐页面积**累加**写入：qa:tone 要能一次看到所有已测过的页面，
   // 否则跑完第二批就把第一批的记录顶掉，等于"最后跑哪批只查哪批"。
-  const REPORT = path.join(ART, 'tone-report.json');
-  const prev = fs.existsSync(REPORT) ? JSON.parse(fs.readFileSync(REPORT, 'utf8')) : {};
-  const batches = { ...(prev.batches || {}), [BATCH]: Object.keys(tone) };
-  fs.writeFileSync(REPORT, JSON.stringify({
-    generatedAt: new Date().toISOString(),
-    batches,
-    pages: { ...(prev.pages || {}), ...tone },
-  }, null, 2), 'utf8');
+  // 只记 1280：换成窄屏量会把同一页的占比写成另一个视口的值，qa:tone 的"逐页预算"就串了。
+  if (WIDTH === 1280) {
+    const REPORT = path.join(ART, 'tone-report.json');
+    const prev = fs.existsSync(REPORT) ? JSON.parse(fs.readFileSync(REPORT, 'utf8')) : {};
+    const batches = { ...(prev.batches || {}), [BATCH]: Object.keys(tone) };
+    fs.writeFileSync(REPORT, JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      batches,
+      pages: { ...(prev.pages || {}), ...tone },
+    }, null, 2), 'utf8');
+  }
   await browser.close();
 }
 
@@ -220,7 +299,7 @@ async function sheet() {
   const page = await browser.newPage({ viewport: { width: COLS * (CELL_W + PAD) + PAD, height: rows * (CELL_H + LABEL + PAD) + PAD } });
   await page.setContent(html, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__done === true);
-  const out = path.join(ART, `screen-sheet-${BATCH}.png`);
+  const out = path.join(ART, `screen-sheet-${BATCH}${SUFFIX}.png`);
   await page.locator('#c').screenshot({ path: out });
   await browser.close();
   console.log('联系表 →', out);

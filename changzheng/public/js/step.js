@@ -61,20 +61,13 @@ export function askChoice(host, options, opts = {}) {
     box.dataset.choiceHost = '1';
     box.innerHTML = '';
     (options || []).forEach((o, i) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'btn choice';
-      b.dataset.choiceIndex = String(i);
-      const extra = opts.extraOf ? opts.extraOf(o) : '';
-      b.innerHTML = [
-        `<span class="ic">${o.icon || String.fromCharCode(65 + i)}</span>`,
-        '<span class="ch-text">',
-        `<b>${esc(o.label)}</b>`,
-        o.sub ? `<span class="ch-sub">${esc(o.sub)}</span>` : '',
-        extra ? `<span class="ch-extra">${extra}</span>` : '',
-        '</span>',
-        i < 9 ? `<span class="kbd-hint">${i + 1}</span>` : '',
-      ].join('');
+      const b = choiceButton({
+        label: o.label,
+        sub: o.sub,
+        icon: o.icon,
+        extra: opts.extraOf ? opts.extraOf(o) : '',
+        index: i,
+      });
       b.addEventListener('click', () => {
         box.querySelectorAll('button').forEach((x) => { x.disabled = true; });
         setStepState('busy');
@@ -85,6 +78,36 @@ export function askChoice(host, options, opts = {}) {
     // 逐条入场：选项一条一条渗出来（同一容器复用时靠 replayAnim 重新触发）
     replayAnim(box, 'anim-stagger');
   });
+}
+
+/**
+ * 选项按钮的**唯一**构建实现。
+ *
+ * 结构契约（样式在 framework.css 的 .blk-choice）：
+ *   <span class="ic">     序号/图标（可省）
+ *   <span class="ch-text"> <b>主文案</b> + <span class="ch-sub">副文案</span>（可省）
+ *                          + <span class="ch-extra">代价预告/风险标签</span>（由 extraOf 产出）
+ *   <span class="kbd-hint"> 键盘序号
+ *
+ * 为什么要抽出来：篝火菜单与交谈快捷句原先各自手拼 innerHTML，迁移到 blk-choice 时
+ * 就是它们先漂移（少了 ch-text 包裹，副文案字号跟着主文案走）。**新增选项一律走这里。**
+ *
+ * @param {{label:string, sub?:string, icon?:string, extra?:string, index?:number, action?:string, keyboard?:boolean}} o
+ */
+export function choiceButton(o = {}) {
+  const { label = '', sub = '', icon = '', extra = '', index = 0, action = '' } = o;
+  const keyboard = o.keyboard !== false && index < 9;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'blk-choice';
+  b.dataset.choiceIndex = String(index);
+  if (action) b.dataset.action = action;
+  b.innerHTML = [
+    icon ? `<span class="ic">${esc(icon)}</span>` : '',
+    `<span class="ch-text"><b>${esc(label)}</b>${sub ? `<span class="ch-sub">${esc(sub)}</span>` : ''}${extra}</span>`,
+    keyboard ? `<span class="kbd-hint">${index + 1}</span>` : '',
+  ].join('');
+  return b;
 }
 
 /**

@@ -1,5 +1,6 @@
 ﻿/**
- * E2E 鍐掔儫锛氭爣棰?鈫?钀ュ湴 鈫?涓€娆′簰鍔?鈫?鍥炶惀鍦? * 杩愯锛歯pm run qa:smoke
+ * E2E 冒烟：标题 → 营地 → 一次互动 → 回营地
+ * 运行：npm run qa:smoke
  */
 import { ensureServer } from './lib/server.mjs';
 import { chromium } from 'playwright';
@@ -57,7 +58,9 @@ async function run() {
   assert(await page.locator('.hotspot').count() >= 3, 'hotspots >= 3');
   assert((await page.locator('.j-node').count()) >= 5, 'journey nodes');
 
-  await page.locator('.hotspot:not(.march)').first().click({ force: true });
+  const firstHotspot = page.locator('.hotspot:not(.march)').first();
+  const hotspotLabel = (await firstHotspot.getAttribute('data-hotspot-label')) || '';
+  await firstHotspot.click({ force: true });
   // 真调一次要 1.5–6s，轮询等回到营地（最多 120s）
   const deadline = Date.now() + 120000;
   let talkAsked = false;
@@ -72,14 +75,14 @@ async function run() {
       await page.locator('#btn-continue').click({ force: true }).catch(() => {});
       continue;
     }
-    const ch = page.locator('#ch-opts .btn.choice:not([disabled])');
+    const ch = page.locator('#ch-opts .blk-choice:not([disabled])');
     if (await ch.count()) {
       await ch.first().click({ force: true }).catch(() => {});
       continue;
     }
     if (await page.locator('#talk-quick').isVisible().catch(() => false)) {
       if (!talkAsked) {
-        await page.locator('#talk-quick .btn.choice').first().click({ force: true }).catch(() => {});
+        await page.locator('#talk-quick .blk-choice').first().click({ force: true }).catch(() => {});
         talkAsked = true;
       } else {
         await page.locator('#talk-end').click({ force: true }).catch(() => {});
@@ -90,6 +93,13 @@ async function run() {
     await page.waitForTimeout(200);
   }
   if (!backToCamp) throw new Error('一次互动未在 120s 内回到营地（真调可能超时）');
+
+  // 用过一次的热点必须**当场**变成"已看过"：热点用一次就作废，但 DOM 若不跟着状态重画，
+  // 界面就在撒谎——看着还能点，点下去只弹「这里已经看过了」。玩家只是困惑，
+  // 自动化会卡在这颗热点上反复点、一直到 40s 超时（2026-09-13 影音审计实锤）。
+  const used = page.locator(`.hotspot[data-hotspot-label="${hotspotLabel}"]`);
+  assert(await used.isDisabled(), `用过的热点「${hotspotLabel}」应立刻置为已看过`);
+  assert((await used.getAttribute('data-hotspot-state')) === 'done', `用过的热点「${hotspotLabel}」状态应为 done`);
 
   // 设置面板 = 模型控制台：模型（下拉+自定义）/ 推理档位 / Key / 接口 / 测试键
   await page.click('#btn-settings').catch(async () => { await page.click('#btn-settings2').catch(() => {}); });

@@ -4,7 +4,9 @@
 
 | 命令 | 覆盖 | 通过标准 |
 |------|------|----------|
-| `npm run test:unit` | 资源钳制、史实解锁、附身线门控、行动点、每日场景、失败判定、AI 响应契约 | 22/22 通过 |
+| `npm run test:unit` | 资源钳制、史实解锁、附身线门控、行动点、每日场景、失败判定、AI 响应契约 | 47/47 通过 |
+| `npm run qa:tokens` · `qa:frames` · `qa:tone` · `qa:motion` | 设计系统守卫：颜色/字体/圆角无新增字面量、页面只用模板与区块、纸面面积在预算内、五个标准动效真的挂上 | 全部通过（口径见 [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md)） |
+| `npm run qa:screens -- <批次>` | 逐页截图 + 纸面占比 + 联系表（加 `--width 820` 出窄屏版） | 该批页面逐张出图，占比 ≤35% |
 | `npm run qa:smoke` | 标题→营地→热点→回营地 | SMOKE PASS |
 | `npm run test:e2e` | 五幕**真调**通关 + 五个新玩法各 1 次 + 不重复结算 | E2E FULL PASS，`source=GLM`，无 pageerror |
 | `node tests/e2e/full-run.mjs --quick` | 快速模式通关 | E2E FULL PASS |

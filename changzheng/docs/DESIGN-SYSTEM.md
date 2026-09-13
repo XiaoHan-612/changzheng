@@ -78,7 +78,7 @@
 |---|---|---|
 | `ink-in` 墨显 | 舞台正文 `#stage-panel`、对白 `#dlg-body` | `setStagePanel()` / `say()` 调 `replayAnim()` |
 | `.anim-stagger` 逐条入场 | 选项 `#ch-opts`、回响两栏、手记两列、`#facts-list` | `askChoice()` 与各列表渲染处 |
-| `sheet-rise` 纸卷上滑 | `tpl-stage / tpl-board / tpl-drawer` 的内容面入场 | `showScreen()` 按模板选 |
+| `sheet-rise` 纸卷上滑 | `tpl-stage / tpl-board / tpl-drawer` 的内容面**真正入场**时 | `showScreen()` 按模板选（见下方第 3 条） |
 | `seal-stamp` 钤印 | 回响印章 `.echo-seal` | 组件自身 CSS |
 | `scene-wipe` 换幕抹擦 | 过场屏 | `runCutscene()` 调 `wipe()` |
 | `ember` 余烬 | 营地热点、行程当前节点、告急启程键 | 组件自身 CSS |
@@ -86,8 +86,9 @@
 
 `prefers-reduced-motion` 下**位移类全部关掉、只留淡入**（`--motion-scale` 归零）。
 验收靠 `npm run qa:motion`：动效截图拍不到，只能量计算样式——animation-name 是否为预期、逐条入场延迟是否 0/60/120ms、减动效下位移是否真的关掉。
-两条踩过的坑：**居中元素必须用 `fade-in` 而不是 `ink-in`**（后者的 keyframes 把 `transform` 收成 `none`，会吃掉 `translateX(-50%)`）；
-**同一元素重复渲染要重放动画必须"摘类→强制重排→挂类"**（浏览器不会因为内容变了就重启动画），实现只有 `replayAnim()` 一处。
+三条踩过的坑：**居中元素必须用 `fade-in` 而不是 `ink-in`**（后者的 keyframes 把 `transform` 收成 `none`，会吃掉 `translateX(-50%)`）；
+**同一元素重复渲染要重放动画必须"摘类→强制重排→挂类"**（浏览器不会因为内容变了就重启动画），实现只有 `replayAnim()` 一处；
+**屏入场只在"确实从隐藏转为可见"时重放**——交谈每轮都会重渲染舞台屏，按旧写法每轮都重放一次纸卷上滑，读起来像"又换了一屏"（现在 `showScreen()` 先记 `entering` 再决定，2026-09-13 批三）。
 
 ## 二点六、色调指标（`npm run qa:tone`）
 
@@ -95,7 +96,7 @@
 |---|---|---|
 | 墨字对纸底 | ≥7:1 | 8.41:1 |
 | 纸面对插画暗部 | ≤9:1 | 7.75:1 |
-| 纸面占屏（逐页） | ≤35% | 批一：标题 0% · 怎么玩 19.0% · 设置 33.5% · 过场 9.1%　／　批二：营地 0% · 手记 22.4% · 史实 33.5% · 回响 33.5% · 岔路 0% |
+| 纸面占屏（逐页） | ≤35%（1280 桌面档） | 批一：标题 0% · 怎么玩 19.0% · 设置 33.5% · 过场 9.1%　／　批二：营地 0% · 手记 22.4% · 史实 33.5% · 回响 33.5% · 岔路 0%　／　批三：交谈 29.7% · 抉择 29.7% · 裁决 29.7% · 篝火 21.2% |
 
 面积这一项的两把尺子分开存：`tone-report.json` 是 `qa:screens` 在 1280 真机上量的**逐页预算**（`qa:tone` 只认这一份），
 `tone-report-templates.json` 是 `qa:proof` 量的模板缩略图估算（缩略只有 400×250，比例必然被放大，只用于模板之间横向比较）。
@@ -111,6 +112,7 @@
 | `.paper-surface` | 内容面（面板、纸卷、手记、回响） | 米黄纸 + 纸纹 + 折痕；文字 `ink-0` |
 | `.ink-surface` | 压在插画上的骨架（HUD、顶栏、岔路题字） | 暖墨半透明；文字 `paper`；**子树里的区块自动换纸色系**（kicker 转旧金、title/body 转纸白、lead/note 转纸灰） |
 | `.blk-stat` | 数值签、状态签（唯一实现） | 标签 `kai` 11–12px + 数字 `num` 15–16px 等宽；默认墨纱，落在纸面自动换浅纱；状态只走描边与底纹 |
+| `.blk-choice` | 选项、菜单项（唯一实现） | 由 `step.js` 的 `choiceButton()` 产出（结构契约写在那个函数的注释里）：序号徽章 `.ic`、主文案 + `.ch-sub`、代价预告 `.ch-extra`（`.trend` / `.risk`）、键盘序号 `.kbd-hint`。容器只负责竖排（`.choices` / `.choice-row`） |
 | `.rule-ink` | 分隔线 | 1px `rule` |
 | `.seal-mark` | 印章、钤记 | 朱红描边圆形，仅小面积 |
 | `.btn` / `.btn.primary` / `.btn.ghost` | 纸片 / 印章 / 幽灵 | 纸面里的按钮用纸片态；朱红只给"确认类"动作 |
@@ -136,12 +138,16 @@
 |---|---|---|
 | 1 | 标题页、怎么玩、设置、过场 | ✅ 已按框架重做（见 `screen-sheet-1.png`） |
 | 2 | 营地、手记、史实、岔路（+ 回响作为史实链条的同伴一并收） | ✅ 已完成（见 `screen-sheet-2.png`） |
-| 3 | 舞台对话、抉择、回响、篝火菜单 | ⏳ 待做 |
+| 3 | 舞台对话、抉择、回响、篝火菜单 | ✅ 已完成（见 `screen-sheet-3.png` / `screen-sheet-3-820.png`） |
 | 4 | 钓鱼+弯针、夜校、分糖、夜岗 | ⏳ 待做 |
 | 5 | 五子棋、泸定桥、陡坡、自由行军沙盘 | ⏳ 待做 |
 | 6 | 答题、夜间、终局、记录/答辩 | ⏳ 待做 |
 
-每批交付：该批代码 + `qa:tokens` 无新增 + 1280/820 截图 + 联系表 `screen-sheet-<n>.png`。
-命令：`npm run qa:screens -- <批次号>`、`npm run qa:tokens`、`npm run qa:fonts`、`npm run qa:motion`。
+每批交付：该批代码 + `qa:tokens` 无新增 + 1280/820 截图 + 联系表 `screen-sheet-<n>.png`（820 档是 `screen-sheet-<n>-820.png`）。
+命令：`npm run qa:screens -- <批次号>`、`node tests/manual/screen-sheet.mjs <批次号> --width 820`、`npm run qa:tokens`、`npm run qa:fonts`、`npm run qa:motion`；
+窄屏另跑 `node tests/e2e/layout-audit.mjs --width 820`（自动报横向溢出 / 控件出界 / 点按区过小）。
+
+批三同时把「选项」收成了单一实现：区块 `.blk-choice`（样式在 `framework.css`）+ `step.js` 的 `choiceButton()`（**唯一**构建处，`askChoice` / 篝火菜单 / 交谈快捷句 / 夜校内层选项都走它）。
+`.btn.choice`、`.sheet-portrait` 已删除；代价预告（`.trend` 模型倾向 + `.risk` 作者风险标注）随选项块挪进 framework，避免再长出第二套选项。篝火菜单的属性（标题 / 退回键）仍是 `.panel` 系共用件，随批六的面板一起收。
 
 **目标环境**：Chromium 桌面；窄屏只保证到 **820**（平板 / 展馆触屏一体机），手机（375）不在交付范围内。

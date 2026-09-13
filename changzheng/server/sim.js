@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { logAiCall } from './logger.js';
+import { missingFields } from './schema.js';
 
 /**
  * 沙盘世界模拟：一次调用同时完成「裁判 + 世界更新 + NPC 反应」
@@ -62,6 +63,14 @@ export async function callSim({ world, action, intent }) {
       }
       if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
         throw new Error('模型返回空 JSON');
+      }
+      // 字段契约：与 /api/decide 走同一张表（server/schema.js）。
+      // 这条原先只在 ai.js 里，沙盘漏了：模型返回 JSON **数组**时 `typeof === 'object'` 能过、
+      // 非空数组的键数也大于 0，于是数组被当合规响应落库，界面拿到的是空白叙事
+      // （2026-09-13 真调实测到一条 sim_turn 数组响应，日志审计才发现）。
+      const missing = missingFields('sim_turn', parsed);
+      if (missing.length) {
+        throw new Error(`模型返回缺少必需字段：${missing.join('、')}`);
       }
       logAiCall({
         scene: `沙盘·${world?.place || '路上'}`,

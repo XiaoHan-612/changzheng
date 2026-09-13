@@ -4,6 +4,7 @@
  * 统一返回 { score: 0..1, detail: {...}, summary?: string }
  */
 import { audio } from './audio.js';
+import { choiceButton } from './step.js';
 
 function h(tag, attrs = {}, children = []) {
   const el = document.createElement(tag);
@@ -306,12 +307,9 @@ export function runNightSchool(container) {
         <div class="choices" id="school-opts"></div>`;
       const box = container.querySelector('#school-opts');
       r.opts.forEach((t, i) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'btn choice';
+        const b = choiceButton({ label: `${String.fromCharCode(65 + i)}. ${t}`, index: i, keyboard: false });
         // 契约：此前这一屏没有任何 data-* 标记，自动化只能干等（交接文档里记的债）
         b.dataset.miniAction = 'answer';
-        b.innerHTML = `<b>${String.fromCharCode(65 + i)}. ${t}</b>`;
         b.onclick = () => {
           if (i === r.a) correct += 1;
           idx += 1;

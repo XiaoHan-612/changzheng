@@ -58,7 +58,7 @@ check('微视差已绑定', await page.evaluate(() => {
 // ④ 舞台：点"浮桥"热点（走到真正的抉择屏，交谈屏的快捷问句不算）→ 正文墨显 + 选项逐条入场
 await page.locator('.hotspot').filter({ hasText: '浮桥' }).click({ force: true });
 for (let i = 0; i < 30; i++) {
-  if (await page.locator('#ch-opts .btn.choice').count()) break;
+  if (await page.locator('#ch-opts .blk-choice').count()) break;
   await page.waitForTimeout(400);
 }
 check('舞台入场（纸卷上滑）', await animOf('#screen-stage .sheet'), 'sheet-rise 0s');
@@ -73,7 +73,7 @@ check('选项第 2 条延迟', await page.evaluate(() => {
 }), '0.06s');
 
 // ⑤ 回响：印章钤印 + 两栏逐条入场
-await page.locator('#ch-opts .btn.choice').first().click({ force: true });
+await page.locator('#ch-opts .blk-choice').first().click({ force: true });
 for (let i = 0; i < 40; i++) {
   if (await page.locator('#btn-continue').count()) break;
   await page.waitForTimeout(400);

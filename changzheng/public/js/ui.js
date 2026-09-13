@@ -77,10 +77,14 @@ export function showScreen(id) {
   document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
   const el = $(id);
   if (el) {
+    // 只有"之前确实藏着"的屏才算入场：同一屏被反复 showScreen（交谈每轮都会重渲染）
+    // 不该每次都重放一遍上滑，那是"换屏"的动效，不是"刷新内容"的动效。
+    const entering = el.classList.contains('hidden');
     el.classList.remove('hidden');
-    // 入场：display 从 none 变回来会重放动画，但同一屏内部重复渲染不会，所以这里显式重放一次
-    const tpl = [...el.classList].find((c) => c.startsWith('tpl-'));
-    replayAnim(entranceTarget(el), ENTRANCE[tpl] || 'anim-fade');
+    if (entering) {
+      const tpl = [...el.classList].find((c) => c.startsWith('tpl-'));
+      replayAnim(entranceTarget(el), ENTRANCE[tpl] || 'anim-fade');
+    }
   }
   if (id !== 'screen-stage') {
     // 离开舞台屏时把舞台内容一起清掉：否则小游戏容器会作为"残留节点"留在 DOM 里，

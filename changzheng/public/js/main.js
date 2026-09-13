@@ -120,7 +120,7 @@ import { runFishing, runNightSchool, runCandy, runSentry, runGomoku, runBendNeed
 import { audio } from './audio.js';
 import { bindSandbox } from './sandbox.js';
 import * as UI from './ui.js';
-import { setStep, setStepState, waitContinue, askChoice, markAction, markMini } from './step.js';
+import { setStep, setStepState, waitContinue, askChoice, markAction, markMini, choiceButton } from './step.js';
 
 const { $, showScreen, setTopbar, renderStats, renderAp, renderCompanions,
   appendCampLog, toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
@@ -420,6 +420,12 @@ function exposeSheetHooks() {
     journal: () => openJournal(),
     facts: () => $('btn-facts').click(),
     pathZones: () => renderPathZones($('path-zones'), () => {}),
+    // 篝火菜单只在第四幕营地的 fire 热点出现，跑一遍太贵；这里直接走它的真实渲染函数
+    fire: () => {
+      if (!S) return;
+      showOverlay('screen-fire');
+      renderFireMenu(currentActDef());
+    },
   };
 }
 
@@ -475,7 +481,7 @@ function bindChrome() {
     if (e.key.toLowerCase() === 'j' && S) { openJournal(); return; }
     const n = Number(e.key);
     if (n >= 1 && n <= 9) {
-      const rows = [...document.querySelectorAll('.choice-row:not(.hidden) .btn.choice:not([disabled]), #stage-panel .btn.choice:not([disabled]), #fire-opts .btn.choice:not([disabled]), .quiz-opt:not([disabled]), .path-zone')]
+      const rows = [...document.querySelectorAll('.choice-row:not(.hidden) .blk-choice:not([disabled]), #stage-panel .blk-choice:not([disabled]), #fire-opts .blk-choice:not([disabled]), .quiz-opt:not([disabled]), .path-zone')]
         .filter((el) => el.offsetParent !== null);
       if (rows[n - 1]) {
         audio.playSfx('click');
@@ -1296,6 +1302,9 @@ async function onHotspot(act, h) {
     // 键优先取 action（与 forced 里的 id 对齐），没有 action 就用热点 id。
     const doneKey = h.action || h.id;
     if (doneKey) markDone(act.id, doneKey);
+    // 立刻按新状态重画热点：热点用一次就作废，但 DOM 若不重画就会停在"看着还能点"的样子——
+    // 点下去只弹一句「这里已经看过了」，界面对不上状态（自动化会卡在这颗热点上死循环，2026-09-13 实锤）。
+    renderHotspots(act, dayScene(act, S.day).hotspots);
 
     renderStats(S);
     renderCompanions(S);
@@ -1328,11 +1337,9 @@ function renderFireMenu(act) {
     { label: '分一口粮', sub: '士气信念', action: 'share' },
   ];
   items.forEach((f) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'btn choice';
-    b.dataset.choiceIndex = String(items.indexOf(f));
-    b.innerHTML = `<b>${f.label}</b><span>${f.sub}</span>`;
+    const b = choiceButton({
+      label: f.label, sub: f.sub, icon: String.fromCharCode(65 + items.indexOf(f)), index: items.indexOf(f),
+    });
     b.disabled = S.ap <= 0;
     b.onclick = async () => {
       hideOverlay('screen-fire');
@@ -1392,12 +1399,7 @@ async function doTalk(act, h) {
   const quick = ['前面的路怎么走？', '你为什么来当红军？', '我想家了。'];
   const qbox = $('talk-quick');
   quick.forEach((q, i) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'btn choice';
-    b.dataset.choiceIndex = String(i);
-    b.dataset.action = 'talk-quick';
-    b.innerHTML = `<b>${q}</b>`;
+    const b = choiceButton({ label: q, index: i, action: 'talk-quick' });
     b.onclick = () => sendTalk(npcName, q);
     qbox.appendChild(b);
   });

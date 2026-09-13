@@ -157,6 +157,17 @@
 .blk-choice .ch-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .blk-choice .ch-sub { font-family: var(--font); font-size: 12px; color: var(--ink-2); }
 .blk-choice .kbd-hint { font-family: var(--font-num); font-size: var(--fs-micro); color: var(--ink-2); }
+/* 选项的"代价预告"：模型给的倾向（.trend）+ 作者标注的风险（.risk，决定实际后果）。
+   它们是选项的一部分，所以和选项块放一起——否则又会出现"两套选项实现"。 */
+.blk-choice .ch-extra { display: flex; flex-wrap: wrap; gap: var(--sp-2); width: 100%; margin-top: 2px; }
+.blk-choice .trend { font-style: normal; font-size: var(--fs-micro); color: var(--seal); white-space: nowrap; }
+.blk-choice .risk {
+  font-style: normal; font-size: var(--fs-micro); padding: 1px 8px; white-space: nowrap;
+  border: 1px solid var(--rule-strong); border-radius: var(--radius-inset); color: var(--ink-2);
+}
+.blk-choice .risk.r-low { color: var(--risk-low); border-color: var(--risk-low); }
+.blk-choice .risk.r-mid { color: var(--risk-mid); border-color: var(--risk-mid); }
+.blk-choice .risk.r-high { color: var(--risk-high); border-color: var(--risk-high); }
 
 .blk-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .blk-actions.end { justify-content: flex-end; }
@@ -183,6 +194,7 @@
   border: 2px solid var(--rule-strong); box-shadow: var(--seal-ring);
   font-family: var(--font-kai); display: grid; place-items: center; color: var(--ink-1);
 }
+.blk-portrait.has-img { color: transparent; font-size: 0; }   /* 有立绘图时不再显示首字 */
 .blk-progress { display: flex; gap: 6px; align-items: center; }
 .blk-progress .dot {
   width: 12px; height: 12px; border-radius: 50%;

@@ -117,7 +117,7 @@ async function main() {
   await shot(page, '03-stage-choice');
 
   // 选第一项 → 等 continue
-  await page.locator('#ch-opts .btn.choice').first().click({ force: true });
+  await page.locator('#ch-opts .blk-choice').first().click({ force: true });
   await page.waitForTimeout(1500);
   await shot(page, '04-stage-after-choice');
 
@@ -153,7 +153,7 @@ async function main() {
       await page.waitForTimeout(900);
       continue;
     }
-    const ch = page.locator('#ch-opts .btn.choice:not([disabled])');
+    const ch = page.locator('#ch-opts .blk-choice:not([disabled])');
     if (await ch.count()) {
       await ch.first().click({ force: true });
       await page.waitForTimeout(1200);

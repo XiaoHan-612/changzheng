@@ -32,7 +32,9 @@ export const REQUIRED = {
 export function missingFields(callType, res) {
   const need = REQUIRED[callType];
   if (!need) return [];
-  if (!res || typeof res !== 'object') return ['(整体不是对象)'];
+  // 数组也是 object，但契约要求的是对象：直接点明"整体不是对象"，
+  // 否则报出来的是"缺少 narrative、feasible"，看着像字段名写错，实际是形状不对。
+  if (!res || typeof res !== 'object' || Array.isArray(res)) return ['(整体不是对象)'];
   return need.filter((spec) => {
     const keys = spec.split('|');
     return !keys.some((k) => res[k] !== undefined && res[k] !== null);

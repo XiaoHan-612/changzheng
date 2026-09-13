@@ -40,6 +40,14 @@ test('非对象整体判失败', () => {
   assert.deepEqual(missingFields('npc_chat', 'reply'), ['(整体不是对象)']);
 });
 
+test('回归：数组不是对象（2026-09-13 沙盘真调实测）', () => {
+  // 模型把整个响应包成数组 [{...}]。空数组会被"空 JSON"那条拦下，
+  // 但非空数组 `typeof === 'object'` 成立、键数也大于 0，一路放行到界面，
+  // 玩家就得到一个没有叙事的空白回合（沙盘当时也没接这张表，见 server/sim.js 的注释）。
+  assert.deepEqual(missingFields('sim_turn', [{ feasible: 'yes', narrative: 'x' }]), ['(整体不是对象)']);
+  assert.deepEqual(missingFields('sim_turn', ['x', 'y']), ['(整体不是对象)']);
+});
+
 test('回归：模型把 answer_index 键名写坏时必须报出来', () => {
   // 2026-09-13 真实事故：模型返回里键名变成 ",answer_index"，
   // 宽松解析后照样成对象，界面拿不到正确答案却照常渲染。

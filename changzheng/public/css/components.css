@@ -307,15 +307,9 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .sheet { position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius) var(--radius) 0 0; }
 .sheet-backdrop { position: absolute; inset: 0; }
 .sheet-head { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-5) var(--sp-5) var(--sp-3); }
-.sheet-kicker { position: absolute; right: 22px; top: 18px; font-size: var(--fs-micro); letter-spacing: 0.22em; color: var(--ink-2); }
-.sheet-head h2 { font-family: var(--font-display); font-size: var(--fs-h2); letter-spacing: var(--ls-title); }
-.sheet-portrait {
-  width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
-  background-size: cover; background-position: center top;
-  border: 2px solid var(--rule-strong); box-shadow: 0 0 0 2px var(--seal-veil);
-  display: grid; place-items: center; font-family: var(--font-kai); font-size: 26px; color: var(--ink-1);
-}
-.sheet-portrait.has-img { color: transparent; font-size: 0; }
+/* 场景角标、说话人名、立绘都改走区块（blk-kicker / blk-title / blk-portrait）；
+   这里只剩"放在哪儿"的布局：角标钉在右上，其余交给 .sheet-head 的 flex。 */
+.sheet-kicker { position: absolute; right: 22px; top: 18px; }
 .mood-chip { display: inline-block; margin-top: 6px; padding: 1px 9px; border-radius: var(--radius-inset); border: 1px solid var(--rule-strong); background: var(--ink-veil); font-size: var(--fs-micro); color: var(--ink-2); }
 .sheet-body { flex: 1; min-height: 120px; overflow: auto; margin: 0 var(--sp-4); padding: var(--sp-4) var(--sp-5); border-radius: var(--radius); background: var(--ink-veil); }
 .sheet-actions { padding: 0 var(--sp-5); }
@@ -330,27 +324,8 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 
 /* 选项 */
 .choices, .choice-row { display: flex; flex-direction: column; gap: var(--sp-2); }
-.btn.choice {
-  display: flex; align-items: center; gap: var(--sp-3); width: 100%; text-align: left;
-  padding: var(--sp-4); border-radius: var(--radius);
-  border: 1px solid var(--rule-strong); background-color: var(--paper-0); color: var(--ink-0);
-  font-family: var(--font-kai); font-size: var(--fs-h3);
-  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
-}
-.btn.choice:hover:not(:disabled) { border-color: var(--seal); transform: translateX(4px); }
-.btn.choice:disabled { opacity: 0.5; }
-.btn.choice .ic { width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid var(--rule-strong); border-radius: var(--radius-inset); background: var(--ink-veil); font-family: var(--font-kai); font-size: 15px; color: var(--ink-1); }
-.btn.choice .ch-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.btn.choice .ch-sub { font-family: var(--font); font-size: 12px; color: var(--ink-2); }
-.btn.choice b { font-family: var(--font-kai); font-size: var(--fs-h3); }
-.btn.choice span { font-size: 12px; color: var(--ink-2); }
-.btn.choice .ch-extra { display: flex; flex-wrap: wrap; gap: var(--sp-2); width: 100%; margin-top: 2px; }
-.btn.choice .trend { font-style: normal; font-size: var(--fs-micro); color: var(--seal); white-space: nowrap; }
-.btn.choice .risk { font-style: normal; font-size: var(--fs-micro); padding: 1px 8px; border-radius: var(--radius-inset); border: 1px solid var(--rule-strong); color: var(--ink-2); white-space: nowrap; }
-.btn.choice .risk.r-low { color: var(--risk-low); border-color: var(--risk-low); }
-.btn.choice .risk.r-mid { color: var(--risk-mid); border-color: var(--risk-mid); }
-.btn.choice .risk.r-high { color: var(--risk-high); border-color: var(--risk-high); }
-.kbd-hint { font-family: var(--font-num); font-size: var(--fs-micro); color: var(--ink-2); }
+/* 选项本身不再在这里定义：它是区块（blk-choice），唯一定义处在 framework.css。
+   .choices / .choice-row 只是"把选项竖排起来"的容器布局。 */
 
 /* ───────── 答题 / 岔路 / 夜间 / 终局 ───────── */
 .quiz-panel { width: min(var(--panel-w), 92vw); max-height: var(--panel-h); overflow: auto; }

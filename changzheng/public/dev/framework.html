@@ -72,10 +72,11 @@
 
   <div class="row" style="margin-top:14px">
     <div class="cell" style="width:420px">
-      <div class="lbl">blk-choice（默认 / 悬停 / 选中 / 禁用；悬停用 .is-hover 强制摆出来）</div>
+      <div class="lbl">blk-choice（默认 / 悬停 / 选中 / 禁用；悬停用 .is-hover 强制摆出来）<br/>
+        代价预告是选项的一部分：.trend 是模型给的倾向，.risk 是作者标注的实际风险</div>
       <div class="paper-surface" style="padding:12px">
         <div class="blk-choice-list">
-          <button class="blk-choice"><span class="ic">A</span><span class="ch-text"><b>照着地图找渡口</b><span class="ch-sub">默认</span></span><span class="kbd-hint">1</span></button>
+          <button class="blk-choice"><span class="ic">A</span><span class="ch-text"><b>照着地图找渡口</b><span class="ch-sub">默认 · 带代价预告</span><span class="ch-extra"><em class="trend">士气↑ 体力↓</em><em class="risk r-mid">中风险</em></span></span><span class="kbd-hint">1</span></button>
           <button class="blk-choice is-hover"><span class="ic">B</span><span class="ch-text"><b>出门问当地的老乡</b><span class="ch-sub">悬停</span></span><span class="kbd-hint">2</span></button>
           <button class="blk-choice" aria-selected="true"><span class="ic">C</span><span class="ch-text"><b>按原路折回一段</b><span class="ch-sub">选中</span></span><span class="kbd-hint">3</span></button>
           <button class="blk-choice" disabled><span class="ic">D</span><span class="ch-text"><b>沿河滩硬趟过去</b><span class="ch-sub">禁用 · 水急，过不去</span></span><span class="kbd-hint">4</span></button>
