@@ -18,14 +18,18 @@ npm start
 ## 测试
 
 ```powershell
-npm run test:unit     # 状态层 + 配置层（13 项）
-npm run qa:smoke      # UI 冒烟
-npm run test:e2e      # 五幕**真调**通关（需配好 Key；加 --quick 跑快速模式）
-npm run qa:sandbox    # 自由行军沙盘
-npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
-npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md
-npm run tts:manifest  # 生成语音清单 → docs/TTS-MANIFEST.md
+# 全流程（真调，需配好 Key）
+npm run test:e2e      # 五幕真调通关（加 --quick 跑快速模式）
+npm run qa:sandbox    # 自由行军沙盘 · qa:regress 沙盘回归 · qa:failure 失败线
+npm run qa:av         # 影音运行时审计（资源 404 / 立绘 / 环境床 / TTS 能否解码）
+# 局部（多数不需要 AI，可随时跑）
+npm run test:unit     # 状态层 / 契约 / 配置层 · qa:smoke UI 冒烟
+npm run qa:board      # 玩法板体检：五个玩法逐屏摆上板，验板屏壳与契约标记
+npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫（字面量/模板/纸面/动效）
+npm run qa:handoff    # 交接文档与代码一致
+npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md · tts:manifest 语音清单
 ```
+`test:unit` 49 项、`qa:board` 36 项、`qa:motion` 16 项；`test:e2e` 一次真调约 76 次。
 
 ## 玩法一句话
 
@@ -38,7 +42,8 @@ npm run tts:manifest  # 生成语音清单 → docs/TTS-MANIFEST.md
 - 事件卡选项带**倾向预告**（体力↓ 信念↑ / 风险），选项、答题、选路都支持 `1/2/3` 数字键
 - **史实回响**：你刚经历的 / 真实发生过的 / 虚构边界
 - 顶栏 **答辩**：按 call_type 聚合的调用统计，路演用
-- 营地小游戏：钓鱼（弯针 → 起竿 → 分汤）· 分糖 · 夜岗（夜校口令在此生效）· 夜校识字 · 五子棋 · 陡坡拉人
+- **玩法板**：小游戏都在专属板屏上玩（题名 + 数值签 + 玩法区）；人物在舞台屏交代任务，结算回舞台屏
+- 小游戏：钓鱼（弯针 → 起竿 → 分汤）· 分糖 · 夜岗（夜校口令在此生效）· 夜校识字 · 五子棋 · 陡坡拉人
 - **篝火夜**（第四幕幕末）：由模型生成互斥抉择，选完写「当夜之后」
 
 ## 设置
@@ -48,7 +53,8 @@ npm run tts:manifest  # 生成语音清单 → docs/TTS-MANIFEST.md
 
 ## 文档
 
-- **`docs/HANDOFF-CODE.md`** — 给下一个代码 agent：模块地图、状态机、callType 契约、已知坑
+- **`docs/HANDOFF-CODE.md`** — 给下一个代码 agent：模块地图、状态机、callType 契约、已知坑（接手先读这份）
+- **`docs/DESIGN-SYSTEM.md`** — 视觉体系与逐批打磨进度（改界面先读）· **`logs/README.md`** — 日志目录各文件的职责
 - **`docs/HANDOFF-ART.md`** / **`docs/HANDOFF-AUDIO.md`** — 给生图 / 音频模型
 - `docs/ASSETS.md` — 素材清单（可勾选）· `docs/TTS-MANIFEST.md` — 语音哈希清单
 - `docs/ARCHITECTURE.md` · `docs/QA.md` · `docs/SCORING.md` · `docs/PITCH.md`

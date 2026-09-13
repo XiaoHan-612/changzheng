@@ -195,6 +195,7 @@ ch.push(pRuns([
 ch.push(pRuns([
   { text: "章节模板复用：", bold: true },
   "全景壳、热点组件、回响组件、对决组件、日志面板全项目共用；每幕只换 data 配置 + 场景图 + 小游戏模块。演示样品草地章即第四幕的实现样例。",
+  "界面骨架两条：**舞台屏**（人物立绘 + 对白 + 抉择 / 裁决，纸卷从底部升起）与**玩法板**（小游戏专属：题名 + 数值签 + 玩法区）。人物在舞台交代任务，玩法在板上做，结算回舞台——别把玩法塞进对白纸卷里。",
 ]));
 
 ch.push(br());
@@ -694,33 +695,34 @@ ch.push(
 ch.push(h1("十、技术实现（正式工程）"));
 ch.push(h2("10.1 工程形态"));
 ch.push(
-  bullet("在演示样品 demo/ 上扩展为正式工程 changzheng/；保留 Express + 静态前端，不引入重型框架（比赛演示友好）。"),
-  bullet("可选：若团队更熟 Vue/React，可只重写 public/ 为 Vite 工程，server 不变。"),
+  bullet("正式工程从演示样品扩展而来（样品现归档于 _archive/sample/ 与 _archive/demo-v1/，只读参考）；保留 Express + 静态前端，不引入重型框架（比赛演示友好）。"),
+  bullet("**正式工程已定形**：前端零构建（原生 ES Module + DOM 叙事 + Canvas 小游戏），`npm start` 直接托管；无需任何打包步骤，改文件即生效。"),
+  bullet("中文字体自托管（正文宋 / 对白楷 / 标题毛笔 / 档案明朝 / 数字 Garamond，全 OFL），随包分发、跨机字形一致；界面颜色与字号一律取自 `public/css/tokens.css`，由守卫脚本强制。"),
 );
 
-ch.push(h2("10.2 推荐目录"));
+ch.push(h2("10.2 目录（实际工程）"));
 ch.push(p(
 `changzheng/
   package.json
   .env.example          # GLM_API_KEY / URL / MODEL / PORT
   server/
-    index.js routes ai.js logger.js config.js
+    index.js            # 路由 + 静态 + gzip
+    ai.js               # VN 侧：提示词 / 真调 / 重试 / 契约校验
+    sim.js              # 沙盘侧世界裁判
+    schema.js           # 响应契约唯一真源（REQUIRED）
+    logger.js           # JSONL 落库（按日文件 + 会话镜像 + 契约戳记）
+    balance.js config.js
   public/
-    index.html
-    css/
-    js/
-      main.js           # 全局 router + act 调度
-      acts/act0.js … act5.js
-      systems/{state,echo,duel,night,logs,audio}.js
-      minigames/{fishing,escort,ferry,luding,climb,path}.js
-      ui.js data.js ai-client.js
-    assets/scenes/ characters/ ui/
-  public/audio/{ambient,sfx,cache}/
-  data/
-    facts.json acts.json hotspots/*.json
-  logs/
-  qa/                   # playwright`
-));
+    index.html          # 18 个屏：标题/怎么玩/设置/过场/营地/舞台/玩法板/…
+    css/                # fonts → tokens → base → framework（模板+区块）→ components
+    js/                 # main.js（状态机）step.js（交互契约）minigames.js（8 玩法）
+                        # sandbox.js / ui.js / state.js / audio.js / data.js / origin.js
+    assets/scenes|characters|events/    fonts/    audio/{ambient,sfx,cache,reactions}/
+  data/                 # acts.json facts.json sim-visuals.json tts-lines.json
+  logs/                 # 入库样本 sample-full-run.jsonl + 运行时按日日志（不入库）
+  tests/                # unit / e2e（Playwright）/ manual（体检脚本）
+  docs/                 # 交接、架构、QA、设计系统、交付
+`));
 
 ch.push(h2("10.3 数据驱动"));
 ch.push(
@@ -740,19 +742,24 @@ ch.push(table(
     ["键盘监听泄漏", "舞台销毁时 removeEventListener；resolve 时清理"],
     ["热点与图不对", "百分比坐标 + 换图 checklist；预留 Alt 微调写回"],
     ["密钥进前端", "只放 .env；/api/config 不回传 key"],
+    ["玩法塞进对白纸卷", "玩法一律挂玩法板（openBoard），宿主与数值签各只有一处实现"],
+    ["'看着能点却点不动'的状态", "用过的热点/选项必须当场改 DOM 标记，否则玩家困惑、自动化卡死"],
+    ["契约校验漏接调用点", "每个调模型的路径都过 server/schema.js 同一张表；缺字段即重试"],
   ],
   [2800, 6560]
 ));
 
 ch.push(h2("10.5 日志字段（固定）"));
-ch.push(p("id, timestamp, model, scene, callType, agent, situation, options, operation, prompt{system,user}, rawResponse, response, appliedEffects, stateSnapshot, durationMs, source∈{GLM-5.1,MOCK_AI,FALLBACK}, attempt, requestId。"));
+ch.push(p("id, timestamp, model, scene, callType, agent, situation, options, operation, prompt{system,user}, rawResponse, response, appliedEffects, stateSnapshot, durationMs, source∈{GLM,ERROR}, contractOk（契约戳记：该响应是否满足必需字段）, attempt, requestId。"));
+ch.push(p("source 只标「走的是真模型」，具体模型名看 model 字段；断网或重试用尽记 ERROR 并附原因，界面给「重试」键，不编造兜底文案。"));
 
-ch.push(h2("10.6 QA 脚本（每幕必过）"));
+ch.push(h2("10.6 验收脚本（每轮必跑）"));
 ch.push(
-  bullet("npm run qa：Playwright 跑「过场点按 → 主热点 → 回响 → 对决 → 行军」最小路径。"),
-  bullet("检查：无 pageerror；log count ≥ 预期；关键屏截图入 qa/。"),
+  bullet("全流程（真调）：`npm run test:e2e`（五幕通关 + 不重复结算断言，一次约 76 次调用）；`qa:sandbox` / `qa:regress` / `qa:failure` / `qa:av`。"),
+  bullet("局部（不烧 AI）：`npm run test:unit`（49 项）、`qa:smoke`、`qa:board`（玩法板 36 项）。"),
+  bullet("视觉守卫：`qa:tokens`（不许新增颜色/字体/圆角字面量）、`qa:frames`（页面只用模板与区块）、`qa:tone`（纸面面积 ≤35%）、`qa:motion`（五个标准动效真的挂上）。"),
+  bullet("文档守卫：`qa:handoff`（交接文档与代码契约一致）、`qa:audit`（日志 schema 审计）。"),
 );
-
 ch.push(br());
 
 /* ═══════════ 11 素材总表 ═══════════ */
@@ -772,6 +779,7 @@ ch.push(table(
   [1000, 2200, 3800, 2360]
 ));
 ch.push(p("生产：统一 prompt 前缀（§0.4）→ 裁水印 → 1280 宽 JPEG q82 → 标热点写 JSON。近景可 1024 宽以省体积。"));
+ch.push(p("**实际落盘**：场景图 21 张、立绘 14 张、环境床 8 条、事件图 6 张，清单与用途见 changzheng/docs/ASSETS.md；新增图按约定命名落盘即生效（代码是探测式接入）。"));
 
 ch.push(h2("11.2 角色立绘（脸心 280px）"));
 ch.push(table(
@@ -803,7 +811,7 @@ ch.push(
 );
 
 /* ═══════════ 12 排期 ═══════════ */
-ch.push(h1("十二、开发排期（建议 4 周，含音频）"));
+ch.push(h1("十二、开发排期（建议 4 周，含音频）— 已全部完成"));
 ch.push(table(
   ["周", "游戏内容", "技术", "验收"],
   [
@@ -814,6 +822,8 @@ ch.push(table(
   ],
   [1000, 3200, 2800, 2360]
 ));
+
+ch.push(p("四周排期已完成（W4 的录屏留到路演前做）。此后进入**视觉收口**：纸墨设计系统（7 模板 + 区块 + 5 标准动效 + 守卫脚本）逐批打磨 25 个页面，批 1–4 已完成、批 5–6 待做，进度见 changzheng/docs/DESIGN-SYSTEM.md §五。"));
 
 ch.push(h1("十三、范围与风险"));
 ch.push(h3("明确不做"));
@@ -849,7 +859,7 @@ ch.push(p(
 ));
 ch.push(pRuns([
   { text: "定稿后第一步：", bold: true },
-  "把 demo/ 升级为 changzheng/ 工程，按 W1 先打通「开场 + 湘江」，再横向复制全景模板。",
+  "（已完成）把演示样品升级为 changzheng/ 工程，按 W1 先打通「开场 + 湘江」，再横向复制全景模板。",
 ]));
 
 const doc = new Document({

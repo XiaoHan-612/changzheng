@@ -38,11 +38,14 @@ npm start          # http://localhost:3001
 
 ```powershell
 cd changzheng
-npm run test:unit     # 资源钳制 / 史实解锁 / 配置层
-npm run qa:smoke      # 标题 → 营地 → 一次互动
-npm run test:e2e      # 五幕 MOCK 通关（含「不重复结算」回归断言）
+npm run test:unit     # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏
+npm run qa:smoke      # 标题 → 营地 → 一次互动（顺带断言用过的热点当场作废）
+npm run qa:board      # 玩法板体检：五个玩法逐屏摆上板（板屏壳 / 数值签 / 契约标记）
+npm run test:e2e      # 五幕真调通关（约 76 次调用）+「不重复结算」等回归断言
 npm run qa:sandbox    # 自由行军沙盘：两回合 + 存档恢复
 npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
+npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
+npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫
 ```
 
 ## 重新生成策划文档
@@ -59,7 +62,8 @@ node make-docx.js     # 输出 ../长征-抉择-设计方案.docx
 |------|------|
 | `changzheng/README.md` | 玩法与交互要点 |
 | `changzheng/docs/ARCHITECTURE.md` | 架构、运行时数据流、设计约束 |
-| `changzheng/docs/HANDOFF.md` | 已完成 / 已知缺口 / 接力建议 |
+| `changzheng/docs/HANDOFF.md` | 已完成 / 已知缺口 / **每轮收尾清单** / 接力建议 |
+| `changzheng/docs/DESIGN-SYSTEM.md` | 视觉体系（模板 / 区块 / 动效）与逐批打磨进度 |
 | `changzheng/docs/SCORING.md` | 评分对照与路演讲法 |
-| `changzheng/docs/QA.md` | 测试清单 |
+| `changzheng/docs/QA.md` | 测试清单（每条命令的通过标准） |
 | `_archive/README.md` | 归档内容与新旧路径对照 |

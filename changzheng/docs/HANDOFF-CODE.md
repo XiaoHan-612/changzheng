@@ -10,7 +10,7 @@
 cd changzheng
 npm install
 npm start                 # http://localhost:3001
-npm run test:unit         # 13 项，状态层 + 配置层
+npm run test:unit         # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏
 npm run test:e2e          # 五幕**真调**通关（含快速模式：node tests/e2e/full-run.mjs --quick）
 npm run qa:smoke          # 标题→营地→一次互动
 npm run qa:sandbox        # 自由行军沙盘
@@ -126,7 +126,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 
 ## 六、下一步建议（按价值排序）
 
-1. **真调验证已全覆盖**（2026-09-13）：标准模式 57 次调用全 `source=GLM`、无 ERROR；`failure_review` 由 `npm run qa:failure` 单独覆盖（注入"断粮+体力见底"走失败线，断言真调 1 次且渲染出标题/段落/史实要点）。16 类 callType 全部有真调记录。
+1. **真调验证已全覆盖**（2026-09-13）：标准模式一局 76 次调用全 `source=GLM`、无 ERROR；`failure_review` 由 `npm run qa:failure` 单独覆盖（注入"断粮+体力见底"走失败线，断言真调 1 次且渲染出标题/段落/史实要点）。16 类 callType 全部有真调记录。
 2. **契约扩散（部分完成）**：夜校小游戏的内层选项已补 `data-mini-action="answer"`（2026-09-13，此前那一屏没有任何 `data-*` 标记，自动化只能干等）。仍待办：`runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职，建议走 `askChoice`；`runRest` 只有一个「继续」，可直接 `waitContinue`。
 3. **数值平衡（进行中）**：测量口径已建好 —— `npm run qa:playtest` 按人类节奏跑局，输出时长/分幕耗时/五维终值/AI 调用数，结果表落 `docs/PLAYTEST.md`。判定与调参（含把热点改成一次性）见批次二的计划；行军模式失败条件仍是「体力≤0」或「粮食=0 且体力≤30」。
 4. **素材已全清**（2026-09-13）：场景图 21/21、立绘 14/14、环境床 8 条 Ogg、TTS 缓存 20 条全部就位。唯一"备而未用"的是 `xianggui.png`（老乡）——现有「向导老乡」热点挂的是「向导」，要不要补一个老乡热点属于内容决策。

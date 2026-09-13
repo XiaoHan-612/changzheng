@@ -1,10 +1,10 @@
 # 交接说明（Handoff）
 
 > ⚠️ **本文件是总览。分工交接请看：**
-> [`HANDOFF-CODE.md`](HANDOFF-CODE.md)（代码 agent）· [`HANDOFF-ART.md`](HANDOFF-ART.md)（生图模型）· [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md)（音频/TTS 模型）· [`ASSETS.md`](ASSETS.md)（素材清单）
+> [`HANDOFF-CODE.md`](HANDOFF-CODE.md)（代码 agent）· [`HANDOFF-ART.md`](HANDOFF-ART.md)（生图模型）· [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md)（音频/TTS 模型）· [`ASSETS.md`](ASSETS.md)（素材清单）· [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md)（视觉体系与逐批进度）
 
-> 给接力的模型/同学：这份文档说明**已经做完什么、还差什么、怎么验证**。
-> 目前所有自动化测试均为绿色，可以直接在现有基础上继续。
+> 给接力的模型/同学：这份文档说明**已经做完什么、还差什么、怎么验证、怎么接着干**。
+> 所有自动化测试与守卫当前均为绿色；任何时刻停下都能按 §六 的清单移交。
 
 ## 一、项目现状
 
@@ -12,96 +12,125 @@
 
 | 玩法 | 入口 | 核心循环 | 状态 |
 |------|------|----------|------|
-| 五幕主线（VN） | 标题「研学模式 / 行军模式」 | 暮色营地探索 → 决策 → 模型裁决 → 史实回响 → 启程 | 完整可通关 |
-| 自由行军沙盘 | 标题「自由行军」 | 自由输入行动 → 模型当世界裁判 → 世界推进 + NPC 反应 | 可玩（首版） |
+| 五幕主线（VN） | 标题「研学模式 / 行军模式 / 快速演示」 | 暮色营地探索 → 决策 → 模型裁决 → 史实回响 → 启程 | 完整可通关 |
+| 自由行军沙盘 | 标题「自由行军」 | 自由输入行动 → 模型当世界裁判 → 世界推进 + NPC 反应 | 可玩（v2，含存档） |
 
 ## 二、已完成
 
 ### 引擎与服务端
-- `/api/decide`：12 类 call_type（scene_gen / choice_hint / npc_chat / share_judge /
-  minigame_review / branch_judge / quiz_generate / quiz_answer_ai / quiz_judge /
-  night_options / night_resolve / act_review / ending_review / failure_review / study_report）
+- `/api/decide`：**16 类** callType（scene_gen / choice_hint / npc_chat / share_judge / minigame_review /
+  branch_judge / quiz_generate / quiz_answer_ai / quiz_judge / night_options / night_resolve /
+  act_review / ending_review / failure_review / study_report / sim_turn）
 - `/api/sim`：沙盘单次调用完成「裁判 + 世界更新 + NPC 反应」
-- 两态日志：`GLM`（成功，具体模型看 `model` 字段）/ `ERROR`（重试用尽，附原因），每次调用落 JSONL；**没有 MOCK**
+- 两态日志：`GLM`（成功，具体模型看 `model` 字段）/ `ERROR`（重试用尽，附原因），每次调用落 JSONL；
+  **没有 MOCK**。落库时盖 `contractOk` 契约戳记（`server/logger.js`），响应必过 `server/schema.js` 同一张表
 - `/api/config` 读写模型与 Key，`/api/config/test` 连通测试，`/api/logs/clear` 重置
 
 ### 客户端
 - 暮色营地（提灯跟随 + 行动点越少越暗）、电影事件卡、史实回响盖章
+- **舞台屏**（立绘 + 对白 + 抉择）与**玩法板**（`tpl-board`：题名 + 数值签 + 玩法区）分工明确：
+  人物在舞台交代任务 → 玩法在板上做 → 回舞台结算
 - 行程缎带、手记（回望）、键盘 `1/2/3` 选、`J` 手记、`Esc` 关浮层
 - 行军模式：体力归零 → 掉队失败结算；断粮幕间扣体力；高风险抉择可能留下一个人
-- 答辩面板（按 call_type 聚合）、评委演示模式（右侧实时调用流）
-- 沙盘：世界面板（人/粮/士气/体力/情报）、自由输入、语音输入（Web Speech）、建议行动
+- 答辩面板（按 call_type 聚合）、评委演示模式（右侧实时调用流）——都藏在「设置 → 展示」后面
+- 沙盘：世界面板（人/粮/士气/体力/情报）、自由输入、语音输入（Web Speech）、建议行动、事件图卡、同伴语音
 
 ### 视觉（纸墨设计系统，逐批打磨 25 页）
-- 已完成：框架（模板 + 区块 + 动效 + 守卫）与批 1–4（标题/怎么玩/设置/过场；营地/手记/史实/岔路/回响；舞台对话/抉择/裁决/篝火菜单；**新建 `tpl-board` 板屏** + 钓鱼+弯针/夜校/分糖/夜岗五屏）
-- 待做：批 5–6（五子棋/泸定桥/陡坡/沙盘 → 答题/夜间/终局/记录）。**批五开工前先读 [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md) §五 的「批五开工前先读」**——那里列着同类的"类名在、样式没了"欠账（`.grab-*` 三兄弟、`.mg-*`、`.score-line`）与玩法宿主的新规矩（`openBoard()` + `mountMini()`）
-- **进度表、每批交付口径与守卫命令都在 [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md) §五**；改界面先读 §三 的组件规范与 §二点五 的区块表，别在页面里新写样式（`qa:frames` 会拦）
+- 已完成：框架（7 模板 + 区块 + 5 标准动效 + 守卫 + 样板页）与批 1–4
+  （标题/怎么玩/设置/过场；营地/手记/史实/岔路/回响；舞台对话/抉择/裁决/篝火菜单；
+  **新建 `tpl-board` 板屏** + 钓鱼+弯针/夜校/分糖/夜岗）
+- 待做：批 5–6（五子棋/泸定桥/陡坡/沙盘 → 答题/夜间/终局/记录）。**批五开工前先读
+  [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md) §五 的「批五开工前先读」**——那里列着同类的
+  "类名在、样式没了"欠账（`.grab-*` 三兄弟、`.mg-*`、`.score-line`）与玩法宿主的新规矩
+  （`openBoard()` + `mountMini()`）
+- 进度表、每批交付口径与守卫命令都在 DESIGN-SYSTEM §五；改界面先读 §三 组件规范与 §二点五 区块表，
+  别在页面里新写样式（`qa:frames` 会拦）
 
-### 测试
+### 日志与证据
+- 仓库里入库一份**真实全程样本** `logs/sample-full-run.jsonl`（96 条、覆盖 16/16 类、零违约），
+  运行时的按日日志不入库（见 [`../logs/README.md`](../logs/README.md)）
+- `npm run qa:audit` → `docs/LOG-AUDIT.md`：本版本字段缺失 0、FALLBACK 0
+
+### 测试（当前全绿）
 ```powershell
-npm run test:unit    # 5 项，资源钳制 / 史实解锁 / 失败判定
-npm run qa:smoke     # 标题→营地→一次互动
-npm run test:e2e     # 五幕真调通关（~57 次调用）+ 重复结算回归断言
-npm run qa:sandbox   # 沙盘两回合 + 建议行动
-npm run qa:regress   # 沙盘监听泄漏 / 存档回合错位回归
+# 全流程（真调，需配好 Key）
+npm run test:e2e     # 五幕真调通关：unit 之外的总验收（~76 次调用），含不重复结算等回归断言
+npm run qa:sandbox   # 沙盘两回合 + 建议行动      · npm run qa:regress  沙盘监听泄漏/存档错位
+npm run qa:failure   # 行军模式失败线（failure_review 真调）
+npm run qa:av        # 影音运行时审计：资源 404 / 立绘 / 环境床 / TTS 解码
+# 局部（多数不烧 AI，随时可跑）
+npm run test:unit    # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏
+npm run qa:smoke     # 标题→营地→一次互动→回设置
+npm run qa:board     # 玩法板体检 36 项（板屏壳 / 数值签 / 契约标记 / 第一步可点 / 离开清空）
+npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫：字面量 / 模板 / 纸面 / 动效
+npm run qa:handoff   # 交接文档与代码契约是否一致
 ```
 
-当前结果：unit 9/9 · smoke PASS · e2e FULL PASS · sandbox PASS · regress PASS
+当前结果：unit 49/49 · smoke PASS · board 36/36 · motion 16/16 · e2e FULL PASS ·
+sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 全绿 ·
+`layout-audit --width 820` 与 1280 均零布局缺陷
 
 ## 三、还没做 / 已知缺口（按优先级）
 
 | 优先级 | 缺口 | 说明 |
 |--------|------|------|
-| P0 | ~~沙盘真调未验证~~ | 已解决：`qa:sandbox` 与 `qa:regress` 都跑真调并通过 |
-| P0 | 沙盘无持久化 | ~~已解决~~ localStorage 存档，刷新可续上，`重开沙盘`可清 |
-| P0 | 沙盘无模型化收尾 | ~~已解决~~ 中断/走出时调 `ending_review` 写小结 |
-| P1 | 失败条件偏少 | 只有「体力≤0」触发失败；断粮有扣体力但无专属失败叙事 |
-| P1 | 损失事件只覆盖 1 幕 | 仅第一幕 escort 定义了 `loss`，其余四幕待补 |
-| P1 | 数值平衡未调 | 行军模式难度未实测，可能出现必败或过于轻松 |
-| P1 | 沙盘无环境音 | ~~已解决~~ 进入沙盘播放 `camp` 环境床 |
-| P2 | 移动端未验证 | 沙盘与主线的窄屏布局未逐项检查 |
-| P2 | 沙盘多智能体偏轻 | ~~部分解决~~ NPC 有 goal 与 3 条记忆，会随回合更新；但没有「目标推进」的主动事件 |
+| P1 | 契约还差两处 | `runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职（建议走 `askChoice`）；`runRest` 只有一个「继续」，可直接 `waitContinue` |
+| P1 | 数值平衡未调 | 测量口径已建（`npm run qa:playtest` → `docs/PLAYTEST.md`），调参待做 |
+| P1 | 视觉批 5–6 | 五子棋/泸定桥/陡坡/沙盘 → 答题/夜间/终局/记录（欠账清单见 DESIGN-SYSTEM §五） |
+| P2 | 移动端不做 | 窄屏只保证到 **820**（已逐屏体检）；375 手机档明确不在交付范围 |
+| P2 | 沙盘多智能体偏轻 | NPC 有 goal 与 3 条记忆，但没有「目标推进」的主动事件 |
+| P2 | 操作音效仍是合成 | click/hook/echo 等由 WebAudio 合成；是否预录看路演音质要求 |
+| P2 | 封装未定型 | 一键启动（`start.bat` + 便携 Node）见 [`DELIVERY.md`](DELIVERY.md)，演示前收口 |
+| P3 | 离线回放（备选） | 现场无网/额度耗尽的风险预案，见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)，**未开发** |
 
-## 三·五、沙盘 v2 新增能力（本轮）
+## 四、接着干的话，从哪儿下手
 
-- **事件图卡**：模型返回 `visual` 标签（rain/night_march/starve/village/loss/river/march/camp），
-  每回合在纪事里插入一张现场照片卡（带标签），右上角另有全局场景标签
-- **同伴语音**：NPC 反应按「角色+立场」播放预生成 wav（老班长反对/支持、卫生员担忧、
-  红小鬼嘴硬、向导指路、新兵自责）；模型自由句静默
-- **人物目标与记忆**：`people[].goal` / `people[].memory[]` 由模型随回合更新，面板可见
-- **存档**：`localStorage` 键 `czjc_sandbox_world_v2`，每回合自动存；刷新续上
-- **模型化收尾**：沙盘中断或走出时调 `ending_review` 写小结
-
-## 四、接力的建议切入点
-
-1. **先把沙盘接真调并跑一局**（设置→测试连通→自由行军→连做 5～8 回合），
-   记录 schema 失败率；必要时在 `server/sim.js` 的 system 里收紧字段约束。
-2. 给其余四幕补 `loss` 定义，并做一次行军模式通盘平衡。
-3. 想再上一台阶：让 NPC 的 goal 驱动主动事件（老班长因反对而私下行动），
-   而不只是反应玩家。
-4. 移动端逐项检查沙盘与主线窄屏布局。
+1. **批五**（五子棋 / 泸定桥 / 陡坡 / 沙盘）：照批四的模板收，欠账清单已在 DESIGN-SYSTEM §五 列明。
+2. **补两处契约**（`runQuiz` / `runRest`）——顺手就能做，做完 `test:e2e` 复验。
+3. **数值平衡**：`qa:playtest` 跑几局看 `docs/PLAYTEST.md` 的曲线，按 HANDOFF-CODE 第 25 条同时改三处
+   （钳制表 / 提示词 / 单测）。
+4. 想再上一台阶：让沙盘 NPC 的 goal 驱动主动事件（老班长因反对而私下行动）。
 
 ## 五、关键文件
 
 ```
 server/
   index.js      路由（/api/decide /api/sim /api/config /api/logs）
-  ai.js         VN 侧：提示词 + 真调 + 重试
-  sim.js        沙盘侧：世界裁判提示词 + 真调 + 重试
+  ai.js         VN 侧：提示词 + 真调 + 重试 + 契约校验
+  sim.js        沙盘侧：世界裁判提示词 + 真调 + 重试 + 契约校验
+  schema.js     响应契约唯一真源（REQUIRED / missingFields / contractStamp）
+  logger.js     JSONL 落库（按日文件 + 会话镜像 + 契约戳记）
   config.js     .env / runtime-config.json 双层配置
 public/js/
-  main.js       主线状态机（幕、强制链、失败结算、锁定）
+  main.js       主线状态机（幕、营地、强制链、失败结算、玩法宿主 openBoard/mountMini）
+  step.js       交互契约（step/askChoice/choiceButton/waitContinue/markMini）
+  minigames.js  8 个玩法（本地只判手感，结算走 /api/decide）
   sandbox.js    沙盘循环 v2（事件图卡、语音、存档、目标/记忆、模型收尾）
+  ui.js         渲染与浮层（showScreen 按模板选入场动效、板屏清空）
   state.js      资源/好感/失败判定/粮荒（可单测）
   audio.js      环境床 + SFX + 预置语音
-data/acts.json  五幕定义（热点、强制链、对决）
+public/css/     fonts → tokens（唯一值源）→ base → framework（模板+区块+动效）→ components
+data/acts.json  五幕定义（热点、dayScenes、强制链、对决）
 data/facts.json 史实卡（real / fiction 分栏）
-data/sim-visuals.json  沙盘事件图与语音映射
-public/assets/events/  事件场景图（rain/night_march/starve/village/loss/river）
-public/audio/reactions/  同伴反应语音
+logs/           入库样本 + 运行时日志（见 logs/README.md）
+tests/          unit / e2e（Playwright）/ manual（一次性排查与体检脚本）
 ```
 
-## 六、注意事项
+## 六、每轮收尾清单（**每轮结束都做，做到随时能移交**）
+
+1. **跑验收**：改动涉及的层级按 §二 的命令跑一遍；服务端改动后必须看到测试输出 `restarted`
+   （否则跑的是旧进程，绿灯是假的）。
+2. **更新文档**（缺一项都算没做完）：
+   - 本轮改动 → `HANDOFF-CODE.md`（坑与规矩，编号往后加）与 `README.md` / `QA.md` 的命令表；
+   - 界面改动 → `DESIGN-SYSTEM.md` §五 批次表 + §三 组件表 + 模板表；
+   - **策划案**（`../DESIGN.md` 与 `../design/make-docx.js` → `长征-抉择-设计方案.docx`）如涉及
+     玩法、界面结构、调用点、技术形态的变化，一并在本轮改掉并重新生成 docx；
+   - 本文件 §二 的结果行与 §三 缺口表同步（缺口解决了就划掉）。
+3. **刷新生成物**：`qa:audit`（LOG-AUDIT）、`tts:manifest`（TTS-MANIFEST）、涉及素材时 `qa:assets`。
+4. **交付图**：涉及页面的批次，出 1280 与 820 联系表（`qa:screens`）。
+5. **提交**：一个批次一个提交，信息里写清"做了什么 + 验收结果 + 遗留"。
+
+## 七、注意事项
 
 - 密钥只在 `.env` 与 `runtime-config.json`，永不进前端
 - 小游戏手感判定算本地逻辑，**智能判断一律走 API**，答辩时按这条口径回答
@@ -109,4 +138,5 @@ public/audio/reactions/  同伴反应语音
 - **合作与场景口径不进界面**：对外只按"一款普通的长征叙事游戏"呈现。玩家可见的一切
   （界面文案、页面 `meta`、可复制的研学报告、模型生成内容）不写合作方名称与行业场景，
   这些口径统一放 [`PITCH.md`](PITCH.md) 与 [`SCORING.md`](SCORING.md)，答辩时口头讲。
-- 改动后请跑 `npm run test:unit && npm run qa:smoke && npm run test:e2e && npm run qa:sandbox`
+- 日志是运行产物、不入库（只留样本）；要留全量证据就先归档当天的运行日志再只跑那一局
+- 任何"看起来能点但点了没反应"的界面状态都当缺陷修——它会让自动化卡死（2026-09-13 踩过两次）
