@@ -102,6 +102,29 @@ audio.speak({ text: '……', voiceId: 'laoban', actorId: 'laoban' })
 
 ## 六、红线与验收
 
+## 六点五、产线 ④ BGM（章节/场景各不同）——**待额度恢复后执行**
+
+需求（用户 2026-09-13 确认）：不只是台词有声音，整体要有背景音乐，且**不同章节、不同场景不一样**。
+
+**文件与命名**（与 `AMBIENT_FILE` 的 key 对齐，便于按幕切换，落盘即生效）：
+
+```text
+public/audio/bgm/depart_bgm.ogg     开场·于都河（告别、克制、弦乐长音）
+public/audio/bgm/xiangjiang_bgm.ogg 一幕·湘江（低沉、行进、暗流）
+public/audio/bgm/zunyi_bgm.ogg      二幕·遵义（雨夜、思索、室内感）
+public/audio/bgm/jinsha_bgm.ogg     三幕前·金沙江（水流、紧张但克制）
+public/audio/bgm/luding_bgm.ogg     三幕后·泸定桥（鼓点式紧张，铁索质感）
+public/audio/bgm/snow_bgm.ogg       四幕·雪山（风声、寒冷、稀疏）
+public/audio/bgm/grass_bgm.ogg      四幕·草地（泥沼、疲惫、缓慢）
+public/audio/bgm/huining_bgm.ogg    五幕·会宁（汇合、暖调、收束）
+```
+
+**规格**：Ogg Vorbis 立体声 44.1kHz，**60–120 秒且可无缝循环**（环境床是 20–30 秒，BGM 太短会听出重复）；单条 1–2MB 以内。
+**混音**：BGM 音量应低于环境床（建议 0.18 vs 环境床 0.32）；人声播放时自动闪避（duck 到 40%，300ms 淡入淡出）。
+**红线**：无版权素材或已授权；**不含人声**（避免与台词抢）；不用强节奏与打击乐重音；整体克制，符合历史题材。
+
+**代码侧（可选，不依赖模型，随时可做）**：加 `BGM_FILE` 映射 + `audio.playBgm(kind)` / `stopBgm()`，与 `playAmbient` 同一套回退约定（文件缺失就静音，不影响流程）；`qa:audio` 会自动把 `public/audio/bgm/` 纳入体检（可解码 + 被引用），`qa:av` 增加"每幕 BGM 播放成功"的断言。文件一旦落盘即生效，无需再改代码。
+
 **红线**：不夸张译制腔；不当背景音乐用（人声只配"有立绘的同伴"与"史实回响标题"）；不给人声加回声/电音；**任何音频都不允许阻塞流程**（放不出来必须静默）。
 
 **验收**
@@ -112,3 +135,4 @@ audio.speak({ text: '……', voiceId: 'laoban', actorId: 'laoban' })
 4. `npm start` → 浏览器控制台无音频 404。
 5. 产出后更新 `ASSETS.md` 第四节的表格状态。
 6. 跑 `npm run qa:assets`，确认新音频出现在「已就位环境床」里（出现即在游戏内生效）。
+7. 跑 `npm run qa:audio`，确认逐个文件「可解码 + 被代码路径引用」；报告见 `docs/AUDIO-REPORT.md`。

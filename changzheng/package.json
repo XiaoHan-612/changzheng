@@ -17,6 +17,7 @@
     "qa:failure": "node tests/e2e/march-failure.mjs",
     "qa:playtest": "node tests/e2e/playtest.mjs",
     "qa:av": "node tests/e2e/av-audit.mjs",
+    "qa:audio": "node scripts/check-audio.mjs",
     "qa:audit": "node scripts/audit-logs.mjs",
     "qa:assets": "node tests/e2e/asset-drop.mjs",
     "qa:inspect": "node scripts/inspect-assets.mjs",

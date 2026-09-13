@@ -13,6 +13,7 @@
 | `npm run qa:failure` | 行军模式失败线（`failure_review` 真调） | MARCH FAILURE PASS，失败屏有标题/段落/史实要点 |
 | `npm run qa:playtest` | 自动试玩：人类节奏下的单局时长与资源曲线（`--mode/--strategy/--runs/--speed/--doc`） | PLAYTEST DONE，`docs/PLAYTEST.md` 落表 |
 | `npm run qa:av` | **影音运行时审计**：资源 404、营地全景/舞台图/立绘是否用对、环境床与语音是否真播放、TTS 音频能否解码、音效链路、**无声率与 TTS 缺口** | AV AUDIT PASS，问题列表为空；缺口清单落 `docs/TTS-GAPS.md` |
+| `npm run qa:audio` | **音频逐个体检**（55 个）：容器 vs 扩展名、HTTP 200、MIME、浏览器逐条解码、以及"能否被代码路径引用到" | AUDIO PASS，报告落 `docs/AUDIO-REPORT.md` |
 | `npm run qa:inspect` | 素材体检：格式/尺寸/时长/重复（含立绘） | 素材体检通过 |
 | `npm run qa:handoff` | 交接文档与代码契约一致（场景/环境床/TTS/立绘） | 可以交接 |
 | `node tests/e2e/layout-audit.mjs --width 820` | 逐屏布局硬伤（横向溢出/控件出界/点按区） | 820 宽 0 处横向溢出 |
