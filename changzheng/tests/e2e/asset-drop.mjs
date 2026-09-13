@@ -18,6 +18,12 @@ const CONTRACT = (() => {
   const scenes = [...new Set([...md.matchAll(/^\| `([a-z_]+\.jpg)`/gm)].map((m) => m[1]))];
   return scenes.map((f) => `/assets/scenes/${f}`);
 })();
+// 立绘同样按契约表校验（png，圆形头像框用）
+const PORTRAITS = (() => {
+  const md = fs.readFileSync(path.resolve(ROOT, '..', 'design/asset-prompts.md'), 'utf8');
+  return [...new Set([...md.matchAll(/^\| `([a-z_]+\.png)`/gm)].map((m) => m[1]))]
+    .map((f) => `/assets/characters/${f}`);
+})();
 const NEW_ASSETS = CONTRACT;   // 全部按契约校验；已就位 vs 待生成由 HEAD 决定
 // 环境床 ogg
 const AMBIENT = [
@@ -54,6 +60,10 @@ async function main() {
     const r = await fetch(BASE + p, { method: 'HEAD' });
     report.image[p] = r.ok ? '已就位' : '待生成';
   }
+  const reportPortrait = {};
+  for (const p of PORTRAITS) {
+    reportPortrait[p] = (await fetch(BASE + p, { method: 'HEAD' })).ok ? '已就位' : '待生成';
+  }
   const ambientReady = [];
   for (const [i, p] of AMBIENT.entries()) {
     if ((await fetch(BASE + p, { method: 'HEAD' })).ok) { report.ambient[p] = '已就位（ogg）'; ambientReady.push(p); continue; }
@@ -76,7 +86,7 @@ async function main() {
       img.src = src;
     })));
     return out;
-  }, NEW_ASSETS);
+  }, [...NEW_ASSETS, ...PORTRAITS]);
   // 环境床：用 Audio 真解码一次（能拿到 duration 才说明 MIME 与容器没问题）
   const audioOk = await page.evaluate(async (list) => {
     const out = {};
@@ -91,13 +101,35 @@ async function main() {
     })));
     return out;
   }, ambientReady);
+
+  // ── 立绘接线回归：非同伴 NPC 必须立自己的立绘，不能一律显示老班长的脸
+  //    （2026-09-13 修复：同伴兜底写在专属立绘之前，导致母亲/船工/宣传员等全显示老班长）
+  await page.click('#btn-mode-study');
+  const skipBtn = page.locator('#btn-cut-skip');
+  await skipBtn.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+  if (await skipBtn.isVisible()) await skipBtn.click();
+  const mother = page.locator('.hotspot[data-hotspot-label="母亲"]');
+  await mother.waitFor({ state: 'visible', timeout: 20000 });
+  await mother.click();
+  await page.waitForTimeout(400);
+  const shownPortrait = await page.evaluate(() => ({
+    name: document.getElementById('portrait-name')?.textContent || '',
+    bg: document.getElementById('portrait-art')?.style.backgroundImage || '',
+  }));
+  if (shownPortrait.name !== '母亲') throw new Error(`母亲交谈位显示的角色名不对：${shownPortrait.name}`);
+  if (!shownPortrait.bg.includes('mother.png')) {
+    throw new Error(`母亲交谈位没有立 mother.png，实际：${shownPortrait.bg || '(空，退回文字头像)'}`);
+  }
   await browser.close();
 
   const readyImages = Object.entries(report.image).filter(([, v]) => v === '已就位').map(([k]) => k);
+  const readyPortraits = Object.entries(reportPortrait).filter(([, v]) => v === '已就位').map(([k]) => k);
   const readyAmbient = Object.entries(report.ambient).filter(([, v]) => v.startsWith('已就位')).map(([k]) => k);
   console.log(JSON.stringify({
     已就位图片: readyImages,
     待生成图片: Object.entries(report.image).filter(([, v]) => v !== '已就位').map(([k]) => k),
+    已就位立绘: readyPortraits,
+    待生成立绘: Object.entries(reportPortrait).filter(([, v]) => v !== '已就位').map(([k]) => k),
     已就位环境床: readyAmbient,
     合成兜底环境床: Object.entries(report.ambient).filter(([, v]) => !v.startsWith('已就位')).map(([k]) => k),
     环境床解码时长秒: audioOk,
@@ -108,6 +140,9 @@ async function main() {
   // 已就位的图必须能被浏览器解码，否则前端探测会退回占位图
   for (const p of readyImages) {
     if (decoded[p] !== true) throw new Error(`已就位但浏览器无法解码：${p}`);
+  }
+  for (const p of readyPortraits) {
+    if (decoded[p] !== true) throw new Error(`已就位但浏览器无法解码的立绘：${p}`);
   }
   for (const p of readyAmbient) {
     // readyAmbient 里放的是清单键（.ogg），实际可播路径可能是同名 .wav

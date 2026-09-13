@@ -59,10 +59,29 @@ function checkTts() {
   }
 }
 
+// 立绘：HANDOFF-ART 承诺"落盘即生效"的角色 vs main.js 的 PORTRAIT_FILE 映射
+function checkPortraitDropin() {
+  const md = read('docs/HANDOFF-ART.md');
+  const anchor = md.indexOf('**立绘同样落盘即生效**');
+  if (anchor < 0) {
+    problems.push('HANDOFF-ART 缺少「立绘同样落盘即生效」说明');
+    return;
+  }
+  const para = md.slice(anchor).split('\n\n')[0];
+  const doc = pick(para, /`([a-z_]+)`（/g);
+  const main = read('public/js/main.js');
+  const body = main.slice(main.indexOf('const PORTRAIT_FILE'), main.indexOf('function portraitImage'));
+  const code = pick(body, /\/assets\/characters\/([a-z_]+)\.png/g);
+  const onlyDoc = doc.filter((x) => !code.includes(x));
+  if (onlyDoc.length) problems.push('HANDOFF-ART 承诺立绘落盘即生效但 PORTRAIT_FILE 没接线：' + onlyDoc.join(', '));
+  else ok.push('立绘落盘即生效清单一致（文档承诺 ' + doc.length + ' 张，代码已接线 ' + code.length + ' 张）');
+}
+
 checkFiles();
 checkSceneDropin();
 checkAmbient();
 checkTts();
+checkPortraitDropin();
 
 console.log('交接就绪检查：');
 for (const o of ok) console.log('  ✓ ' + o);

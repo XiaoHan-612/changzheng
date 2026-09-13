@@ -1,5 +1,5 @@
 // 素材体检：不只看文件在不在，还看格式/尺寸/时长/是否重复。
-// 用法：node scripts/inspect-assets.mjs [scenes|ambient|all]
+// 用法：node scripts/inspect-assets.mjs [scenes|chars|ambient|all]
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -7,10 +7,18 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCENES = path.join(ROOT, 'public/assets/scenes');
+const CHARS = path.join(ROOT, 'public/assets/characters');
 const AMBIENT = path.join(ROOT, 'public/audio/ambient');
+const PROMPTS = path.join(ROOT, '..', 'design/asset-prompts.md');
 const SHA = (buf) => crypto.createHash('sha256').update(buf).digest('hex').slice(0, 12);
 
 const problems = [];
+
+/** 读 PNG 头：宽高固定写在 IHDR 的 16-24 字节 */
+function pngSize(buf) {
+  if (buf.length < 24 || buf.readUInt32BE(0) !== 0x89504e47) return null;
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+}
 
 function jpegSize(buf) {
   let i = 2;
@@ -77,8 +85,7 @@ function bytesLabel(n) {
 function inspectImages() {
   // 只对"契约内"的图做硬性判定（design/asset-prompts.md 里列出的）；其余历史素材只展示不判失败
   const contract = new Set(
-    [...fs.readFileSync(path.join(ROOT, '..', 'design/asset-prompts.md'), 'utf8')
-      .matchAll(/^\| `([a-z_]+\.jpg)`/gm)].map((m) => m[1])
+    [...fs.readFileSync(PROMPTS, 'utf8').matchAll(/^\| `([a-z_]+\.jpg)`/gm)].map((m) => m[1])
   );
   const files = fs.existsSync(SCENES) ? fs.readdirSync(SCENES).filter((f) => /\.(jpe?g|png)$/i.test(f)) : [];
   console.log('\n■ 图片（public/assets/scenes/）');
@@ -100,6 +107,40 @@ function inspectImages() {
   }
   for (const [h, list] of hashes) {
     if (list.length > 1) problems.push(`图片内容完全相同（${h}）：${list.join(', ')}`);
+  }
+}
+
+function inspectPortraits() {
+  // 契约清单直接读 design/asset-prompts.md 的立绘表，避免"代码一份、文档一份"两处真相
+  const want = [...fs.readFileSync(PROMPTS, 'utf8').matchAll(/^\| `([a-z_]+\.png)`/gm)].map((m) => m[1]);
+  const files = fs.existsSync(CHARS) ? fs.readdirSync(CHARS).filter((f) => /\.(png|jpe?g)$/i.test(f)) : [];
+  console.log('\n■ 立绘（public/assets/characters/）');
+  console.log('  文件'.padEnd(28) + '格式'.padEnd(8) + '尺寸'.padEnd(14) + '大小'.padEnd(10) + '指纹');
+  const hashes = new Map();
+  for (const w of want) {
+    if (!files.includes(w)) problems.push(`立绘缺少 ${w}（design/asset-prompts.md 的契约行还在，说明还没生成/没落盘）`);
+  }
+  for (const f of files.sort()) {
+    const buf = fs.readFileSync(path.join(CHARS, f));
+    const size = pngSize(buf);
+    const h = SHA(buf);
+    (hashes.get(h) || hashes.set(h, []).get(h)).push(f);
+    if (!size) {
+      console.log('  ' + f.padEnd(26) + '非 PNG'.padEnd(8) + '—'.padEnd(14) + bytesLabel(buf.length).padEnd(10) + h);
+      problems.push(`${f} 不是合法 PNG（立绘必须是 PNG）`);
+      continue;
+    }
+    console.log('  ' + f.padEnd(26) + 'PNG'.padEnd(8) + `${size.w}×${size.h}`.padEnd(14)
+      + bytesLabel(buf.length).padEnd(10) + h);
+    if (!want.includes(f)) problems.push(`${f} 不在 design/asset-prompts.md 的立绘清单里（文件名拼错了？）`);
+    // 圆形头像框 + 小尺寸(28px)可读：正方形、别太小、别直接塞未缩放的 1024 原图
+    if (size.w !== size.h) problems.push(`${f} 不是正方形（${size.w}×${size.h}），圆形头像框会裁歪`);
+    else if (size.w < 200) problems.push(`${f} 只有 ${size.w}px，小屏会糊（契约要求导出 280×280）`);
+    else if (size.w > 512) problems.push(`${f} 是 ${size.w}px，像是没缩放的原始大图（应导出 280×280）`);
+    if (buf.length > 400 * 1024) problems.push(`${f} 有 ${bytesLabel(buf.length)}，远超 280×280 应有体积（忘了导出小图？）`);
+  }
+  for (const [h, list] of hashes) {
+    if (list.length > 1) problems.push(`立绘内容完全相同（${h}）：${list.join(', ')}`);
   }
 }
 
@@ -148,6 +189,7 @@ function inspectAmbient() {
 
 const mode = process.argv[2] || 'all';
 if (mode === 'scenes' || mode === 'all') inspectImages();
+if (mode === 'chars' || mode === 'all') inspectPortraits();
 if (mode === 'ambient' || mode === 'all') inspectAmbient();
 
 console.log('');

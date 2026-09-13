@@ -3,8 +3,12 @@
 //   node scripts/check-glm.mjs                          # 测 .env 里的 GLM_MODEL 与 glm-5.1
 //   node scripts/check-glm.mjs glm-5.1 --url <接口> --key <密钥> [--timeout 15000]
 //   node scripts/check-glm.mjs glm-5.3-flash --max-tokens 512 --thinking disabled
+//   node scripts/check-glm.mjs glm-5.3-flash --reasoning-effort low   # 默认即 low，与 server/ai.js 一致
 //   node scripts/check-glm.mjs glm-5.3-flash --extra thinking.type=low
 //   node scripts/check-glm.mjs glm-5.3-flash --extra thinking.type=enabled,thinking.level=low
+// 注意：默认请求体与 server/ai.js 保持一致（reasoning_effort=low + max_tokens 256）。
+//      glm-5.3-flash 是"始终思考"模型，若不带 reasoning_effort 又只给 64 tokens，
+//      token 会被推理吃光、content 返回空、finish_reason=length —— 那是自检脚本的问题，不是接口坏了。
 // 注意：--key 只从命令行读取，不会写入任何文件。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,7 +39,9 @@ const key = flag('key') || process.env.GLM_API_KEY || env.GLM_API_KEY || '';
 const url = flag('url') || process.env.GLM_API_URL || env.GLM_API_URL
   || 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 const timeoutMs = Number(flag('timeout', '15000')) || 15000;
-const maxTokens = Number(flag('max-tokens', '64')) || 64;
+const maxTokens = Number(flag('max-tokens', '256')) || 256;
+const reasoningEffort = flag('reasoning-effort') || process.env.GLM_REASONING_EFFORT
+  || env.GLM_REASONING_EFFORT || 'low';
 const thinking = flag('thinking', '');
 const modelArgs = argv.filter((a, i) => !a.startsWith('--') && !argv[i - 1]?.startsWith('--'));
 const models = modelArgs.length
@@ -82,6 +88,8 @@ async function probe(model) {
     temperature: 0,
     response_format: { type: 'json_object' },
   };
+  // 与服务端同源：不设 reasoning_effort 时，思考型模型会把 token 全用在推理上
+  if (reasoningEffort && reasoningEffort !== 'none') payload.reasoning_effort = reasoningEffort;
   if (thinking) payload.thinking = { type: thinking };
   const extra = flag('extra', '');
   if (extra) {
@@ -128,6 +136,10 @@ async function probe(model) {
     if (!ok) {
       console.log(`   reasoning_content 长度=${String(reasoning).length}  message 字段=[${Object.keys(choice?.message || {}).join(', ')}]`);
       console.log(`   原始片段：${text.slice(0, 320).replace(/\s+/g, ' ')}`);
+      if (choice.finish_reason === 'length' && String(reasoning).length > 0) {
+        console.log('   → 推理吃光了 token（finish=length）。这只说明本次请求参数太紧，不代表接口坏了：'
+          + '调大 --max-tokens 或设 --reasoning-effort low（当前 ' + (reasoningEffort || '未设置') + '）。');
+      }
     }
     return ok;
   } catch (err) {

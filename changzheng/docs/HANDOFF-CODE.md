@@ -94,6 +94,8 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 6. **测试别污染用户配置** —— e2e 会写 `runtime-config.json`，跑完要还原（已内置 snapshot/restore）。
 7. **改台词文本会让 TTS 哈希文件名变化** —— 重跑 `npm run tts:manifest`。
 8. **空 JSON 的根因是推理吃 token** —— 实测 54 次真调里 8 次返回 `{}`，耗时 9.6–12.3 秒。根因是 glm-5.3-flash「始终思考」：不设 `reasoning_effort` 时 token 全用在推理上。现在默认 `reasoning_effort=low` + `max_tokens` 2000（sim 2400），实测 1.2 秒、21 tokens 就返回合规 JSON；空对象仍按失败处理。
+   `check-glm.mjs` 早先没带 `reasoning_effort` 且只给 64 tokens，结果自检报"失败"而游戏其实是好的——现已与服务端请求体对齐（默认 `reasoning_effort=low`、`max_tokens=256`），并在 `finish=length` 时直接提示"是参数太紧，不是接口坏了"。
+   2026-09-13 实测同一网关：`glm-5.3-flash` 2.6s / 37 tokens 正常返回；`glm-5.1` **不认 `reasoning_effort=low`**，要 `max_tokens≥2000` 才吐 content，单次 ~11s。也就是说 glm-5.1 在这里能真调，但慢一个数量级——答辩前若要用指定模型，务必按 11s/次估时。
 9. **真调可能等 10 秒以上** —— 「思考中」指示器会显示秒数；失败会弹出原因与「重试」键（不再有兜底文案）。
 10. **日志审计要按 id 去重** —— 同一条调用会同时写进「按日文件」和 `session-full.jsonl`；`audit-logs.mjs` 已去重。`docs/LOG-AUDIT.md` 里的「字段缺失」混有旧版本历史记录；想只看当前版本，用 `LOG_DIR=<临时目录>` 单独跑一局再审计（当前版本 MOCK 全流程字段缺失为 0）。
 11. **素材是「探测式」接入** —— 图片走 `sceneImage(新图, 占位图)`（`main.js` 顶部 + boot 里的 `preloadScenes()`），音频走 `AMBIENT_FILE` 映射（`audio.js`）。生图/音频模型把文件按约定名字落盘就自动生效，**不需要改代码**；加新素材时同步更新 `preloadScenes()` 与 `AMBIENT_FILE` 两张表即可。自检：`npm run qa:assets`。
@@ -101,14 +103,15 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 13. **契约标记要随状态撤销** —— 过场按钮是静态 DOM，结束后必须 `delete dataset.action`；已用掉的糖/已落子的格必须移除 `data-mini-action` 或置 `aria-disabled`，否则"当前可交互项"会撒谎（这几条都是踩过的坑）。
 14. **自动化只认契约** —— `tests/e2e/full-run.mjs` 的驱动按 `body[data-step]` + `data-action`/`data-choice-index`/`data-mini-*` 操作，不认识任何中文标签或屏内元素 id。新增玩法时先声明契约，别再改驱动。
 15. **TTS 缓存靠"逐字一致"命中** —— 哈希是 `sha1(voiceId|text)`，所以：① 代码里 `say()` 的文本改了，就要同步改 `data/tts-lines.json` 并重跑 `npm run tts:manifest`，否则文件白做（曾 21/24 条不可达）；② `speak()` 的 voiceId 必须走 `audio.js` 的 `ACTOR_VOICE` 映射（中文角色名会被清洗成 `default`，哈希对不上）；③ 史实回响会念 `facts.json` 的标题，标题即 TTS 文本。验收：`npm run qa:tts` + 跑一局看 `ttsHits`（E2E 已断言 ≥5）。
+16. **立绘兜底不能反过来写** —— 旧代码 `comp.img || portraitImage(npc)` 里的 `comp` 是 `COMPANIONS.find(...) || COMPANIONS[0]`，于是任何**非同伴 NPC**（母亲、船工、宣传员、向导、新兵）都长出老班长的脸，10 张新立绘里 5 张永远不会出现（2026-09-13 修）。现在统一走 `showNpc(npc, { role, mood })`：专属立绘 → 同伴立绘 → 文字头像。热点/抉择集想立谁，就写 `npc` 字段（`acts.json` 的 `wounded`、`CHOICE_SETS.snow_help` 是样例）。回归用例在 `tests/e2e/asset-drop.mjs`（点开「母亲」热点，断言立绘必须是 `mother.png`）。
 
 ## 六、下一步建议（按价值排序）
 
 1. **真调验证**：标准模式真调一局已跑通（57 次调用、`source=GLM`、无 ERROR）；`npm run qa:audit` 显示 15 类 callType 全部有真调记录。**只剩 `failure_review`（行军模式掉队结算）未验证** —— 需要故意把体力耗到 0 跑一次失败线。
 2. **契约扩散**：`runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto`、夜校小游戏的内层选项（`#school-opts`）目前靠 `data-choice-index` 兼职，建议也走 `askChoice`；`runRest` 只有一个「继续」，可直接 `waitContinue`。
 3. **数值平衡**：行军模式的失败条件现在是「体力≤0」或「粮食=0 且体力≤30」；建议真人试 3 局记录曲线。
-4. **场景图补齐**：按 `HANDOFF-ART.md` 生成 3 张本轮必需 + 18 张后续，落盘后热点背景即可升级。
-5. **音频升级**：环境床从 WebAudio 合成换成 ogg，TTS 缓存按 `TTS-MANIFEST.md` 产出。
+4. **素材已全清**（2026-09-13）：场景图 21/21、立绘 14/14、环境床 8 条 Ogg、TTS 缓存 20 条全部就位。唯一"备而未用"的是 `xianggui.png`（老乡）——现有「向导老乡」热点挂的是「向导」，要不要补一个老乡热点属于内容决策。
+5. **音频剩余项**：操作音效仍是 WebAudio 合成（click/hook/echo 等），是否需要预录由路演音质要求决定。
 6. **移动端专项**：目前只有 820/900px 两个断点，未逐屏验证 375 宽。
 
 ## 七、验收清单

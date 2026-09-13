@@ -77,7 +77,7 @@
       "hotspots": [
         { "id": "boatman", "label": "老船工", "sub": "问夜渡", "x": 22, "y": 55, "kind": "talk", "npc": "船工" },
         { "id": "ferry", "label": "木筏", "sub": "摆渡抉择", "x": 45, "y": 58, "kind": "choice", "action": "ferry" },
-        { "id": "wounded", "label": "岸边伤员", "sub": "让他先渡", "x": 65, "y": 50, "kind": "share" },
+        { "id": "wounded", "label": "岸边伤员", "sub": "让他先渡", "x": 65, "y": 50, "kind": "share", "npc": "担架伤员" },
         { "id": "rest", "label": "背囊", "sub": "休息", "x": 78, "y": 52, "kind": "rest" },
         { "id": "march", "label": "东岸路", "sub": "奔泸定 →", "x": 90, "y": 46, "kind": "march" }
       ],

@@ -205,6 +205,17 @@ function portraitImage(name) {
   return key ? sceneImage(PORTRAIT_FILE[key], '') : undefined;
 }
 
+/**
+ * NPC 立绘统一入口：专属立绘（PORTRAIT_FILE）→ 同伴立绘 → 文字头像。
+ * 热点/抉择集只要写 npc 字段，新立绘落盘就自动生效，不用改这里。
+ * 注意：同伴兜底必须放在专属立绘之后，否则"非同伴 NPC"会一律显示老班长的脸。
+ */
+function showNpc(npc, { role, mood = '平静' } = {}) {
+  const comp = COMPANIONS.find((c) => npc.includes(c.name));
+  setPortrait(npc, role || comp?.role || '同行者', comp?.ava || npc.slice(0, 1), mood,
+    portraitImage(npc) || comp?.img);
+}
+
 const CHOICE_SETS = {
   cross: {
     title: '怎么过河',
@@ -287,6 +298,8 @@ const CHOICE_SETS = {
     title: '扶他一把',
     callType: 'branch_judge',
     img: '/assets/scenes/snow_climb.jpg',
+    npc: '掉队的战士',
+    npcRole: '雪山掉队',
     loss: { who: '掉队的战士', reason: '风雪里他没能跟上，队伍在天黑前下不了山' },
     options: [
       { label: '架起他的胳膊一起走', sub: '慢，但谁都不落' },
@@ -1082,7 +1095,7 @@ const HOTSPOT_HANDLERS = {
   fishing: (act) => doFishing(act, false),
   school: () => doSchool(),
   rest: () => doRest(),
-  share: () => doShare(),
+  share: (act, h) => doShare(h),
   candy: () => doCandy(),
   sentry: () => doSentry(),
   gomoku: () => doGomoku(),
@@ -1207,11 +1220,10 @@ async function doTalk(act, h) {
   step(`${act.id}:talk`, 'talk');
   talkPending = false;
   const npcName = h.npc || '同伴';
-  const comp = COMPANIONS.find((c) => npcName.includes(c.name)) || COMPANIONS[0];
   showScreen('screen-stage');
   // 热点可以指定自己的近景（acts.json 的 img 字段），没写就用本幕全景
   setStageBanner(`${act.title} · 交谈`, sceneImage(h.img, act.pano));
-  setPortrait(npcName, h.sub || '同伴', comp.ava, '平静', comp.img || portraitImage(npcName));
+  showNpc(npcName, { role: h.sub });
   setStagePanel(`
     <div class="chat-row">
       <input id="talk-input" placeholder="对${npcName}说点什么…" autocomplete="off" />
@@ -1314,11 +1326,13 @@ async function doRest() {
   await waitBtn('继续');
 }
 
-async function doShare() {
+async function doShare(h = {}) {
   step('share', 'choice');
   showScreen('screen-stage');
   setStageBanner('分一口粮', '/assets/scenes/night_fire.jpg');
-  setPortrait('你', '年轻战士', '你', '平静');
+  // 热点带 npc 就立这个人（如"岸边伤员"），否则立玩家自己
+  if (h.npc) showNpc(h.npc, { role: h.sub });
+  else setPortrait('你', '年轻战士', '你', '平静');
   setStagePanel('<div class="choice-row" id="share-opts"></div>');
   const shareOpts = ['全给伤员', '全班平分，自己少一点', '先紧着小鬼和卫生员', '自己留大半'];
   const choice = (await askChoice($('share-opts'), shareOpts.map((label) => ({ label })), {
@@ -1350,7 +1364,7 @@ async function doSchool() {
   step('school', 'minigame');
   showScreen('screen-stage');
   setStageBanner('夜校识字', '/assets/scenes/school_close.jpg');
-  setPortrait('文化教员', '夜校', '教', '耐心', portraitImage('文化教员'));
+  showNpc('文化教员', { role: '夜校', mood: '耐心' });
   setStagePanel('<div id="school-host"></div>');
   markMini($('school-host'), 'school');
   await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
@@ -1629,7 +1643,9 @@ async function doChoice(act, actionId) {
   if (!cs) return;
   showScreen('screen-stage');
   setStageBanner(cs.title, sceneImage(cs.img, act.pano));
-  setPortrait('你', act.title, '你', '决断');
+  // 抉择集写 npc 就先立当事人（如雪山上的掉队战士），让代价看得见
+  if (cs.npc) showNpc(cs.npc, { role: cs.npcRole, mood: '决断' });
+  else setPortrait('你', act.title, '你', '决断');
   setStagePanel(`<div class="choice-row" id="ch-opts"></div>`);
   // 深度调用：选项倾向预告（类 Reigns 卡牌预览）
   let hints = {};
@@ -1693,7 +1709,7 @@ async function doLuding(act) {
   showScreen('screen-stage');
   setStageBanner('飞夺泸定桥', sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg'));
   audio.playAmbient('luding');
-  setPortrait('突击队长', '红四团', '勇', '决绝', portraitImage('突击队长'));
+  showNpc('突击队长', { role: '红四团', mood: '决绝' });
   setStagePanel('<div id="luding-host"></div>');
   markMini($('luding-host'), 'luding');
   await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');

@@ -42,7 +42,7 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | P0 | `snow_climb.jpg` | 雪山陡坡（拉人时机），当前用 `snow_pano.jpg` 占位 |
 | P1 | `snow_camp.jpg`、`snow_let_clothes.jpg` | 把第四幕雪山日做扎实 |
 | P1 | `luding_bridge.jpg`、`jinsha_ferry.jpg` | 泸定桥小游戏与渡口 |
-| P2 | 其余 13 张场景 + 10 张立绘 | 按 ASSETS.md 清单推进 |
+| P2 | 其余 13 张场景 + 10 张立绘 | ✅ 已全部就位（2026-09-13），无待生成项 |
 
 ## 四、落盘即生效（不用改代码）
 
@@ -73,10 +73,15 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `zunyi_street.jpg` | 「一封密信」抉择 |
 | `huining_crowd.jpg` | 会宁「数一数熟面孔」 |
 
-其余 13 张（`depart_crowd`、`xiangjiang_wreck`、`xiangjiang_night`、`zunyi_room`、`luding_run`、`snow_climb` 之外的雪山图、`map_route`、`echo_paper` 等）落盘后**需要一行代码接入**，位置见 `HANDOFF-CODE.md` 的模块地图。
+场景图 **21/21 全部就位并接线**（2026-09-13），本表即完整清单；`qa:handoff` 会逐行核对"文档承诺自动生效"与"代码确实预热"是否一致。
 
-**立绘同样落盘即生效**：`public/assets/characters/` 下按约定名放就能自动替换文字头像（`main.js` 的 `PORTRAIT_FILE` 映射 + 启动预热）：
-`mother`（母亲）· `xianggui`（老乡）· `guide`（向导）· `boatman`（船工）· `recruit`（新兵）· `straggler`（掉队战士）· `drummer`（宣传员）· `captain`（突击队长）· `teacher`（文化教员）· `wounded`（担架伤员）——10 张已接线，规格 280×280 PNG、脸心居中偏上。
+**立绘同样落盘即生效**：`public/assets/characters/` 下按约定名放就能自动替换文字头像（`main.js` 的 `PORTRAIT_FILE` 映射 + `showNpc()` 统一入口）：
+`mother`（母亲）· `xianggui`（老乡）· `guide`（向导）· `boatman`（船工）· `recruit`（新兵）· `straggler`（掉队战士）· `drummer`（宣传员）· `captain`（突击队长）· `teacher`（文化教员）· `wounded`（担架伤员）——**10 张已就位并接线（2026-09-13）**，规格 280×280 PNG、脸心居中偏上。
+
+两个容易踩的点，返工时注意：
+
+1. **必须缩到 280×280 再落盘**。直接把 1024×1024 原图丢进 `public/assets/characters/` 会让单张从 ~130KB 涨到 ~2.2MB（首屏 14 张就是 30MB）。`npm run qa:inspect` 现在会拦住这种文件。
+2. **别把"老班长"当成万能兜底**。立绘优先用专属图，只有配不到时才退回同伴立绘/文字头像；顺序写反会让所有非同伴 NPC 长着老班长的脸（2026-09-13 修过一次，见 `HANDOFF-CODE.md` 坑 16）。
 
 ### 自检命令（产图后跑一次）
 
