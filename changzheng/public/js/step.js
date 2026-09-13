@@ -20,7 +20,7 @@
  * 结果：新增玩法只需声明契约；测试驱动只看契约，不认具体元素 id。
  */
 
-import { $ } from './ui.js';
+import { $, replayAnim } from './ui.js';
 
 /** 开始一个步骤 */
 export function setStep(id, kind = 'choice', state = 'awaiting') {
@@ -82,6 +82,8 @@ export function askChoice(host, options, opts = {}) {
       });
       box.appendChild(b);
     });
+    // 逐条入场：选项一条一条渗出来（同一容器复用时靠 replayAnim 重新触发）
+    replayAnim(box, 'anim-stagger');
   });
 }
 

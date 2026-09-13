@@ -64,8 +64,9 @@
 .pano-img, .title-bg, .cut-stage, .quiz-bg, .night-bg, .end-bg, .path-bg, .sandbox-bg {
   position: absolute; inset: 0; background-size: cover; background-position: center;
 }
-.pano-img { transition: background-image var(--dur-scene) var(--ease-out); }
-.title-bg { filter: saturate(0.8) brightness(0.7); }
+.pano-img { transition: background-image var(--dur-scene) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+/* transform 过渡给"微视差"用（bindParallax 改 translate，不改背景位置） */
+.title-bg { filter: saturate(0.8) brightness(0.7); transition: transform var(--dur-base) var(--ease-out); }
 .title-bg::after, .cut-stage::after, .path-bg::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(180deg, var(--scrim-soft), var(--scrim));

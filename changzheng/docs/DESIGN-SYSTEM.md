@@ -72,9 +72,22 @@
 默认墨纱（叠在插画上），进入 `.panel/.sheet/.journal/.echo-cinema/.paper-surface` 时自动换成极淡墨底 + 墨字；
 状态只改描边与底纹（`.warn` 朱红描边 + 淡淡朱纱、`.good` 旧金描边、`.off` 降透明度），**数字恒为高对比前景色**——不允许出现五颜六色的数字。
 
-**动效（五个标准效果）**：`ink-in` 墨显、`sheet-rise` 纸卷上滑、`seal-stamp` 钤印、`scene-wipe` 换幕抹擦、`ember` 余烬；
-列表用 `.anim-stagger` 逐条入场；`prefers-reduced-motion` 下全部降级为淡入（`--motion-scale` 归零）。
-注意：**居中元素必须用 `fade-in` 而不是 `ink-in`**——后者的 keyframes 会把 `transform` 收成 `none`，吃掉 `translateX(-50%)` 导致跑偏（踩过）。
+**动效（五个标准效果 + 微视差）**：关键帧与工具类都在 `framework.css`，但"定义"不等于"接上"——每个效果的**接线位置**见下表。
+
+| 效果 | 挂在哪 | 谁负责挂 |
+|---|---|---|
+| `ink-in` 墨显 | 舞台正文 `#stage-panel`、对白 `#dlg-body` | `setStagePanel()` / `say()` 调 `replayAnim()` |
+| `.anim-stagger` 逐条入场 | 选项 `#ch-opts`、回响两栏、手记两列、`#facts-list` | `askChoice()` 与各列表渲染处 |
+| `sheet-rise` 纸卷上滑 | `tpl-stage / tpl-board / tpl-drawer` 的内容面入场 | `showScreen()` 按模板选 |
+| `seal-stamp` 钤印 | 回响印章 `.echo-seal` | 组件自身 CSS |
+| `scene-wipe` 换幕抹擦 | 过场屏 | `runCutscene()` 调 `wipe()` |
+| `ember` 余烬 | 营地热点、行程当前节点、告急启程键 | 组件自身 CSS |
+| 微视差 | 封面 `.title-bg`、营地 `.pano-img` | `bindParallax()`（位移 ≤8px，只动 `transform`） |
+
+`prefers-reduced-motion` 下**位移类全部关掉、只留淡入**（`--motion-scale` 归零）。
+验收靠 `npm run qa:motion`：动效截图拍不到，只能量计算样式——animation-name 是否为预期、逐条入场延迟是否 0/60/120ms、减动效下位移是否真的关掉。
+两条踩过的坑：**居中元素必须用 `fade-in` 而不是 `ink-in`**（后者的 keyframes 把 `transform` 收成 `none`，会吃掉 `translateX(-50%)`）；
+**同一元素重复渲染要重放动画必须"摘类→强制重排→挂类"**（浏览器不会因为内容变了就重启动画），实现只有 `replayAnim()` 一处。
 
 ## 二点六、色调指标（`npm run qa:tone`）
 
@@ -129,4 +142,6 @@
 | 6 | 答题、夜间、终局、记录/答辩 | ⏳ 待做 |
 
 每批交付：该批代码 + `qa:tokens` 无新增 + 1280/820 截图 + 联系表 `screen-sheet-<n>.png`。
-命令：`npm run qa:screens -- <批次号>`、`npm run qa:tokens`、`npm run qa:fonts`。
+命令：`npm run qa:screens -- <批次号>`、`npm run qa:tokens`、`npm run qa:fonts`、`npm run qa:motion`。
+
+**目标环境**：Chromium 桌面；窄屏只保证到 **820**（平板 / 展馆触屏一体机），手机（375）不在交付范围内。

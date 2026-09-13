@@ -5,10 +5,83 @@ export function $(id) {
   return document.getElementById(id);
 }
 
+/**
+ * 重放一次入场动效。
+ *
+ * 为什么需要：动画不会因为"内容换了"自己重跑——同一个元素两次渲染同一类动画时浏览器不会重启动画，
+ * 所以必须"摘类 → 强制重排 → 挂类"。这是全项目唯一的重放实现，别处不要再手写一遍。
+ */
+export function replayAnim(el, cls) {
+  if (!el || !cls) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;      // 读一次布局，强制重排，动画才会从 0 重新开始
+  el.classList.add(cls);
+}
+
+/** 屏幕入场动效：按模板选标准效果（题字/世界面板只淡入；纸卷与抽屉上滑；中央面板墨显） */
+const ENTRANCE = {
+  'tpl-title': 'anim-fade',
+  'tpl-world': 'anim-fade',
+  'tpl-side': 'anim-fade',
+  'tpl-stage': 'anim-rise',
+  'tpl-board': 'anim-rise',
+  'tpl-drawer': 'anim-rise',
+  'tpl-panel': 'anim-ink',
+};
+
+/** 该屏里"要入场"的那一层：模板内容盒，其次各屏幕自己的内容面（题字卡、纸卷、面板、抽屉、侧栏） */
+function entranceTarget(el) {
+  return el.querySelector('.tpl-body, .title-card, .sheet, .panel, .journal, .echo-cinema, .sb-world, .cut-caption-wrap, .hud-left');
+}
+
+/**
+ * 换幕抹擦：在目标屏上铺一层横扫的墨色，动画结束自删。
+ * 只用在"换幕"这种大转场，不要挂在每次 showScreen 上（否则常规切屏也在扫，很吵）。
+ */
+export function wipe(hostEl) {
+  const host = hostEl || [...document.querySelectorAll('.screen')].find((s) => !s.classList.contains('hidden'));
+  if (!host || host.dataset.wiping === '1') return;
+  host.dataset.wiping = '1';
+  const layer = document.createElement('div');
+  layer.className = 'scene-wipe';
+  host.appendChild(layer);
+  const done = () => {
+    layer.remove();
+    delete host.dataset.wiping;
+  };
+  layer.addEventListener('animationend', done, { once: true });
+  // 兜底：prefers-reduced-motion 下 .scene-wipe 是 display:none，animationend 永远不会来
+  setTimeout(done, 1200);
+}
+
+/**
+ * 微视差：插画随指针轻微位移（只动 transform，幅度 ≤ depth 像素）。
+ * 尊重 prefers-reduced-motion：系统开了减动效就整段不生效。
+ */
+export function bindParallax(screenId, layerSel, depth = 8) {
+  const screen = $(screenId);
+  const layer = screen?.querySelector(layerSel);
+  if (!screen || !layer) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  layer.style.willChange = 'transform';
+  screen.addEventListener('pointermove', (e) => {
+    const r = screen.getBoundingClientRect();
+    const dx = (e.clientX - r.left) / Math.max(1, r.width) - 0.5;
+    const dy = (e.clientY - r.top) / Math.max(1, r.height) - 0.5;
+    layer.style.transform = `scale(1.04) translate3d(${(-dx * depth).toFixed(1)}px, ${(-dy * depth).toFixed(1)}px, 0)`;
+  });
+  screen.addEventListener('pointerleave', () => { layer.style.transform = 'scale(1.04)'; });
+}
+
 export function showScreen(id) {
   document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
   const el = $(id);
-  if (el) el.classList.remove('hidden');
+  if (el) {
+    el.classList.remove('hidden');
+    // 入场：display 从 none 变回来会重放动画，但同一屏内部重复渲染不会，所以这里显式重放一次
+    const tpl = [...el.classList].find((c) => c.startsWith('tpl-'));
+    replayAnim(entranceTarget(el), ENTRANCE[tpl] || 'anim-fade');
+  }
   if (id !== 'screen-stage') {
     // 离开舞台屏时把舞台内容一起清掉：否则小游戏容器会作为"残留节点"留在 DOM 里，
     // 既有重复 id，也会让"元素存在即当前场景"的判断出错。
@@ -211,11 +284,14 @@ export function setStageBanner(text, img) {
 }
 
 export function setStagePanel(html) {
-  $('stage-panel').innerHTML = html;
+  const el = $('stage-panel');
+  el.innerHTML = html;
+  replayAnim(el, 'anim-ink');     // 墨显：正文换内容时重新"渗"出来
 }
 
 export async function say(speaker, text, voiceId) {
   $('dlg-speaker').textContent = speaker || '';
+  replayAnim($('dlg-body'), 'anim-ink');
   // 预置语音后台播，不阻塞打字与流程
   audio.speak(text, speaker || '叙事', voiceId).catch(() => {});
   await typeText($('dlg-body'), text);

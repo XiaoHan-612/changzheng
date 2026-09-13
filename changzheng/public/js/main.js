@@ -125,7 +125,7 @@ import { setStep, setStepState, waitContinue, askChoice, markAction, markMini } 
 const { $, showScreen, setTopbar, renderStats, renderAp, renderCompanions,
   appendCampLog, toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
   flashEffects, setAiMode, bumpAiCount, typeText, escapeHtml, renderLogs, renderFacts,
-  showOverlay, hideOverlay } = UI;
+  showOverlay, hideOverlay, replayAnim, wipe, bindParallax } = UI;
 
 let S = null;
 let allFacts = {};
@@ -360,6 +360,9 @@ async function boot() {
   actsData = await fetchActs();
   bindChrome();
   exposeSheetHooks();
+  // 微视差：两幅整屏插画（封面与营地全景）随指针轻微位移；减动效偏好下 bindParallax 自己跳过
+  bindParallax('screen-title', '.title-bg');
+  bindParallax('screen-camp', '.pano-img');
   bindTitle();
   bindEcho();
   bindSettings();
@@ -434,6 +437,7 @@ function bindChrome() {
   $('btn-facts').onclick = () => {
     showOverlay('screen-facts');
     renderFacts(allFacts, S?.unlockedFacts || []);
+    replayAnim($('facts-list'), 'anim-stagger');
   };
   $('btn-facts-close').onclick = () => hideOverlay('screen-facts');
   $('btn-end-logs').onclick = () => $('btn-logs').click();
@@ -510,12 +514,15 @@ function openJournal() {
     : '<li class="empty">还没有写下抉择。</li>';
 
   const unlocked = S.unlockedFacts || [];
-  $('journal-facts').innerHTML = unlocked.length
-    ? unlocked.map((id) => {
-        const f = allFacts?.[id];
-        return `<li><b>${escapeHtml(f?.title || id)}</b>${f?.date ? ` <span class="muted">${escapeHtml(f.date)}</span>` : ''}</li>`;
-      }).join('')
-    : '<li class="empty">还没有照亮史实。</li>';
+    $('journal-facts').innerHTML = unlocked.length
+      ? unlocked.map((id) => {
+          const f = allFacts?.[id];
+          return `<li><b>${escapeHtml(f?.title || id)}</b>${f?.date ? ` <span class="muted">${escapeHtml(f.date)}</span>` : ''}</li>`;
+        }).join('')
+      : '<li class="empty">还没有照亮史实。</li>';
+    // 逐条入场：两栏列表各自一条条渗出来
+    replayAnim($('journal-choices'), 'anim-stagger');
+    replayAnim($('journal-facts'), 'anim-stagger');
 
   $('journal-foot').textContent =
     `出身 ${originText()}　｜　`
@@ -761,6 +768,8 @@ function showEcho({ title, play, real, fic }) {
     $('echo-real').textContent = real || '';
     $('echo-fic').textContent = fic ? `虚构边界：${fic}` : '';
     showOverlay('screen-echo');
+    // 回响两栏逐条入场（印章的钤印动效由 .echo-seal 自己的动画负责）
+    replayAnim(document.querySelector('#screen-echo .echo-grid'), 'anim-stagger');
     echoResolve = resolve;
   });
 }
@@ -948,6 +957,7 @@ async function runQuickAct(act) {
 async function runCutscene(frames) {
   step('cutscene', 'cutscene');
   showScreen('screen-cutscene');
+  wipe($('screen-cutscene'));     // 换幕抹擦：一层墨色横扫而过，动画结束自删
   const stage = $('cut-stage');
   const cap = $('cut-caption');
   const nextBtn = $('btn-cut-next');
