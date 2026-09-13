@@ -129,6 +129,12 @@
 
 /* 标题页 */
 .title-card { position: relative; z-index: 2; text-align: center; padding: var(--sp-6) var(--sp-5); max-width: 640px; }
+/* 标题块脚下压一层柔和暗场：字与卡片落在"自己的地面"上，而不是浮在画上 */
+.title-card::before {
+  content: ""; position: absolute; inset: -12% -18%;
+  z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse at center, var(--scrim) 0%, transparent 72%);
+}
 .title-card h1 { font-family: var(--font-display); font-size: clamp(40px, 6vw, 64px); letter-spacing: var(--ls-title); line-height: 1.2; text-shadow: var(--shadow-text); }
 .title-card h1 span { color: var(--seal-bright); margin: 0 0.08em; }
 .subtitle { margin: 10px 0 var(--sp-4); color: var(--gold); font-family: var(--font-kai); letter-spacing: 0.22em; }
@@ -139,12 +145,19 @@
 .mode-card {
   width: 220px; padding: var(--sp-4) var(--sp-4); text-align: left; cursor: pointer;
   border-radius: var(--radius); font-family: var(--font-ui);
-  transition: transform var(--dur-fast) var(--ease-out);
+  /* 封面用"墨色薄纱"而不是纸片：纸贴在做旧插画上会像贴纸，突兀。
+     半透明墨底 + 轻模糊 + 金线，让它读起来是画面的一部分；纸面留给要读的内容页。 */
+  background: linear-gradient(180deg, var(--scrim-soft), var(--scrim));
+  border: 1px solid var(--gold-soft);
+  color: var(--paper);
+  backdrop-filter: blur(6px) saturate(0.9);
+  box-shadow: 0 8px 24px var(--scrim);
+  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
-.mode-card:hover { transform: translateY(-2px); }
+.mode-card:hover { transform: translateY(-2px); border-color: var(--gold); background: linear-gradient(180deg, var(--scrim), var(--veil-dark)); }
 .mode-card b { display: block; font-family: var(--font-kai); font-size: var(--fs-h3); letter-spacing: var(--ls-title); margin-bottom: 6px; }
-.mode-card span { font-size: var(--fs-micro); line-height: 1.65; color: var(--ink-2); }
-.mode-card.march b { color: var(--seal); }
+.mode-card span { font-size: var(--fs-micro); line-height: 1.65; color: var(--paper-dim); }
+.mode-card.march b { color: var(--gold); }
 
 /* 设置 */
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--sp-3); margin: var(--sp-3) 0 var(--sp-4); }
