@@ -39,7 +39,7 @@ export const snap = (page) => page.evaluate(() => {
     // 五维读数（HUD 顶栏）：让策略能像真人一样"没体力了先休息"
     stats: (() => {
       const out = {};
-      for (const el of document.querySelectorAll('#stats .stat')) {
+      for (const el of document.querySelectorAll('#stats .blk-stat')) {
         const m = /^(体力|粮食|士气|信念|民心)(\d+)$/.exec((el.textContent || '').replace(/\s+/g, ''));
         if (m) out[m[1]] = Number(m[2]);
       }

@@ -45,13 +45,107 @@ async function measurePaper(page) {
   });
 }
 
-/** 每批要截的页面：{ name, 准备动作 } */
+/**
+ * 每批要截的页面：{ name, setup }。setup 把页面摆到该屏，返回后立刻截图。
+ *
+ * 为什么是函数而不是"关键字 + if 链"：批次越往后页面越深（沙盘、终局、小游戏），
+ * 关键字写法会让这个文件长成一坨 goto。函数式每条只管自己那一屏，互不干扰。
+ */
+
+/** 开局：标题 → 出身设定 → 过场 → 营地（后面所有屏都从这里出发） */
+async function intoCamp(page) {
+  await page.click('#btn-mode-study');
+  await page.waitForTimeout(300);
+  await passOrigin(page);
+  await page.click('#btn-cut-skip').catch(() => {});
+  await page.waitForTimeout(800);
+}
+
+/** 走一次营地热点，做到"选完 → 回响"这一步 */
+async function intoEcho(page) {
+  await page.locator('.hotspot').filter({ hasText: '浮桥' }).click({ force: true });
+  await page.waitForTimeout(1200);
+  await page.locator('#ch-opts .btn.choice').first().click({ force: true });
+  for (let i = 0; i < 20; i++) {          // 等模型裁决 + 叙事打字
+    if (await page.locator('#btn-continue').isVisible().catch(() => false)) break;
+    await page.waitForTimeout(400);
+  }
+  await page.locator('#btn-continue').click({ force: true }).catch(() => {});
+  await page.waitForTimeout(600);
+}
+
+/**
+ * 深层屏走不到时，用 __czScreens 直接把屏摆出来（内容仍走各屏自己的渲染）。
+ * 浮层屏（overlay）由渲染函数自己 showOverlay——先 showScreen 会把底下的营地屏也一起藏掉。
+ */
+async function jump(page, id, prep) {
+  const ok = await page.evaluate(([id, prep]) => {
+    const api = window.__czScreens;
+    if (!api) return false;
+    const overlay = document.getElementById(id)?.classList.contains('overlay');
+    if (overlay && prep && typeof api[prep] === 'function') api[prep]();
+    else {
+      api.show(id);
+      if (prep && typeof api[prep] === 'function') api[prep]();
+    }
+    return true;
+  }, [id, prep || '']);
+  if (!ok) throw new Error(`没有 __czScreens 钩子：把「设置 → 展示」打开后再截图（缺 ${id}）`);
+  await page.waitForTimeout(400);
+}
+
 const BATCHES = {
   1: [
-    { name: '01-title', shot: 'title' },
-    { name: '02-how', shot: 'how' },
-    { name: '03-settings', shot: 'settings' },
-    { name: '04-cutscene', shot: 'cutscene' },
+    { name: '01-title', setup: async (p) => { await p.waitForTimeout(300); } },
+    { name: '02-how', setup: async (p) => { await p.click('#btn-how'); await p.waitForTimeout(400); } },
+    {
+      name: '03-settings',
+      setup: async (p) => {
+        await p.click('#btn-settings-close').catch(() => {});
+        await p.click('#screen-how .btn, #btn-how-back').catch(() => {});
+        await p.waitForTimeout(200);
+        await p.click('#btn-settings2').catch(async () => { await p.click('#btn-settings'); });
+        await p.waitForTimeout(400);
+      },
+    },
+    {
+      name: '04-cutscene',
+      setup: async (p) => {
+        await p.click('#btn-settings-close').catch(() => {});
+        await p.waitForTimeout(150);
+        await p.click('#btn-mode-study');
+        await p.waitForTimeout(200);
+        await passOrigin(p);
+        await p.waitForTimeout(900);        // 停在过场第一帧
+      },
+    },
+  ],
+  2: [
+    { name: '01-camp', setup: intoCamp },
+    { name: '02-journal', setup: async (p) => { await jump(p, 'screen-journal', 'journal'); } },
+    {
+      name: '03-facts',
+      setup: async (p) => {
+        await p.click('#btn-journal-close').catch(() => {});
+        await p.waitForTimeout(200);
+        await jump(p, 'screen-facts', 'facts');
+      },
+    },
+    {
+      name: '04-echo',
+      setup: async (p) => {
+        await p.click('#btn-facts-close').catch(() => {});
+        await p.waitForTimeout(300);
+        await intoEcho(p);
+      },
+    },
+    {
+      name: '05-path',
+      fresh: true,                          // 岔路屏不依赖局势，重开一页更省事（不用把回响流程走完）
+      setup: async (p) => {
+        await jump(p, 'screen-path', 'pathZones');
+      },
+    },
   ],
 };
 
@@ -61,29 +155,19 @@ async function capture() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('dialog', (d) => d.accept().catch(() => {}));
   await page.goto(`${BASE}/?sheet=${Date.now()}`, { waitUntil: 'networkidle' });
-  await page.evaluate(() => sessionStorage.clear());
+  // 打开展示开关：批次二之后要截的屏（岔路等）在很深的幕里，靠 __czScreens 直接摆出来。
+  // 开关只影响"多挂一个截图入口"，不改变任何屏的渲染与样式。
+  await page.evaluate(() => {
+    sessionStorage.clear();
+    localStorage.setItem('czjc_devtools', '1');
+  });
   await page.reload({ waitUntil: 'networkidle' });
 
   const shots = BATCHES[BATCH] || BATCHES[1];
   const tone = {};
   for (const s of shots) {
-    if (s.shot === 'how') { await page.click('#btn-how'); await page.waitForTimeout(400); }
-    if (s.shot === 'settings') {
-      await page.click('#btn-settings-close').catch(() => {});
-      await page.click('#screen-how .btn, #btn-how-back').catch(() => {});
-      await page.waitForTimeout(200);
-      await page.click('#btn-settings2').catch(async () => { await page.click('#btn-settings'); });
-      await page.waitForTimeout(400);
-    }
-    if (s.shot === 'cutscene') {
-      await page.click('#btn-settings-close').catch(() => {});
-      await page.waitForTimeout(150);
-      await page.click('#btn-mode-study');
-      await page.waitForTimeout(400);
-      await passOrigin(page);
-      await page.waitForTimeout(1200);   // 停在过场第一帧
-    }
-    if (s.shot === 'title') { await page.waitForTimeout(300); }
+    if (s.fresh) await page.reload({ waitUntil: 'networkidle' });
+    await s.setup(page);
     await page.screenshot({ path: path.join(OUT, `${s.name}.png`) });
     tone[s.name] = { paperRatio: await measurePaper(page) };
     console.log('shot', s.name, `纸面 ${(tone[s.name].paperRatio * 100).toFixed(1)}%`);

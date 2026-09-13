@@ -25,6 +25,7 @@
     "qa:tone": "node scripts/check-tone.mjs",
     "qa:proof": "node tests/manual/framework-proof.mjs",
     "qa:screens": "node tests/manual/screen-sheet.mjs",
+    "qa:hud": "node tests/manual/qa-hud.mjs",
     "fonts:build": "node tools/build-fonts.mjs",
     "qa:audit": "node scripts/audit-logs.mjs",
     "qa:assets": "node tests/e2e/asset-drop.mjs",

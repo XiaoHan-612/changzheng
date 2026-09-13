@@ -359,6 +359,7 @@ async function boot() {
   allFacts = (await fetchFacts()) || {};
   actsData = await fetchActs();
   bindChrome();
+  exposeSheetHooks();
   bindTitle();
   bindEcho();
   bindSettings();
@@ -399,6 +400,24 @@ function currentActDef() {
   const idx = S.actIndex || 0;
   const id = order[idx];
   return actsData?.acts?.[id] || null;
+}
+
+/**
+ * 逐页截图/打磨入口（只在「设置 → 展示」打开时挂出，正式玩法不受影响）。
+ *
+ * 为什么需要：逐页打磨要逐屏对比风格，但岔路、回响这类屏要走到很深的幕才出现，
+ * 为了截一张图跑一整局既慢又烧模型调用。这里只暴露"把某屏摆出来"的能力，
+ * 内容仍由各屏自己的渲染函数产出，不另写一套（否则迟早与正式流程漂移）。
+ */
+function exposeSheetHooks() {
+  if (!isDevToolsOn()) return;
+  window.__czScreens = {
+    show: showScreen,
+    overlay: showOverlay,
+    journal: () => openJournal(),
+    facts: () => $('btn-facts').click(),
+    pathZones: () => renderPathZones($('path-zones'), () => {}),
+  };
 }
 
 function bindChrome() {
@@ -1907,27 +1926,34 @@ async function runForcedChain(act) {
   });
 }
 
+/**
+ * 把三个岔路点位画到图上（唯一实现：正式流程与逐页截图工具共用）。
+ * 点位来自 data.js 的 PATH_ZONES，改坐标只需改那一处。
+ * @param {HTMLElement} host 承载点位的容器
+ * @param {(zone:object)=>void} onPick 玩家选定后回调
+ */
+function renderPathZones(host, onPick) {
+  host.innerHTML = '';
+  PATH_ZONES.forEach((z, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'path-zone';
+    b.dataset.choiceIndex = String(i);
+    b.style.left = z.x + '%';
+    b.style.top = z.y + '%';
+    b.style.width = z.w + '%';
+    b.style.height = z.h + '%';
+    b.innerHTML = `<b>${z.label}</b><span>${z.sub}</span>`;
+    b.onclick = () => onPick(z);
+    host.appendChild(b);
+  });
+}
+
 async function runPathOnImage() {
   step('path', 'choice');
   showScreen('screen-path');
   audio.speak('前面岔开了三条路。你定。', '指导员', 'zhiyuan_grass');
-  const zones = $('path-zones');
-  zones.innerHTML = '';
-  const choice = await new Promise((resolve) => {
-    PATH_ZONES.forEach((z, i) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'path-zone';
-      b.dataset.choiceIndex = String(i);
-      b.style.left = z.x + '%';
-      b.style.top = z.y + '%';
-      b.style.width = z.w + '%';
-      b.style.height = z.h + '%';
-      b.innerHTML = `<b>${z.label}</b><span>${z.sub}</span>`;
-      b.onclick = () => resolve(z);
-      zones.appendChild(b);
-    });
-  });
+  const choice = await new Promise((resolve) => renderPathZones($('path-zones'), resolve));
   showScreen('screen-stage');
   setStageBanner('过草地', '/assets/scenes/marsh.jpg');
   setPortrait('指导员', '连队指导员', '指', '严肃', '/assets/characters/zhiyuan.png');

@@ -76,9 +76,11 @@
   --crease: repeating-linear-gradient(180deg, rgba(36,29,20,0.045) 0 1px, transparent 1px 74px);
   --grain: repeating-linear-gradient(92deg, rgba(36,29,20,0.035) 0 1px, transparent 1px 5px);
   --shadow: 0 18px 44px rgba(12, 8, 5, 0.55);
-  /* 【旋钮】纸边"融入"强度：去掉 inset 两行即"无"，加大数值即"强" */
-  --shadow-paper: 0 1px 0 rgba(255, 250, 238, 0.28) inset,
-                  0 -1px 0 rgba(36, 29, 20, 0.16) inset,
+  /* 【旋钮】纸边"融入"强度：只改下面这一行——加 alpha / 加模糊即"强"，
+     要"无"就写成 `0 0 0 transparent`（不能写 none，它在阴影列表里不合法）。 */
+  --paper-edge-shadow: 0 1px 0 rgba(255, 250, 238, 0.28) inset,
+                       0 -1px 0 rgba(36, 29, 20, 0.16) inset;
+  --shadow-paper: var(--paper-edge-shadow),
                   0 12px 28px rgba(10, 7, 4, 0.5),
                   0 0 0 1px var(--paper-edge);
   --shadow-float: 0 24px 60px rgba(10, 7, 4, 0.6);
@@ -147,46 +149,8 @@
   --font-num: num, serif, Georgia, serif;
 }
 
-/* 纸面：内容层的统一材质（中调纸 + 纸纹 + 折痕 + 纸边收口） */
-.paper-surface {
-  background-color: var(--paper-veil);
-  background-image: linear-gradient(180deg, var(--paper-hi), var(--paper-lo)), var(--paper-tex), var(--crease);
-  background-size: auto, cover, auto;
-  background-position: center, center 40%, center;
-  background-blend-mode: normal, multiply, normal;
-  color: var(--ink-0);
-  box-shadow: var(--shadow-paper);
-}
-
-/* 墨区：压在插画上的界面骨架 */
-.ink-surface {
-  background: linear-gradient(180deg, var(--ink-bg), var(--ink-bg-2));
-  color: var(--paper);
-  border: 1px solid var(--line);
-}
-
-/* 纸签：数值、状态、短标签 */
-.paper-tag {
-  background: linear-gradient(180deg, rgba(240,232,214,0.94), rgba(226,214,190,0.9));
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius-inset);
-  color: var(--ink-1);
-  box-shadow: 0 1px 3px rgba(10, 7, 4, 0.35);
-}
-
-/* 墨线：分隔与收口 */
-.rule-ink {
-  border: none;
-  border-top: 1px solid var(--rule);
-}
-
-/* 印章：朱红小面积强调 */
-.seal-mark {
-  display: inline-grid;
-  place-items: center;
-  border: 2px solid var(--seal);
-  color: var(--seal);
-  border-radius: 50%;
-  font-family: var(--font-display);
-  letter-spacing: 0.12em;
-}
+/* 本文件只有变量。视觉词汇（材质 / 区块 / 模板）在：
+   components.css  —— 材质（纸面、墨区、纸签…）与 app 组件
+   framework.css   —— 7 个整页模板 + blk-* 区块
+   早先版本把 .paper-surface / .ink-surface / .paper-tag 等类写在这里，与上面两处重复，
+   已上移；tokens.css 从此只回答"值是多少"，不回答"长什么样"。 */

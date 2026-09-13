@@ -50,7 +50,7 @@ await page.evaluate(() => {
   document.getElementById('end-title').textContent = '同行';
   document.getElementById('end-paras').innerHTML = '<p>路还长，但脚步声叠在了一起。</p><p>老班长把空鱼钩塞进你手心。</p>';
   document.getElementById('end-history').innerHTML = '<li>1935年过草地</li><li>战友互相让粮</li>';
-  document.getElementById('end-stats').innerHTML = '<span class="stat">体力<b>61</b></span><span class="stat">粮食<b>8</b></span>';
+  document.getElementById('end-stats').innerHTML = '<span class="blk-stat">体力<b>61</b></span><span class="blk-stat">粮食<b>8</b></span>';
   document.getElementById('end-rel').innerHTML = '老班长：43<br/>指导员：42';
   document.getElementById('end-personal').textContent = '你曾路过他们的长征。';
 });

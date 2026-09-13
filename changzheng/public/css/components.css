@@ -2,7 +2,6 @@
    大片纸（面板/纸卷/手记/回响/侧栏/玩法板）：带纸纹与折痕；
    小片纸（按钮/选项/纸签/卡片）：只上色与描边，省性能。 */
 /* 大片纸：纸纹 + 折痕 + 纸边收口（一处定义，容器类共享） */
-.paper-lg,
 .panel, .sheet, .journal, .echo-cinema, .cut-caption-wrap,
 .sb-feed, .quiz-panel, .night-panel, .end-panel, .ai-inspector {
   background-color: var(--paper-veil);
@@ -16,7 +15,6 @@
 }
 
 /* 小片纸：只上色与描边，省性能（一处定义） */
-.paper-sm,
 .jr-chip, .mood-chip, .fact-card, .log-item,
 .def-card, .ev-card, .target-card, .sentry-box, .sb-scene-tag, .echo-col, .hs-card,
 .quiz-opt, .set-input, .sb-form input, .chat-row input {
@@ -24,6 +22,29 @@
   border: 1px solid var(--rule-strong);
   color: var(--ink-0);
   box-shadow: var(--shadow-ink);
+}
+
+/* 材质词汇：样板页与游戏共用（原先散在 tokens.css，与上面两组重复定义） */
+.paper-surface {
+  background-color: var(--paper-veil);
+  background-image: linear-gradient(180deg, var(--paper-hi), var(--paper-lo)), var(--paper-tex), var(--crease);
+  background-size: auto, cover, auto;
+  background-position: center, center 40%, center;
+  background-blend-mode: normal, multiply, normal;
+  color: var(--ink-0);
+  border: 1px solid var(--paper-edge);
+  box-shadow: var(--shadow-paper);
+}
+.ink-surface {
+  background: linear-gradient(180deg, var(--ink-bg), var(--ink-bg-2));
+  color: var(--paper);
+  border: 1px solid var(--line);
+}
+.rule-ink { border: none; border-top: 1px solid var(--rule); }
+.seal-mark {
+  display: inline-grid; place-items: center;
+  border: 2px solid var(--seal); color: var(--seal);
+  border-radius: 50%; font-family: var(--font-display); letter-spacing: 0.12em;
 }
 
 /* ═══ 组件层 ═══
@@ -65,20 +86,9 @@
 .brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--seal-bright); box-shadow: 0 0 10px var(--seal-bright); }
 .stats { display: flex; gap: var(--sp-2); flex: 1; flex-wrap: wrap; }
 .stats.compact { flex-wrap: nowrap; overflow: hidden; }
-.stats.compact .stat { padding: 2px 7px; font-size: var(--fs-micro); flex-shrink: 0; }
 .top-actions { display: flex; align-items: center; gap: var(--sp-2); }
-/* 顶栏数值签：压在插画上的浮层，用墨纱而不是纸（纸只留给要读长文的地方） */
-.stat {
-  display: inline-flex; align-items: baseline; gap: 4px;
-  padding: 3px 10px; border-radius: var(--radius-inset);
-  border: 1px solid var(--gold-soft); background: var(--ink-bg);
-  color: var(--paper-dim); font-size: 12px;
-  backdrop-filter: blur(4px);
-}
-.stat b { font-family: var(--font-num); font-weight: 700; color: var(--paper); margin-left: 3px; }
-.stat.warn { border-color: var(--seal); }
-.stat.warn b { color: var(--seal-bright); }
-.stat.good b { color: var(--gold); }
+/* 数值签本身不再在这里定义：它是区块（.blk-stat），唯一定义处在 framework.css。
+   这里只留容器布局——排成一行还是自动换行属于布局，不属于数值签的视觉。 */
 .mode-tag { font-size: var(--fs-micro); padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); color: var(--gold); background: var(--gold-soft); }
 .mode-tag.nokey { color: var(--seal-bright); }
 .pill { display: inline-block; min-width: 18px; padding: 0 5px; text-align: center; background: var(--seal); color: var(--paper-0); border-radius: var(--radius-pill); font-size: var(--fs-micro); }
@@ -276,7 +286,7 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .comp-aff.high { color: var(--gold); }
 
 /* 数字统一用等宽数字：数值变化时不会左右跳动 */
-.stat b, .comp-aff, .hud-sub b, .score-line, .luding-hud,
+.comp-aff, .hud-sub b, .score-line, .luding-hud,
 .quiz-result b, .def-card .v, .fact-card .date { font-variant-numeric: tabular-nums; }
 
 .hud-bottom { position: absolute; left: 190px; right: var(--sp-4); bottom: var(--sp-4); z-index: var(--z-hud); display: flex; align-items: center; gap: var(--sp-3); pointer-events: none; }

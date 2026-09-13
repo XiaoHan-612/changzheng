@@ -19,6 +19,13 @@ const FRAMEWORK = 'framework.css';
 const problems = [];
 const ok = [];
 
+/**
+ * 匹配前先去掉注释。
+ * 守卫量的是"代码里有没有违规写法"，而注释里出现 `.blk-stat`、`#screen-x` 这类字样
+ * 只是在解释规则本身——不剥注释就会把说明文字当成违规（踩过）。
+ */
+const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '');
+
 // 1) 每个屏必须有模板类
 const html = fs.readFileSync(HTML, 'utf8');
 const sections = [...html.matchAll(/<section id="(screen-[a-z-]+)"([^>]*)>/g)];
@@ -35,7 +42,7 @@ if (!problems.length) ok.push(`17 个屏幕都有且只有一个模板类`);
 let pageSelectors = 0;
 for (const f of fs.readdirSync(CSS_DIR).filter((x) => x.endsWith('.css'))) {
   const text = fs.readFileSync(path.join(CSS_DIR, f), 'utf8');
-  const hits = [...text.matchAll(/#screen-[a-z-]+/g)];
+  const hits = [...stripComments(text).matchAll(/#screen-[a-z-]+/g)];
   if (hits.length) {
     pageSelectors += hits.length;
     problems.push(`${f} 里出现 ${hits.length} 处 #screen-* 页面专属选择器（样式应归模板与区块）`);
@@ -46,7 +53,7 @@ if (!pageSelectors) ok.push('页面专属选择器为 0（样式全在框架与�
 // 3) blk-* 只在 framework.css 定义
 for (const f of fs.readdirSync(CSS_DIR).filter((x) => x.endsWith('.css') && x !== FRAMEWORK)) {
   const text = fs.readFileSync(path.join(CSS_DIR, f), 'utf8');
-  const hits = [...text.matchAll(/\.blk-[a-z-]+/g)];
+  const hits = [...stripComments(text).matchAll(/\.blk-[a-z-]+/g)];
   if (hits.length) problems.push(`${f} 里定义了 ${hits.length} 处 .blk-* 区块样式（只允许在 ${FRAMEWORK}）`);
 }
 if (!problems.length) ok.push('区块样式只在 framework.css 定义');

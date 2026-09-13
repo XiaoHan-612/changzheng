@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/css/tokens.css" />
   <link rel="stylesheet" href="/css/base.css" />
   <link rel="stylesheet" href="/css/framework.css" />
+  <link rel="stylesheet" href="/css/components.css" />
   <style>
     /* 样板页自身的排版（不进游戏） */
     body { margin: 0; background: #14110d; color: #ece2cd; font-family: var(--font); }
@@ -21,6 +22,8 @@
     .art { background: linear-gradient(160deg, #2a241c, #14110d 60%, #0d0b08); }
     .thumb { width: 400px; height: 250px; position: relative; overflow: hidden; background: linear-gradient(160deg, #2f2820, #17140f 65%); border: 1px solid rgba(232,220,200,.14); }
     .thumb .tpl-rail, .thumb .tpl-body { position: absolute; }
+    /* 模板名挪到右上角墨纱小签：原先贴在左下角，会被 tpl-stage / tpl-board 的内容压住 */
+    .thumb .tpl-name { position: absolute; right: 6px; top: 6px; margin: 0; padding: 1px 6px; border-radius: 2px; background: rgba(14,11,8,.72); color: #ece2cd; font-family: var(--font-num); font-size: 11px; letter-spacing: .1em; }
     .pal { width: 160px; height: 90px; display: grid; place-items: center; font-size: 12px; font-family: var(--font-num); }
   </style>
 </head>
@@ -30,24 +33,37 @@
   <p class="hint">同一语义只允许用这里的类。四态列在一起，方便一眼看出层次与对比。</p>
   <div class="row">
     <div class="cell" style="width:300px">
-      <div class="lbl">blk-kicker / blk-title / blk-lead</div>
-      <span class="blk-kicker">回响</span>
-      <h2 class="blk-title">怎么过河</h2>
-      <p class="blk-lead">队伍要出发了。先说说你自己——这一条只决定你的起点。</p>
+      <div class="lbl">blk-kicker / blk-title / blk-lead（落在纸面上）</div>
+      <div class="paper-surface" style="padding:14px">
+        <span class="blk-kicker">回响</span>
+        <h2 class="blk-title md">怎么过河</h2>
+        <p class="blk-lead">队伍要出发了。先说说你自己——这一条只决定你的起点。</p>
+      </div>
     </div>
     <div class="cell" style="width:340px">
-      <div class="lbl">blk-body / blk-note / blk-rule</div>
-      <p class="blk-body">你把干粮袋勒紧，汇入行军纵队。于都河水在夜色里发亮，浮桥随脚步轻晃。</p>
-      <hr class="blk-rule" />
-      <p class="blk-note">虚构边界：本关操作是互动重演。</p>
+      <div class="lbl">blk-body / blk-note / blk-rule（落在纸面上）</div>
+      <div class="paper-surface" style="padding:14px">
+        <p class="blk-body">你把干粮袋勒紧，汇入行军纵队。于都河水在夜色里发亮，浮桥随脚步轻晃。</p>
+        <hr class="blk-rule" />
+        <p class="blk-note">虚构边界：本关操作是互动重演。</p>
+      </div>
     </div>
-    <div class="cell" style="width:360px">
-      <div class="lbl">blk-stat-row（默认 / 警告 / 达标 / 失效）</div>
+    <div class="cell art" style="width:360px">
+      <div class="lbl">blk-stat-row（叠在插画上：默认 / 告急 / 达标 / 失效）</div>
       <div class="blk-stat-row">
         <span class="blk-stat">体力<b>72</b></span>
         <span class="blk-stat warn">粮食<b>1</b></span>
         <span class="blk-stat good">士气<b>78</b></span>
         <span class="blk-stat off">民心<b>—</b></span>
+      </div>
+      <div class="lbl" style="margin-top:12px">同一批类落在纸面上（自动换浅纱，数字恒为墨字）</div>
+      <div class="paper-surface" style="padding:10px">
+        <div class="blk-stat-row">
+          <span class="blk-stat">体力<b>72</b></span>
+          <span class="blk-stat warn">粮食<b>1</b></span>
+          <span class="blk-stat good">士气<b>78</b></span>
+          <span class="blk-stat off">民心<b>—</b></span>
+        </div>
       </div>
       <div class="lbl" style="margin-top:12px">blk-progress（行动点）</div>
       <div class="blk-progress"><span class="dot on"></span><span class="dot on"></span><span class="dot"></span></div>
@@ -56,76 +72,86 @@
 
   <div class="row" style="margin-top:14px">
     <div class="cell" style="width:420px">
-      <div class="lbl">blk-choice（默认 / 悬停见效果 / 选中 / 禁用）</div>
-      <div class="blk-choice-list">
-        <button class="blk-choice"><span class="ic">A</span><span class="ch-text"><b>照着地图找渡口</b><span class="ch-sub">信图上的墨线</span></span><span class="kbd-hint">1</span></button>
-        <button class="blk-choice" aria-selected="true"><span class="ic">B</span><span class="ch-text"><b>出门问当地的老乡</b><span class="ch-sub">信活人</span></span><span class="kbd-hint">2</span></button>
-        <button class="blk-choice" disabled><span class="ic">C</span><span class="ch-text"><b>按原路折回一段</b><span class="ch-sub">稳，但多耗体力</span></span><span class="kbd-hint">3</span></button>
+      <div class="lbl">blk-choice（默认 / 悬停 / 选中 / 禁用；悬停用 .is-hover 强制摆出来）</div>
+      <div class="paper-surface" style="padding:12px">
+        <div class="blk-choice-list">
+          <button class="blk-choice"><span class="ic">A</span><span class="ch-text"><b>照着地图找渡口</b><span class="ch-sub">默认</span></span><span class="kbd-hint">1</span></button>
+          <button class="blk-choice is-hover"><span class="ic">B</span><span class="ch-text"><b>出门问当地的老乡</b><span class="ch-sub">悬停</span></span><span class="kbd-hint">2</span></button>
+          <button class="blk-choice" aria-selected="true"><span class="ic">C</span><span class="ch-text"><b>按原路折回一段</b><span class="ch-sub">选中</span></span><span class="kbd-hint">3</span></button>
+          <button class="blk-choice" disabled><span class="ic">D</span><span class="ch-text"><b>沿河滩硬趟过去</b><span class="ch-sub">禁用 · 水急，过不去</span></span><span class="kbd-hint">4</span></button>
+        </div>
       </div>
     </div>
     <div class="cell" style="width:300px">
-      <div class="lbl">blk-actions（纸片 / 印章 / 幽灵 / 禁用）</div>
-      <div class="blk-actions">
-        <button class="blk-btn">继续</button>
-        <button class="blk-btn seal">启程 · 还剩 2 暮色</button>
-        <button class="blk-btn ghost">跳过</button>
-        <button class="blk-btn" disabled>已用尽</button>
+      <div class="lbl">blk-actions（纸片 / 印章 / 幽灵 / 禁用 / 悬停）</div>
+      <div class="paper-surface" style="padding:12px">
+        <div class="blk-actions">
+          <button class="blk-btn">继续</button>
+          <button class="blk-btn seal">启程 · 还剩 2 暮色</button>
+          <button class="blk-btn ghost">跳过</button>
+          <button class="blk-btn is-hover">悬停</button>
+          <button class="blk-btn" disabled>已用尽</button>
+        </div>
       </div>
-      <div class="lbl" style="margin-top:14px">blk-seal / blk-portrait</div>
-      <div class="row"><span class="blk-seal">史实</span><span class="blk-portrait">你</span></div>
+      <div class="lbl" style="margin-top:14px">blk-seal / blk-portrait（落在纸面上）</div>
+      <div class="paper-surface" style="padding:12px">
+        <div class="row"><span class="blk-seal">史实</span><span class="blk-portrait">你</span></div>
+      </div>
     </div>
     <div class="cell" style="width:280px">
-      <div class="lbl">blk-list / blk-card</div>
-      <ul class="blk-list"><li>护送担架队</li><li>雪山·掉队的战士</li></ul>
-      <div class="blk-card" style="margin-top:10px">事件卡：草地行军 · 泥沼</div>
+      <div class="lbl">blk-list / blk-card（落在纸面上）</div>
+      <div class="paper-surface" style="padding:12px">
+        <ul class="blk-list"><li>护送担架队</li><li>雪山·掉队的战士</li></ul>
+        <div class="blk-card" style="margin-top:10px">事件卡：草地行军 · 泥沼</div>
+      </div>
     </div>
   </div>
 
   <h1 class="sec">B · 七个整页模板</h1>
-  <p class="hint">页面只能选一个模板；纸面占屏 ≤35%，画面优先。</p>
+  <p class="hint">页面只能选一个模板；纸面占屏 ≤35%，画面优先。缩略按真实类名手工搭出，用来比版式配比；真机逐屏对照见 screen-sheet-1.png。</p>
   <div class="row">
     <div class="thumb"><div class="tpl-body paper-surface" style="left:50%;top:50%;transform:translate(-50%,-50%);width:300px;padding:18px;text-align:center">
       <span class="blk-kicker">1934—1936</span><h2 class="blk-title md">长征·抉择</h2><p class="blk-lead">你将走进暮色里的营地。</p>
       <div class="blk-actions" style="justify-content:center"><button class="blk-btn seal">研学模式</button><button class="blk-btn ghost">怎么玩</button></div>
-    </div><div class="lbl" style="position:absolute;left:8px;bottom:6px">tpl-title</div></div>
+    </div><div class="lbl tpl-name">tpl-title</div></div>
 
     <div class="thumb"><div class="tpl-body paper-surface" style="left:50%;top:50%;transform:translate(-50%,-50%);width:300px;padding:16px">
       <span class="blk-kicker">玩法</span><h3 class="blk-title sm">怎么玩</h3>
       <ul class="blk-list"><li>暮色有限，用光照亮他们</li><li>做完一件事，就交给模型裁决</li></ul>
       <div class="blk-actions"><button class="blk-btn seal">返回</button></div>
-    </div><div class="lbl" style="position:absolute;left:8px;bottom:6px">tpl-panel</div></div>
+    </div><div class="lbl tpl-name">tpl-panel</div></div>
 
     <div class="thumb"><div class="tpl-body paper-surface" style="left:50%;bottom:0;transform:translateX(-50%);width:340px;padding:14px">
       <div class="row" style="gap:8px"><span class="blk-portrait" style="width:40px;height:40px;font-size:12px">你</span>
       <div><b style="font-family:var(--font-kai)">你</b><div class="ch-sub" style="font-size:11px;color:var(--ink-2)">年轻战士</div></div></div>
       <hr class="blk-rule" style="margin:8px 0">
       <button class="blk-choice" style="padding:8px 10px"><span class="ic">A</span><span class="ch-text"><b style="font-size:14px">跟着队伍快走</b></span></button>
-    </div><div class="lbl" style="position:absolute;left:8px;bottom:6px">tpl-stage</div></div>
+    </div><div class="lbl tpl-name">tpl-stage</div></div>
 
-    <div class="thumb"><div class="tpl-rail paper-surface" style="left:10px;top:10px;bottom:10px;width:110px;padding:10px">
+    <div class="thumb"><div class="tpl-rail paper-surface" style="left:10px;top:10px;width:110px;max-height:210px;overflow:auto;padding:10px">
       <span class="blk-kicker" style="font-size:9px">于都河</span>
       <div style="font-size:10px;color:var(--ink-2)">日 1/1</div>
       <div class="blk-progress"><span class="dot on"></span><span class="dot on"></span></div>
       <p class="blk-body" style="font-size:10px;line-height:1.6">用光照亮他们。点余烬，走进他的一夜。</p>
-    </div><div class="lbl" style="position:absolute;left:8px;bottom:6px">tpl-side</div></div>
+    </div><div class="lbl tpl-name">tpl-side</div></div>
 
     <div class="thumb"><div class="tpl-body paper-surface" style="left:50%;bottom:0;transform:translateX(-50%);width:320px;padding:12px">
       <div class="row" style="gap:6px"><span class="blk-stat" style="font-size:10px">鱼篓<b>0</b></span><span class="blk-stat" style="font-size:10px">咬钩<b>2</b></span></div>
       <div class="blk-card" style="padding:8px;font-size:11px">浮子刚沉——起竿？</div>
       <div class="blk-actions"><button class="blk-btn seal" style="font-size:11px;padding:6px 12px">起竿</button></div>
-    </div><div class="lbl" style="position:absolute;left:8px;bottom:6px">tpl-board</div></div>
+    </div><div class="lbl tpl-name">tpl-board</div></div>
 
     <div class="thumb"><div class="tpl-body paper-surface" style="left:50%;top:50%;transform:translate(-50%,-50%);width:320px;padding:14px">
       <span class="blk-kicker">回望</span><h3 class="blk-title sm">这一路，你做过什么</h3>
       <ul class="blk-list"><li>抉择：出身——农家子弟</li><li>史实：于都出发</li></ul>
-    </div><div class="lbl" style="position:absolute;left:8px;bottom:6px">tpl-drawer</div></div>
+    </div><div class="lbl tpl-name">tpl-drawer</div></div>
 
     <div class="thumb"><div class="tpl-rail paper-surface" style="left:10px;top:10px;bottom:10px;width:130px;padding:10px">
       <span class="blk-kicker" style="font-size:9px">草地行军</span>
       <div class="blk-stat-row"><span class="blk-stat" style="font-size:10px">第<b>1</b>天</span></div>
       <p class="blk-body" style="font-size:10px">队伍五人，粮三斗。</p>
     </div><div class="tpl-body" style="left:150px;right:10px;top:10px;bottom:10px;background:rgba(20,17,13,.75);border:1px solid var(--line);border-radius:4px;padding:10px;font-size:11px;color:#c7bba1">你决定派两个人去打探…</div>
-    <div class="lbl" style="position:absolute;left:8px;bottom:6px">tpl-world</div></div>
+    <div class="lbl tpl-name">tpl-world</div></div>
   </div>
 
   <h1 class="sec">C · 亮度对照</h1>

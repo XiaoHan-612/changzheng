@@ -58,17 +58,21 @@ export function renderStats(state) {
     { k: '信念', v: state.信念, max: 100 },
     { k: '民心', v: state.民心, max: 100 },
   ];
-  $('stats').innerHTML = items
+  // 数值签是区块（.blk-stat），样式只在 framework.css；这里只负责选状态与尺度。
+  // 顶栏用 sm（压在一行里，与侧栏数值同档），夜间/终局面板用默认号。
+  const chips = (size) => items
     .map((it) => {
       const warn = it.v <= (it.max === 20 ? 2 : 30);
       const good = it.v >= (it.max === 20 ? 10 : 70);
-      return `<span class="stat ${warn ? 'warn' : good ? 'good' : ''}">${it.k}<b>${it.v}</b></span>`;
+      const band = warn ? ' warn' : good ? ' good' : '';
+      return `<span class="blk-stat${size}${band}" aria-label="${it.k} ${it.v}">${it.k}<b>${it.v}</b></span>`;
     })
     .join('');
+  $('stats').innerHTML = chips(' sm');
   const ns = $('night-stats');
-  if (ns) ns.innerHTML = $('stats').innerHTML;
+  if (ns) ns.innerHTML = chips('');
   const es = $('end-stats');
-  if (es) es.innerHTML = $('stats').innerHTML;
+  if (es) es.innerHTML = chips('');
 }
 
 export function renderAp(state) {

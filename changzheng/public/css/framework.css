@@ -86,17 +86,36 @@
 }
 .blk-rule { border: none; border-top: 1px solid var(--rule); margin: var(--sp-4) 0; }
 
+/* 数值签（唯一实现）：顶栏 / 夜间 / 终局 / 样板页共用。
+   1) 它属于"压在插画上的骨架"，所以默认墨纱；落在纸面上自动换极淡墨底 + 墨字，
+      不另开一个类——同一语义只允许一个类，材质面差异由祖先选择器吸收。
+   2) 排版角色固定：标签 kai、数字 num 且等宽（tabular-nums），数字比标签大一档，
+      这样一排数值里数字是锚点，切换数值时也不会左右跳动。
+   3) 状态只改描边与底纹，**数字恒为高对比前景色**——不允许出现五颜六色的数字。 */
 .blk-stat-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .blk-stat {
-  display: inline-flex; align-items: baseline; gap: 4px;
-  padding: 3px 10px; border-radius: var(--radius-inset);
-  border: 1px solid var(--rule-strong); background-color: var(--paper-0);
-  color: var(--ink-1); font-size: 12px;
+  display: inline-flex; align-items: baseline; gap: 5px; flex: none;
+  padding: 2px 9px; border-radius: var(--radius-inset);
+  border: 1px solid var(--gold-soft); background-color: var(--ink-bg);
+  color: var(--paper-dim); font-family: var(--font-kai); font-size: 12px; line-height: 1.5;
   box-shadow: var(--shadow-ink);
 }
-.blk-stat b { font-family: var(--font-num); font-weight: 700; color: var(--ink-0); font-variant-numeric: tabular-nums; }
-.blk-stat.warn { background-color: var(--paper-warn); }
-.blk-stat.good b { color: var(--ok); }
+.blk-stat b {
+  font-family: var(--font-num); font-size: 16px; font-weight: 700;
+  color: var(--paper); font-variant-numeric: tabular-nums;
+}
+/* 顶栏小一号：同一实现，只降一档尺度（与侧栏数值的 15px 对齐） */
+.blk-stat.sm { padding: 2px 8px; gap: 4px; font-size: 11px; }
+.blk-stat.sm b { font-size: 15px; }
+/* 落在纸面上：纸上再贴一块黑会喧宾夺主，换成极淡墨底 + 墨字 */
+.panel .blk-stat, .sheet .blk-stat, .journal .blk-stat, .echo-cinema .blk-stat,
+.paper-surface .blk-stat {
+  background-color: var(--ink-veil); border-color: var(--rule-strong); color: var(--ink-1);
+}
+.panel .blk-stat b, .sheet .blk-stat b, .journal .blk-stat b, .echo-cinema .blk-stat b,
+.paper-surface .blk-stat b { color: var(--ink-0); }
+.blk-stat.warn { border-color: var(--seal); background-image: linear-gradient(var(--seal-veil), var(--seal-veil)); }
+.blk-stat.good { border-color: var(--gold); }
 .blk-stat[aria-disabled="true"], .blk-stat.off { opacity: 0.45; }
 
 .blk-choice-list { display: flex; flex-direction: column; gap: var(--sp-2); }
@@ -109,7 +128,9 @@
   box-shadow: var(--shadow-soft);
   transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
-.blk-choice:hover:not(:disabled) { background-color: var(--paper-0); border-color: var(--seal); transform: translateX(4px); box-shadow: var(--shadow-lift); }
+/* .is-hover 是"强制悬停"：触屏没有 hover，样板页截图也拍不到 :hover，
+   所以四态里的悬停态用这个类摆出来（同一组声明，不另写一份样式）。 */
+.blk-choice:hover:not(:disabled), .blk-choice.is-hover:not(:disabled) { background-color: var(--paper-0); border-color: var(--seal); transform: translateX(4px); box-shadow: var(--shadow-lift); }
 .blk-choice:disabled { opacity: 0.5; cursor: not-allowed; }
 .blk-choice[aria-selected="true"] { border-color: var(--seal); box-shadow: 0 0 0 1px var(--seal) inset; }
 .blk-choice .ic {
@@ -129,7 +150,7 @@
   border: 1px solid var(--rule-strong); background-color: var(--paper-0); color: var(--ink-0);
   transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
-.blk-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
+.blk-btn:hover, .blk-btn.is-hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
 .blk-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .blk-btn.seal { background: linear-gradient(180deg, var(--seal-bright), var(--seal)); border-color: var(--seal-deep); color: var(--paper-0); }
 .blk-btn.ghost { background: transparent; color: inherit; border-color: var(--line); }

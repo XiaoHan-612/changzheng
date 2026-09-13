@@ -43,7 +43,9 @@
 
 ## 二点五、框架：7 个整页模板 + 一套区块
 
-推倒重做后，CSS 只剩四层：`fonts.css`（生成）→ `tokens.css`（变量）→ `base.css`（重置与工具类）→ `framework.css`（模板 + 区块 + 动效）→ `components.css`（app 组件）。
+推倒重做后，CSS 只剩四层：`fonts.css`（生成）→ `tokens.css`（**只有变量**）→ `base.css`（重置与工具类）→ `framework.css`（模板 + 区块 + 动效）→ `components.css`（材质词汇 + app 组件）。
+材质（`.paper-surface` / `.ink-surface` / `.rule-ink` / `.seal-mark`）定义在 `components.css` 的材质段，样板页与游戏共用同一份；
+`tokens.css` 只回答"值是多少"，不回答"长什么样"（早先版本把类写在那里，与上面两处重复，已上移）。
 旧的 `style.css / cinema.css / minigames.css / sandbox.css` 已删除。
 
 | 模板 | 用于 | 纸面占比实测 |
@@ -57,6 +59,9 @@
 | `tpl-world` 世界面板 | 自由行军沙盘 | 27.8%（缩略） |
 
 区块（`blk-*`，样式只在 `framework.css`）：kicker / title / lead / body / choice / stat / actions / btn / note / rule / list / card / seal / portrait / progress。
+`blk-stat` 是**数值签的唯一实现**（顶栏 / 夜间 / 终局 / 样板页共用）：标签走 `kai`、数字走 `num` 且 `tabular-nums`、数字比标签大一档；
+默认墨纱（叠在插画上），进入 `.panel/.sheet/.journal/.echo-cinema/.paper-surface` 时自动换成极淡墨底 + 墨字；
+状态只改描边与底纹（`.warn` 朱红描边 + 淡淡朱纱、`.good` 旧金描边、`.off` 降透明度），**数字恒为高对比前景色**——不允许出现五颜六色的数字。
 
 **动效（五个标准效果）**：`ink-in` 墨显、`sheet-rise` 纸卷上滑、`seal-stamp` 钤印、`scene-wipe` 换幕抹擦、`ember` 余烬；
 列表用 `.anim-stagger` 逐条入场；`prefers-reduced-motion` 下全部降级为淡入（`--motion-scale` 归零）。
@@ -68,9 +73,13 @@
 |---|---|---|
 | 墨字对纸底 | ≥7:1 | 8.41:1 |
 | 纸面对插画暗部 | ≤9:1 | 7.75:1 |
-| 纸面占屏（逐页） | ≤35% | 标题 8.2% · 怎么玩 19.0% · 设置 34.7% · 过场 10.0% |
+| 纸面占屏（逐页） | ≤35% | 标题 0% · 怎么玩 19.0% · 设置 34.7% · 过场 9.1% |
 
-三个旋钮都在 `tokens.css` 顶部注释里标了【旋钮】：纸色三档、`--paper-veil` 透度、`--panel-w/--panel-h` 面积、`--tex-opacity` 纸纹、`--motion-scale` 动效强度。
+面积这一项的两把尺子分开存：`tone-report.json` 是 `qa:screens` 在 1280 真机上量的**逐页预算**（`qa:tone` 只认这一份），
+`tone-report-templates.json` 是 `qa:proof` 量的模板缩略图估算（缩略只有 400×250，比例必然被放大，只用于模板之间横向比较）。
+早先两者写同一个文件的同名键，后跑的覆盖前一个，`qa:tone` 于是成了"最后跑谁看谁"。
+
+旋钮都在 `tokens.css` 顶部注释里标了【旋钮】：纸色三档、`--paper-veil` 透度、`--panel-w/--panel-h` 面积、`--tex-opacity` 纸纹、`--motion-scale` 动效强度。
 
 ## 三、组件规范（同一语义必须复用同一类）
 
@@ -78,12 +87,13 @@
 |---|---|---|
 | `.paper-surface` | 内容面（面板、纸卷、手记、回响） | 米黄纸 + 纸纹 + 折痕；文字 `ink-0` |
 | `.ink-surface` | 压在插画上的骨架（HUD、顶栏） | 暖墨半透明；文字 `paper` |
-| `.paper-tag` | 数值签、状态签 | 纸底墨字，2px 圆角 + 轻投影 |
+| `.blk-stat` | 数值签、状态签（唯一实现） | 标签 `kai` 11–12px + 数字 `num` 15–16px 等宽；默认墨纱，落在纸面自动换浅纱；状态只走描边与底纹 |
 | `.rule-ink` | 分隔线 | 1px `rule` |
 | `.seal-mark` | 印章、钤记 | 朱红描边圆形，仅小面积 |
 | `.btn` / `.btn.primary` / `.btn.ghost` | 纸片 / 印章 / 幽灵 | 纸面里的按钮用纸片态；朱红只给"确认类"动作 |
 
-排版角色：标题位用 `display`，说话人与选项用 `kai`，长叙事用 `serif`，数字用 `num`（`tabular-nums`）。
+排版角色：标题位用 `display`，说话人 / 选项 / 数值签标签用 `kai`，长叙事用 `serif`，数字与型号用 `num`（`tabular-nums`，数值切换时不左右跳动）。
+数值签是"骨架"不是"内容"：它恒为墨纱系，不因为落在纸上就变回纸片——纸面只留给要读长文的地方。
 
 ## 四、无障碍与一致性判据
 
@@ -96,7 +106,11 @@
 
 | 批 | 页面 | 状态 |
 |---|---|---|
-| 1 | 标题页、怎么玩、设置、过场 | ✅ 已完成（见 `screen-sheet-1.png`） |
+| 框架 | 色调 + 7 模板 + 区块 + 动效 + 守卫 + 样板页 + 批次一重做 | ✅ 已完成（`framework-proof.png` + `screen-sheet-1.png`） |
+
+| 批 | 页面 | 状态 |
+|---|---|---|
+| 1 | 标题页、怎么玩、设置、过场 | ✅ 已按框架重做（见 `screen-sheet-1.png`） |
 | 2 | 营地、手记、史实、岔路 | ⏳ 待做 |
 | 3 | 舞台对话、抉择、回响、篝火菜单 | ⏳ 待做 |
 | 4 | 钓鱼+弯针、夜校、分糖、夜岗 | ⏳ 待做 |
