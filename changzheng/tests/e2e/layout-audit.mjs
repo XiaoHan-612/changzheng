@@ -59,7 +59,9 @@ async function probe(page, label) {
       if (r.right > vw + 2 || r.left < -2) {
         const where = r.left < -2 ? `左边越界 ${Math.round(-r.left)}px` : `右边越界 ${Math.round(r.right - vw)}px`;
         out.push(`${describe(el)} ${where}`);
-      } else if (isControl) {
+      } else if (isControl && vw <= 820) {
+        // 点按区规则只对窄屏/触屏生效：桌面鼠标场景下 30px 高的按钮完全够用，
+        // 在 1280 宽也报会把真正的信号淹没（实测一次刷出 42 条噪音）。
         if (r.height < 32 || r.width < 32) {
           out.push(`${describe(el)} 点按区只有 ${Math.round(r.width)}×${Math.round(r.height)}`);
         }
