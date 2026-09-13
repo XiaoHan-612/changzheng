@@ -80,5 +80,6 @@ if (failed.length || errs.length) {
   console.log(`\n✗ 玩法板体检未通过：${failed.length} 项`);
   process.exit(1);
 }
-console.log('\n✓ 玩法板体检通过：五个玩法都在板屏上、数值签与契约标记齐全、第一步可点');
+console.log(`
+✓ 玩法板体检通过：${Object.keys(specs).length} 个玩法都在板屏上、数值签与契约标记齐全、第一步可点`);
 await browser.close();
