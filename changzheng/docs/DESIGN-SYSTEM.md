@@ -41,6 +41,37 @@
 - **层级**：`z-bg/hud/sheet/overlay/toast`
 - **动效**：`dur-fast/base/slow`、`ease-out`、`ease-stamp`
 
+## 二点五、框架：7 个整页模板 + 一套区块
+
+推倒重做后，CSS 只剩四层：`fonts.css`（生成）→ `tokens.css`（变量）→ `base.css`（重置与工具类）→ `framework.css`（模板 + 区块 + 动效）→ `components.css`（app 组件）。
+旧的 `style.css / cinema.css / minigames.css / sandbox.css` 已删除。
+
+| 模板 | 用于 | 纸面占比实测 |
+|---|---|---|
+| `tpl-title` 全屏题字 | 标题页、过场、岔路 | 8.2% / 10.0% |
+| `tpl-panel` 中央面板 | 怎么玩、设置、史实、记录、答辩、答题、夜间、终局 | 19.0%（怎么玩）· 34.7%（设置） |
+| `tpl-stage` 舞台 + 底部纸卷 | 对白、抉择、结果 | — |
+| `tpl-side` 侧栏手记 + 画面 | 营地 | 23.4%（缩略） |
+| `tpl-board` 玩法板 | 钓鱼、夜校、分糖、夜岗、五子棋、泸定桥、陡坡 | — |
+| `tpl-drawer` 抽屉浮层 | 手记、史实回响、篝火菜单 | — |
+| `tpl-world` 世界面板 | 自由行军沙盘 | 27.8%（缩略） |
+
+区块（`blk-*`，样式只在 `framework.css`）：kicker / title / lead / body / choice / stat / actions / btn / note / rule / list / card / seal / portrait / progress。
+
+**动效（五个标准效果）**：`ink-in` 墨显、`sheet-rise` 纸卷上滑、`seal-stamp` 钤印、`scene-wipe` 换幕抹擦、`ember` 余烬；
+列表用 `.anim-stagger` 逐条入场；`prefers-reduced-motion` 下全部降级为淡入（`--motion-scale` 归零）。
+注意：**居中元素必须用 `fade-in` 而不是 `ink-in`**——后者的 keyframes 会把 `transform` 收成 `none`，吃掉 `translateX(-50%)` 导致跑偏（踩过）。
+
+## 二点六、色调指标（`npm run qa:tone`）
+
+| 指标 | 要求 | 当前 |
+|---|---|---|
+| 墨字对纸底 | ≥7:1 | 8.41:1 |
+| 纸面对插画暗部 | ≤9:1 | 7.75:1 |
+| 纸面占屏（逐页） | ≤35% | 标题 8.2% · 怎么玩 19.0% · 设置 34.7% · 过场 10.0% |
+
+三个旋钮都在 `tokens.css` 顶部注释里标了【旋钮】：纸色三档、`--paper-veil` 透度、`--panel-w/--panel-h` 面积、`--tex-opacity` 纸纹、`--motion-scale` 动效强度。
+
 ## 三、组件规范（同一语义必须复用同一类）
 
 | 类 | 用途 | 规则 |

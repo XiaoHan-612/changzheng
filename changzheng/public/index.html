@@ -12,10 +12,9 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/css/fonts.css" />
   <link rel="stylesheet" href="/css/tokens.css" />
-  <link rel="stylesheet" href="/css/style.css" />
-  <link rel="stylesheet" href="/css/cinema.css" />
-  <link rel="stylesheet" href="/css/sandbox.css" />
-  <link rel="stylesheet" href="/css/minigames.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/framework.css" />
+  <link rel="stylesheet" href="/css/components.css" />
 </head>
 <body>
   <div id="app">
@@ -38,7 +37,7 @@
       </div>
     </header>
 
-    <section id="screen-title" class="screen">
+    <section id="screen-title" class="screen tpl-title">
       <div class="title-bg" style="background-image:url('/assets/scenes/depart_pano.jpg')"></div>
       <div class="title-card">
         <p class="eyebrow">1934–1936 · 两万五千里</p>
@@ -76,7 +75,7 @@
       </div>
     </section>
 
-    <section id="screen-how" class="screen overlay hidden">
+    <section id="screen-how" class="screen overlay hidden tpl-panel">
       <div class="panel wide glass">
         <h2>怎么玩</h2>
         <ol class="how-list">
@@ -89,7 +88,7 @@
       </div>
     </section>
 
-    <section id="screen-settings" class="screen overlay hidden">
+    <section id="screen-settings" class="screen overlay hidden tpl-panel">
       <div class="panel wide glass">
         <div class="panel-head">
           <h2>设置 · 模型与日志</h2>
@@ -105,7 +104,7 @@
           <div>
             <h3>推理档位</h3>
             <select id="set-effort" class="set-input"></select>
-            <p class="muted sm">「始终思考」的模型（如 glm-5.3-flash）必填 low/high/max，否则 token 被推理吃光、content 为空</p>
+            <p class="muted sm">始终思考的模型必填 low，否则返回空</p>
           </div>
           <div>
             <h3>API Key</h3>
@@ -122,7 +121,7 @@
               <input type="checkbox" id="set-devtools" />
               <span>显示评委演示与调试工具</span>
             </label>
-            <p class="muted sm">关闭时只保留玩法本身（评委演示 / 答辩 / 记录 / 模型标签都会隐藏）。默认关闭。</p>
+            <p class="muted sm">默认关闭；打开后显示评委演示 / 答辩 / 记录</p>
           </div>
         </div>
         <div class="set-actions">
@@ -135,7 +134,7 @@
       </div>
     </section>
 
-    <section id="screen-cutscene" class="screen hidden">
+    <section id="screen-cutscene" class="screen hidden tpl-title">
       <div class="cut-stage" id="cut-stage"></div>
       <div class="cut-caption-wrap">
         <div class="cut-caption" id="cut-caption"></div>
@@ -147,7 +146,7 @@
     </section>
 
     <!-- 暮色营地 -->
-    <section id="screen-camp" class="screen hidden">
+    <section id="screen-camp" class="screen hidden tpl-side">
       <div class="dusk" id="dusk">
         <div class="pano-img" id="pano-img"></div>
         <div class="dusk-grade" id="dusk-grade"></div>
@@ -172,7 +171,7 @@
     </section>
 
     <!-- 电影事件层 -->
-    <section id="screen-stage" class="screen hidden">
+    <section id="screen-stage" class="screen hidden tpl-stage">
       <div class="sheet-backdrop" id="sheet-backdrop"></div>
       <article class="sheet" id="sheet">
         <header class="sheet-head">
@@ -193,7 +192,7 @@
       </article>
     </section>
 
-    <section id="screen-fire" class="screen overlay hidden">
+    <section id="screen-fire" class="screen overlay hidden tpl-drawer">
       <div class="panel glass">
         <h2>篝火旁</h2>
         <div id="fire-opts" class="choices"></div>
@@ -202,7 +201,7 @@
     </section>
 
     <!-- 史实回响：盖章仪式 -->
-    <section id="screen-echo" class="screen overlay hidden">
+    <section id="screen-echo" class="screen overlay hidden tpl-drawer">
       <div class="echo-cinema">
         <div class="echo-seal" aria-hidden="true">史实</div>
         <div class="echo-head">
@@ -224,7 +223,7 @@
       </div>
     </section>
 
-    <section id="screen-path" class="screen hidden">
+    <section id="screen-path" class="screen hidden tpl-title">
       <div class="path-bg" style="background-image:url('/assets/scenes/path_choice.jpg')"></div>
       <div class="path-ui">
         <h2>前面岔开了三条路</h2>
@@ -234,7 +233,7 @@
     </section>
 
     <!-- 篝火深夜：夜间互斥抉择（选项由模型生成） -->
-    <section id="screen-night" class="screen hidden">
+    <section id="screen-night" class="screen hidden tpl-panel">
       <div class="night-bg" style="background-image:url('/assets/scenes/night_fire.jpg')"></div>
       <div class="panel wide glass night-panel">
         <h2 id="night-title">篝火 · 深夜</h2>
@@ -244,7 +243,7 @@
       </div>
     </section>
 
-    <section id="screen-quiz" class="screen hidden">
+    <section id="screen-quiz" class="screen hidden tpl-panel">
       <div class="quiz-bg" id="quiz-bg"></div>
       <div class="panel wide glass quiz-panel">
         <div class="panel-head">
@@ -255,7 +254,7 @@
       </div>
     </section>
 
-    <section id="screen-end" class="screen hidden">
+    <section id="screen-end" class="screen hidden tpl-panel">
       <div class="end-bg" style="background-image:url('/assets/scenes/huining_pano.jpg')"></div>
       <div class="panel wide glass end-panel">
         <p class="eyebrow" id="end-eyebrow">终局</p>
@@ -302,7 +301,7 @@
       </div>
     </section>
 
-    <section id="screen-logs" class="screen overlay hidden">
+    <section id="screen-logs" class="screen overlay hidden tpl-panel">
       <div class="panel wide glass logs-panel">
         <div class="panel-head">
           <h2>行军记录</h2>
@@ -316,7 +315,7 @@
       </div>
     </section>
 
-    <section id="screen-facts" class="screen overlay hidden">
+    <section id="screen-facts" class="screen overlay hidden tpl-panel">
       <div class="panel wide glass">
         <div class="panel-head">
           <h2>史实档案</h2>
@@ -327,7 +326,7 @@
     </section>
 
     <!-- 手记（回望） -->
-    <section id="screen-journal" class="screen overlay hidden">
+    <section id="screen-journal" class="screen overlay hidden tpl-drawer">
       <div class="journal">
         <header class="journal-head">
           <div>
@@ -352,7 +351,7 @@
     </section>
 
     <!-- 答辩面板 -->
-    <section id="screen-defense" class="screen overlay hidden">
+    <section id="screen-defense" class="screen overlay hidden tpl-panel">
       <div class="panel wide glass">
         <div class="panel-head">
           <h2>答辩面板 · 大模型调用深度</h2>
@@ -366,7 +365,7 @@
     </section>
 
     <!-- 自由行军沙盘 -->
-    <section id="screen-sandbox" class="screen hidden">
+    <section id="screen-sandbox" class="screen hidden tpl-world">
       <div class="sandbox-bg" id="sb-scene" style="background-image:url('/assets/scenes/marsh.jpg')"></div>
       <div class="sandbox-grade"></div>
       <div class="sb-scene-tag" id="sb-scene-tag">草地行军</div>

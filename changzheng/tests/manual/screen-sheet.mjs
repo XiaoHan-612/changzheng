@@ -15,6 +15,36 @@ const BATCH = Number(process.argv[2] || 1);
 const OUT = path.join(ART, 'screens', `batch-${BATCH}`);
 fs.mkdirSync(OUT, { recursive: true });
 
+/** 在实机页面上量纸面占比：视口内网格采样，判断该点是否落在纸面元素上 */
+async function measurePaper(page) {
+  return page.evaluate(() => {
+    const PAPER = [[196, 183, 156], [211, 199, 171], [179, 166, 140]];   // paper-veil / paper-0 / paper-2
+    const parse = (s) => {
+      const m = /rgba?\(([^)]+)\)/.exec(s);
+      if (!m) return null;
+      const [r, g, b, a = '1'] = m[1].split(',').map((x) => parseFloat(x));
+      return Number(a) < 0.5 ? null : [r, g, b];
+    };
+    const isPaper = (el) => {
+      for (let n = el; n; n = n.parentElement) {
+        const rgb = parse(getComputedStyle(n).backgroundColor);
+        if (rgb && PAPER.some(([r, g, b]) => Math.abs(rgb[0] - r) <= 4 && Math.abs(rgb[1] - g) <= 4 && Math.abs(rgb[2] - b) <= 4)) return true;
+      }
+      return false;
+    };
+    const W = window.innerWidth; const H = window.innerHeight;
+    let hit = 0; let total = 0;
+    for (let y = 4; y < H - 4; y += 8) {
+      for (let x = 4; x < W - 4; x += 8) {
+        total += 1;
+        const el = document.elementFromPoint(x, y);
+        if (el && isPaper(el)) hit += 1;
+      }
+    }
+    return total ? hit / total : 0;
+  });
+}
+
 /** 每批要截的页面：{ name, 准备动作 } */
 const BATCHES = {
   1: [
@@ -35,6 +65,7 @@ async function capture() {
   await page.reload({ waitUntil: 'networkidle' });
 
   const shots = BATCHES[BATCH] || BATCHES[1];
+  const tone = {};
   for (const s of shots) {
     if (s.shot === 'how') { await page.click('#btn-how'); await page.waitForTimeout(400); }
     if (s.shot === 'settings') {
@@ -54,8 +85,10 @@ async function capture() {
     }
     if (s.shot === 'title') { await page.waitForTimeout(300); }
     await page.screenshot({ path: path.join(OUT, `${s.name}.png`) });
-    console.log('shot', s.name);
+    tone[s.name] = { paperRatio: await measurePaper(page) };
+    console.log('shot', s.name, `纸面 ${(tone[s.name].paperRatio * 100).toFixed(1)}%`);
   }
+  fs.writeFileSync(path.join(ART, 'tone-report.json'), JSON.stringify({ generatedAt: new Date().toISOString(), batch: BATCH, pages: tone }, null, 2), 'utf8');
   await browser.close();
 }
 

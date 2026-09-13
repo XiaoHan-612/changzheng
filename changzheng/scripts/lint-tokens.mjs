@@ -39,7 +39,8 @@ function scan() {
       const fam = /font-family\s*:\s*([^;]+)/.exec(decl);
       if (fam && !/var\(--font/.test(fam[1])) (out.fonts[f] = out.fonts[f] || []).push(`${i + 1}: ${fam[1].trim().slice(0, 60)}`);
       const rad = /border-radius\s*:\s*([^;]+)/.exec(decl);
-      if (rad && /\d/.test(rad[1]) && !/var\(--radius/.test(rad[1])) {
+      // 50% 是"画圆"不是设计尺度（头像、印章、圆点），允许
+      if (rad && /\d/.test(rad[1]) && !/var\(--radius/.test(rad[1]) && !/^\s*50%\s*$/.test(rad[1])) {
         (out.radius[f] = out.radius[f] || []).push(`${i + 1}: ${rad[1].trim().slice(0, 60)}`);
       }
     });

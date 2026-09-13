@@ -3,18 +3,25 @@
    规则：组件 CSS 里**不允许**出现颜色/字号/圆角/间距字面量，一律引用这里的变量；
    由 `npm run qa:tokens` 强制。public/css/fonts.css 由 tools/build-fonts.mjs 生成。 */
 :root {
-  /* ── 纸（内容层）── */
-  --paper-0: #f0e8d6;
-  --paper-1: #e7dbc2;
-  --paper-2: #dccdaf;
-  --paper-edge: #b9a884;
-  --rule: rgba(36, 29, 20, 0.18);
-  --rule-strong: rgba(36, 29, 20, 0.34);
+  /* ── 纸（内容层）：中调旧纸 ──
+     原纸色 #e7dbc2 亮度 L*≈0.72，插画暗部只有 0.018 —— 面板比插画亮 13 倍，眼睛先看面板。
+     压到中调后：墨字仍有 ~8.6:1，纸与插画暗部收到 ~8:1，纸"落进"画里而不是浮在上面。
+     【旋钮】改纸的明暗只动下面三行。 */
+  --paper-0: #d3c7ab;                       /* 抬起（悬停/选中） */
+  --paper-1: #c4b79c;                       /* 基准纸面 */
+  --paper-2: #b3a68c;                       /* 凹槽 */
+  --paper-edge: #8f836c;
+  --paper-veil: rgba(196, 183, 156, 0.92);  /* 【旋钮】纸的透度：0.82 更透 ↔ 1 不透 */
+  --paper-hi: rgba(240, 232, 214, 0.20);
+  --paper-lo: rgba(120, 108, 86, 0.24);
+  --tex-opacity: 0.35;                      /* 【旋钮】纸纹强度 0.15–0.5 */
+  --rule: rgba(36, 29, 20, 0.20);
+  --rule-strong: rgba(36, 29, 20, 0.38);
 
   /* ── 墨（文字与骨架）── */
-  --ink-0: #241d14;
+  --ink-0: #241d14;   /* 【旋钮】更深 #181209 ↔ 更柔 #544636 */
   --ink-1: #4a3d2c;
-  --ink-2: #6f5f47;
+  --ink-2: #6a5a42;
   --ink-bg: rgba(18, 14, 10, 0.80);
   --ink-bg-2: rgba(14, 11, 8, 0.90);
   --ink-line: rgba(232, 220, 200, 0.16);
@@ -25,6 +32,22 @@
   --seal-deep: #6f1f18;
   --gold: #a8863f;
   --gold-soft: rgba(168, 134, 63, 0.28);
+
+  /* ── 遮罩与浅底（组件层不再写死 rgba）── */
+  --scrim: rgba(10, 7, 4, 0.76);        /* 浮层背后的压暗 */
+  --scrim-soft: rgba(10, 7, 4, 0.42);
+  --veil-dark: rgba(14, 11, 8, 0.9);    /* 顶栏/底栏的墨色渐变端 */
+  --veil-dark-2: rgba(14, 11, 8, 0.55);
+  --ink-veil: rgba(36, 29, 20, 0.08);   /* 纸上的极淡墨底 */
+  --seal-veil: rgba(155, 45, 36, 0.12);
+  --ok-veil: rgba(74, 107, 62, 0.16);
+  --bad-veil: rgba(140, 59, 46, 0.16);
+  --paper-warn: #c9a08f;   /* 资源告警时的纸签底色（暗红米，不喧哗） */
+  --shadow-ink: 0 1px 3px rgba(10, 7, 4, 0.35);
+  --shadow-soft: 0 1px 2px rgba(36, 29, 20, 0.10);
+  --shadow-lift: 0 3px 10px rgba(36, 29, 20, 0.20);
+  --shadow-inset: inset 0 1px 3px rgba(36, 29, 20, 0.14);
+  --seal-ring: 0 0 0 2px rgba(155, 45, 36, 0.5);
 
   /* ── 语义色（风险标签等）── */
   --risk-low: #4a6b3e;
@@ -53,11 +76,18 @@
   --crease: repeating-linear-gradient(180deg, rgba(36,29,20,0.045) 0 1px, transparent 1px 74px);
   --grain: repeating-linear-gradient(92deg, rgba(36,29,20,0.035) 0 1px, transparent 1px 5px);
   --shadow: 0 18px 44px rgba(12, 8, 5, 0.55);
-  --shadow-paper: 0 1px 0 rgba(255, 250, 238, 0.5) inset,
-                  0 -1px 0 rgba(36, 29, 20, 0.12) inset,
-                  0 10px 24px rgba(10, 7, 4, 0.42);
+  /* 【旋钮】纸边"融入"强度：去掉 inset 两行即"无"，加大数值即"强" */
+  --shadow-paper: 0 1px 0 rgba(255, 250, 238, 0.28) inset,
+                  0 -1px 0 rgba(36, 29, 20, 0.16) inset,
+                  0 12px 28px rgba(10, 7, 4, 0.5),
+                  0 0 0 1px var(--paper-edge);
   --shadow-float: 0 24px 60px rgba(10, 7, 4, 0.6);
   --shadow-text: 0 3px 18px rgba(10, 7, 4, 0.75);   /* 压在插画上的大字投影 */
+
+  /* ── 面积预算：【旋钮】纸面占屏 ≤35% ── */
+  --panel-w: 620px;
+  --panel-h: 66vh;
+  --panel-w-wide: 700px;
 
   /* ── 圆角：纸是切出来的，不是圆角卡片 ── */
   --radius: 3px;
@@ -95,12 +125,15 @@
   --z-overlay: 50;
   --z-toast: 100;
 
-  /* ── 动效 ── */
-  --dur-fast: 0.15s;
-  --dur-base: 0.3s;
-  --dur-slow: 0.45s;
+  /* ── 动效：【旋钮】--motion-scale 设 0 即全关，1.4 更明显 ── */
+  --motion-scale: 1;
+  --dur-fast: calc(0.15s * var(--motion-scale));
+  --dur-base: calc(0.3s * var(--motion-scale));
+  --dur-slow: calc(0.45s * var(--motion-scale));
+  --dur-scene: calc(0.6s * var(--motion-scale));
   --ease-out: cubic-bezier(0.2, 0.9, 0.25, 1);
   --ease-stamp: cubic-bezier(0.2, 1.4, 0.4, 1);
+  --ease-ink: cubic-bezier(0.33, 1, 0.68, 1);
 
   /* ── 排版：五族自托管字体（public/css/fonts.css，tools/build-fonts.mjs 生成）
      自定义短族名优先，系统字体仅作字符集之外生僻字的兜底 ── */
@@ -114,12 +147,13 @@
   --font-num: num, serif, Georgia, serif;
 }
 
-/* 纸面：内容层的统一材质 */
+/* 纸面：内容层的统一材质（中调纸 + 纸纹 + 折痕 + 纸边收口） */
 .paper-surface {
-  background-color: var(--paper-1);
-  background-image: linear-gradient(180deg, rgba(255,252,244,0.55), rgba(214,200,172,0.35)), var(--paper-tex);
-  background-size: auto, cover;
-  background-position: center, center 40%;
+  background-color: var(--paper-veil);
+  background-image: linear-gradient(180deg, var(--paper-hi), var(--paper-lo)), var(--paper-tex), var(--crease);
+  background-size: auto, cover, auto;
+  background-position: center, center 40%, center;
+  background-blend-mode: normal, multiply, normal;
   color: var(--ink-0);
   box-shadow: var(--shadow-paper);
 }

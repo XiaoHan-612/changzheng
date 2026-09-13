@@ -1,0 +1,42 @@
+/* ═══ 基础层 ═══
+   只放：重置、全局排版默认、工具类、焦点与滚动条。不放任何组件样式。
+   每个类只在这里或 framework.css / components.css 定义一次。 */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  line-height: var(--lh-normal);
+  background: var(--bg);
+  color: var(--paper);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+#app { height: 100%; position: relative; }
+
+/* 工具类 */
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.sm, .muted.sm { font-size: 12px; }
+.eyebrow { font-size: var(--fs-micro); letter-spacing: 0.28em; color: var(--gold); margin-bottom: var(--sp-3); }
+.empty { color: var(--ink-2); font-style: normal; }
+.type, .typing { min-height: 1.8em; }
+
+/* 展示开关：关掉评委演示/答辩/记录/模型标签，只留纯游戏界面（见 js/features.js） */
+body:not(.dev-tools) .dev-only { display: none !important; }
+/* 浮层打开时隐藏底层纸面，只保留背景插画——纸压纸会糊成一片 */
+body.overlay-open .sheet,
+body.overlay-open .hud-left,
+body.overlay-open .hud-bottom,
+body.overlay-open #hotspots,
+body.overlay-open .path-zone { visibility: hidden; }
+
+/* 焦点：统一墨色描边 */
+:focus-visible { outline: 2px solid var(--ink-0); outline-offset: 2px; }
+
+/* 滚动条：窄、暖色 */
+* { scrollbar-width: thin; scrollbar-color: var(--paper-edge) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--paper-edge); border-radius: var(--radius-pill); }
+*::-webkit-scrollbar-track { background: transparent; }
