@@ -186,27 +186,45 @@ export const STRATEGIES = {
   // 三种策略都带"低于阈值先休息"的常识行为：不这么做，自动试玩永远测不出恢复阀的作用
   balanced: {
     pick: () => 0,
+    risk: '',
     score: (label, s) => (s?.stats?.体力 <= 35 && /背囊|休息/.test(label) ? 5 : 0),
   },
   thrifty: {
     pick: (n) => Math.min(1, n - 1),
+    risk: 'low',
     score: (label, s) => (s?.stats?.体力 <= 50 && /背囊|休息/.test(label) ? 6
       : /背囊|休息|分|塘/.test(label) ? 3
         : /说话|问|交谈/.test(label) ? 1 : 0),
   },
   greedy: {
     pick: () => 0,
+    risk: 'high',
     score: (label, s) => (s?.stats?.体力 <= 25 && /背囊|休息/.test(label) ? 6
       : /陡坡|隘口|红旗|桥/.test(label) ? 3
         : /说话|问|交谈/.test(label) ? 1 : 0),
   },
 };
 
-/** 按策略点选项：目标下标不可见时退到最近的可见项（不能原地返回，否则会假死） */
-export async function clickChoice(page, index) {
+/**
+ * 按策略点选项。
+ * @param {number} index 目标下标（不可见时退到最近的可见项；不能原地返回，否则会假死）
+ * @param {'high'|'low'|''} preferRisk 有风险标注时优先选哪一类（激进玩家挑高风险、保守玩家挑低风险）
+ */
+export async function clickChoice(page, index, preferRisk = '') {
   const opts = page.locator('[data-choice-index]');
   const n = await opts.count().catch(() => 0);
   if (!n) return '';
+  if (preferRisk) {
+    for (let i = 0; i < n; i++) {
+      const el = opts.nth(i);
+      if (!(await el.isVisible().catch(() => false))) continue;
+      const cls = (await el.locator('.risk').first().getAttribute('class').catch(() => '')) || '';
+      if (!cls.includes(`r-${preferRisk}`)) continue;
+      const label = (await el.innerText().catch(() => '')).split('\n')[0].trim();
+      await el.click({ force: true, timeout: 400 }).catch(() => {});
+      return label || `#${i}`;
+    }
+  }
   const order = [...Array(n).keys()].sort((a, b) => Math.abs(a - index) - Math.abs(b - index));
   for (const i of order) {
     const el = opts.nth(i);
@@ -296,7 +314,7 @@ export async function playThrough(page, {
       continue;
     }
     if (s.choices) {
-      trace.push(`choice ${await clickChoice(page, policy.pick(s.choices))}`);
+      trace.push(`choice ${await clickChoice(page, policy.pick(s.choices), policy.risk)}`);
       continue;
     }
     if (s.screens.includes('screen-camp')) {

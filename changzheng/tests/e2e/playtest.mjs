@@ -101,6 +101,7 @@ async function playOne(browser, runIndex) {
       体力: st.体力, 粮食: st.粮食, 士气: st.士气, 信念: st.信念, 民心: st.民心,
       origin: st.origin || null, actIndex: st.actIndex,
     } : null,
+    losses: (st?.losses || []).map((l) => l.who),
     aiCalls: logs.length,
     ttsHits: ttsHits.length,
     errs,
@@ -115,8 +116,9 @@ const median = (xs) => {
 const mmss = (sec) => `${Math.floor(sec / 60)}分${String(sec % 60).padStart(2, '0')}秒`;
 
 function toMarkdown(runs) {
-  const head = '| # | 模式 | 策略 | 时长 | 终局 | 体力 | 粮食 | 士气 | 信念 | 民心 | AI 调用 | TTS 命中 |\n|---|---|---|---|---|---|---|---|---|---|---|---|';
+  const head = '| # | 模式 | 策略 | 时长 | 终局 | 减员 | 体力 | 粮食 | 士气 | 信念 | 民心 | AI 调用 | TTS 命中 |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|';
   const rows = runs.map((r) => `| ${r.run} | ${r.mode} | ${r.strategy} | ${mmss(r.seconds)} | ${r.endTitle}`
+    + ` | ${r.losses?.length ? r.losses.join('、') : '无'}`
     + ` | ${r.resources?.体力 ?? '—'} | ${r.resources?.粮食 ?? '—'} | ${r.resources?.士气 ?? '—'}`
     + ` | ${r.resources?.信念 ?? '—'} | ${r.resources?.民心 ?? '—'} | ${r.aiCalls} | ${r.ttsHits} |`);
   const perAct = runs[0]?.perAct?.map((p) => `${p.act} ${p.seconds}s`).join(' · ') || '';

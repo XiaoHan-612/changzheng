@@ -1,6 +1,6 @@
 import { COMPANIONS, PATH_ZONES } from './data.js';
 import { createState, applyEffects, unlockFact, saveState, checkFailure, addLoss, applyStarvation,
-  markLineDone, linesDoneCount, canNight, apPerDay, dayScene, loadState } from './state.js';
+  markLineDone, linesDoneCount, canNight, apPerDay, dayScene, loadState, resolveLoss } from './state.js';
 import { ORIGINS, ORIGIN_QUIZ, applyOrigin, applyOriginQuiz, findOrigin } from './origin.js';
 import { decide, fetchConfig, fetchLogs, fetchFacts, fetchActs, saveConfig, testConfig, clearLogs } from './ai-client.js';
 
@@ -236,9 +236,9 @@ const CHOICE_SETS = {
     img: '/assets/scenes/xiangjiang_bridge.jpg',
     loss: { who: '担架上的伤员', reason: '为了抢时间冲过封锁，担架没能全部抬过去' },
     options: [
-      { label: '立刻冲过去', sub: '快，但风险大' },
-      { label: '等烟散了再走', sub: '稳，但更耗体力' },
-      { label: '绕浅滩', sub: '远一点，脚会湿' },
+      { label: '立刻冲过去', sub: '快，但风险大', risk: 'high' },
+      { label: '等烟散了再走', sub: '稳，但更耗体力', risk: 'mid' },
+      { label: '绕浅滩', sub: '远一点，脚会湿', risk: 'low' },
     ],
     factId: 'h_xiangjiang',
   },
@@ -257,10 +257,12 @@ const CHOICE_SETS = {
     title: '今夜能不能渡',
     callType: 'branch_judge',
     img: '/assets/scenes/jinsha_ferry.jpg',
+    // 抢渡是有代价的抉择：体力/粮食见底时硬渡，会有人留在江里
+    loss: { who: '木筏上的战士', reason: '抢在雾散前强渡，木筏撞上暗礁，有人没能上岸' },
     options: [
-      { label: '跟船工的桨声走', sub: '信老乡' },
-      { label: '天亮再渡', sub: '更安全，更慢' },
-      { label: '分批快渡，伤员先上', sub: '分工' },
+      { label: '跟船工的桨声走', sub: '信老乡', risk: 'mid' },
+      { label: '天亮再渡', sub: '更安全，更慢', risk: 'low' },
+      { label: '分批快渡，伤员先上', sub: '分工', risk: 'mid' },
     ],
     factId: 'h_jinsha',
   },
@@ -278,10 +280,12 @@ const CHOICE_SETS = {
     title: '腊子口怎么打',
     callType: 'branch_judge',
     img: '/assets/scenes/lazikou_cliff.jpg',
+    // 正面强攻从来不是零代价：这是全篇最后一个"会失去人"的抉择
+    loss: { who: '突击班里的战士', reason: '正面强攻腊子口，突击班没能全部下来' },
     options: [
-      { label: '正面佯攻，侧崖奇袭', sub: '出其不意' },
-      { label: '集中火力正面强攻', sub: '硬碰硬' },
-      { label: '找向导绕道', sub: '耗粮但稳' },
+      { label: '正面佯攻，侧崖奇袭', sub: '出其不意', risk: 'mid' },
+      { label: '集中火力正面强攻', sub: '硬碰硬', risk: 'high' },
+      { label: '找向导绕道', sub: '耗粮但稳', risk: 'low' },
     ],
     factId: 'h_huining',
   },
@@ -304,9 +308,9 @@ const CHOICE_SETS = {
     npcRole: '雪山掉队',
     loss: { who: '掉队的战士', reason: '风雪里他没能跟上，队伍在天黑前下不了山' },
     options: [
-      { label: '架起他的胳膊一起走', sub: '慢，但谁都不落' },
-      { label: '替他背枪，让他自己走', sub: '分担一点是一点' },
-      { label: '先赶到山顶再说', sub: '保存自己' },
+      { label: '架起他的胳膊一起走', sub: '慢，但谁都不落', risk: 'low' },
+      { label: '替他背枪，让他自己走', sub: '分担一点是一点', risk: 'mid' },
+      { label: '先赶到山顶再说', sub: '保存自己', risk: 'high' },
     ],
     factId: 'h_xueshan',
   },
@@ -1759,20 +1763,20 @@ async function doChoice(act, actionId) {
     extraOf: (o) => {
       const h = hints[o.label];
       const trend = h?.trend ? `<em class="trend">${escapeHtml(h.trend)}</em>` : '';
-      const risk = h?.risk ? `<em class="risk r-${h.risk}">${h.risk}风险</em>` : '';
-      return `${trend}${risk}`;
+      // 风险标签优先用作者标注（决定实际后果），模型给的只作补充——
+      // 否则会出现"界面显示低风险、判定却按高风险减员"的不一致
+      const risk = o.risk || h?.risk;
+      const riskChip = risk ? `<em class="risk r-${risk}">${risk === 'high' ? '高' : risk === 'mid' ? '中' : '低'}风险</em>` : '';
+      return `${trend}${riskChip}`;
     },
   })).label;
   logChoice(act, choice, hints[choice]?.trend || '');
-  // 行军模式：高风险抉择可能留下一个人（不可逆）
-  if (S.mode === 'march' && cs.loss) {
-    const risk = hints[choice]?.risk || '';
-    if (risk === '高' || risk === '中') {
-      const who = cs.loss.who;
-      if (addLoss(S, who, cs.loss.reason)) {
-        showLossToast(who, cs.loss.reason);
-        appendCampLog(S, '损失', `${who} 没能跟上`);
-      }
+  // 行军模式：减员由「作者标注的风险 + 当前资源」决定（见 state.js 的 resolveLoss），不可逆
+  if (S.mode === 'march') {
+    const loss = resolveLoss(cs, cs.options.findIndex((o) => o.label === choice), S);
+    if (loss && addLoss(S, loss.who, loss.reason)) {
+      showLossToast(loss.who, loss.reason);
+      appendCampLog(S, '损失', `${loss.who} 没能跟上`);
     }
   }
   showThinking(true);

@@ -5,7 +5,43 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, applyEffects, unlockFact } from '../../public/js/state.js';
-import { markLineDone, linesDoneCount, canNight, apPerDay, dayScene, checkFailure } from '../../public/js/state.js';
+import { markLineDone, linesDoneCount, canNight, apPerDay, dayScene, checkFailure, resolveLoss } from '../../public/js/state.js';
+
+// 减员判定：由作者标注的风险 + 当前资源决定（行军模式的主要代价来源）
+const LOSS_CS = {
+  loss: { who: '某个人', reason: '代价' },
+  options: [
+    { label: 'A', risk: 'high' },
+    { label: 'B', risk: 'mid' },
+    { label: 'C', risk: 'low' },
+  ],
+};
+
+test('减员：高风险在资源吃紧时触发', () => {
+  const s = createState();
+  s.体力 = 59;
+  assert.equal(resolveLoss(LOSS_CS, 0, s).who, '某个人');
+  s.体力 = 80; s.粮食 = 0;
+  assert.equal(resolveLoss(LOSS_CS, 0, s).who, '某个人', '断粮时高风险同样危险');
+  s.体力 = 80; s.粮食 = 5;
+  assert.equal(resolveLoss(LOSS_CS, 0, s), null, '资源充足时不该减员');
+});
+
+test('减员：中风险只在体力见底时触发，低风险永不', () => {
+  const s = createState();
+  s.体力 = 36; s.粮食 = 5;
+  assert.equal(resolveLoss(LOSS_CS, 1, s), null);
+  s.体力 = 35;
+  assert.equal(resolveLoss(LOSS_CS, 1, s).who, '某个人');
+  s.体力 = 1; s.粮食 = 0;
+  assert.equal(resolveLoss(LOSS_CS, 2, s), null, '低风险选项不该减员');
+});
+
+test('减员：没有 loss 声明的抉择永不减员', () => {
+  const s = createState();
+  s.体力 = 0; s.粮食 = 0;
+  assert.equal(resolveLoss({ options: [{ label: 'A', risk: 'high' }] }, 0, s), null);
+});
 
 test('createState 默认五维与锁字段', () => {
   const s = createState();

@@ -93,6 +93,31 @@ export function addLoss(state, who, reason) {
   return true;
 }
 
+/**
+ * 减员判定（行军模式）：由**作者标注的风险 + 玩家当前资源**共同决定，不再看模型心情。
+ *
+ * 为什么改：原先只看 `choice_hint` 返回的 risk 是否 高/中 —— 模型不给风险就不减员，
+ * 实测行军模式三局零减员，"抉择可能真的带不走一些人"这句话就落空了。
+ * 现在的规则让"代价"与资源管理挂钩：
+ *   高风险（正面强攻、抢渡、丢下他）：体力 <60 或 粮食 ≤1 就会失去一个人
+ *   中风险（稳妥但慢、分担）：体力 ≤35 才会失去
+ *   低风险：不减员
+ * 每个抉择的 `loss.who` 各不相同，且同一人在一局里只减一次（addLoss 幂等）。
+ */
+export function lossRiskOf(cs, choiceIndex) {
+  const opt = cs?.options?.[choiceIndex];
+  return opt?.risk || 'low';
+}
+
+export function resolveLoss(cs, choiceIndex, state) {
+  if (!cs?.loss || !state) return null;
+  const risk = lossRiskOf(cs, choiceIndex);
+  const exhausted = state.体力 < 60 || state.粮食 <= 1;
+  if (risk === 'high' && exhausted) return cs.loss;
+  if (risk === 'mid' && state.体力 <= 35) return cs.loss;
+  return null;
+}
+
 /** 幕间粮荒惩罚：粮食为 0 时体力流失 */
 export function applyStarvation(state) {
   if (state.粮食 > 0) return 0;
