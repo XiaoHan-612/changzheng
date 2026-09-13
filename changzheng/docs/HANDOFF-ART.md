@@ -62,6 +62,8 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `xiangjiang_night.jpg` | 第一幕过场第二帧（`cutAlt`） |
 | `xiangjiang_wreck.jpg` | 湘江「沉默的老兵」交谈（热点 `img` 字段） |
 | `zunyi_room.jpg` | 遵义「小楼门口」交谈（热点 `img` 字段） |
+| `map_route.jpg` | 手记（回望）面板底图，叠在手记上（会压一层深色渐变保证可读） |
+| `echo_paper.jpg` | 史实回响面板底纹，叠在回响卡上（同上） |
 | `jinsha_ferry.jpg` | 「今夜能不能渡」抉择 |
 | `map_desk.jpg` | 「往哪里走」抉择 |
 | `depart_bridge.jpg` | 开场「怎么过河」抉择 |

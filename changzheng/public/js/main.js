@@ -167,6 +167,7 @@ function preloadScenes() {
     '/assets/scenes/luding_run.jpg', '/assets/scenes/luding_bridge.jpg', '/assets/scenes/jinsha_ferry.jpg',
     '/assets/scenes/depart_crowd.jpg', '/assets/scenes/xiangjiang_wreck.jpg',
     '/assets/scenes/xiangjiang_night.jpg', '/assets/scenes/zunyi_room.jpg',
+    '/assets/scenes/map_route.jpg', '/assets/scenes/echo_paper.jpg',
     // 立绘（第三轮）：落盘即生效，见 portraitImage()
     '/assets/characters/mother.png', '/assets/characters/xianggui.png', '/assets/characters/guide.png',
     '/assets/characters/boatman.png', '/assets/characters/recruit.png', '/assets/characters/straggler.png',
@@ -421,6 +422,14 @@ function bindChrome() {
 function openJournal() {
   if (!S) return;
   showOverlay('screen-journal');
+  // 手记底图：有 map_route 就用它当"回望这一路"的地图底（图层压暗保证可读）
+  const mapImg = sceneImage('/assets/scenes/map_route.jpg', '');
+  const jPanel = document.querySelector('#screen-journal .journal');
+  if (jPanel) {
+    jPanel.style.backgroundImage = mapImg
+      ? `linear-gradient(160deg, rgba(38,33,25,0.88), rgba(20,19,17,0.92)), url('${mapImg}')`
+      : '';
+  }
   const order = actsData?.order || [];
   const now = S.actIndex ?? 0;
   $('journal-route').innerHTML = order
@@ -660,6 +669,14 @@ function showEcho({ title, play, real, fic }) {
   markAction($('btn-echo-ok'), 'echo-ok');
   return new Promise((resolve) => {
     audio.playSfx('echo');
+    // 史实回响底纹：有 echo_paper 就用它（压一层深色渐变，保证文字可读）
+    const paper = sceneImage('/assets/scenes/echo_paper.jpg', '');
+    const cinema = document.querySelector('#screen-echo .echo-cinema');
+    if (cinema) {
+      cinema.style.backgroundImage = paper
+        ? `linear-gradient(160deg, rgba(40,34,24,0.88), rgba(22,20,18,0.92)), url('${paper}')`
+        : '';
+    }
     // 史实回响的播报点：有史实卡就念卡名（命中 14 张标题的 TTS 缓存），没有才念固定旁白
     if (title) audio.speak(title, '旁白', 'narr').catch(() => {});
     else audio.speak('你刚经历的，和真实发生过的，往往只隔着一层时间。', '叙事', 'narr_echo');
