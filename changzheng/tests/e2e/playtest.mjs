@@ -19,7 +19,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { snap, tap, applyMiniAction, readingDelay, pickHotspot } from './lib/driver.mjs';
+import { playThrough } from './lib/driver.mjs';
 
 const PORT = process.env.PORT || 3001;
 const BASE = `http://localhost:${PORT}`;
@@ -38,24 +38,6 @@ const STRATEGY = arg('strategy', 'balanced');
 const RUNS = Math.max(1, Number(arg('runs', '1')) || 1);
 const SPEED = arg('speed', 'human');
 const WRITE_DOC = process.argv.includes('--doc');
-
-/**
- * 策略 = 「选第几个选项」+「优先点哪个热点」。
- * 三个策略对应三种玩家画像：稳扎稳打 / 保守求存 / 抢进度。
- * 热点优先靠标签关键词打分，是在没有语义标签的情况下能落地的最简办法。
- */
-const STRATEGIES = {
-  balanced: { pick: () => 0, score: () => 0 },
-  thrifty: {
-    pick: (n) => Math.min(1, n - 1),
-    score: (label) => (/背囊|休息|分|塘/.test(label) ? 3 : /说话|问|交谈/.test(label) ? 1 : 0),
-  },
-  greedy: {
-    pick: () => 0,
-    score: (label) => (/陡坡|隘口|红旗|桥/.test(label) ? 3 : /说话|问|交谈/.test(label) ? 1 : 0),
-  },
-};
-const policy = STRATEGIES[STRATEGY] || STRATEGIES.balanced;
 
 async function ensureServer() {
   try {
@@ -78,38 +60,6 @@ const readState = (page) => page.evaluate((k) => {
   try { return JSON.parse(sessionStorage.getItem(k) || 'null'); } catch { return null; }
 }, KEY);
 
-async function clickChoice(page, index) {
-  const opts = page.locator('[data-choice-index]');
-  const n = await opts.count().catch(() => 0);
-  if (!n) return '';
-  // 先按策略选目标下标，若它被判定为不可见（残留节点/零尺寸）则退到最近的可见项。
-  // 不能直接 return —— 那样循环会原地打转直到假死检测触发。
-  const order = [...Array(n).keys()].sort((a, b) => Math.abs(a - index) - Math.abs(b - index));
-  for (const i of order) {
-    const el = opts.nth(i);
-    if (!(await el.isVisible().catch(() => false))) continue;
-    if (await el.isDisabled().catch(() => false)) continue;
-    const label = (await el.innerText().catch(() => '')).split('\n')[0].trim();
-    await el.click({ force: true, timeout: 400 }).catch(() => {});
-    return label || `#${i}`;
-  }
-  return '';
-}
-
-async function clickHotspot(page, labels, scoreOf) {
-  if (!labels.length) return '';
-  let best = labels[0];
-  let bestScore = -1;
-  for (const l of labels) {
-    const sc = scoreOf(l);
-    if (sc > bestScore) { best = l; bestScore = sc; }
-  }
-  const el = page.locator('[data-action="hotspot"]', { hasText: best }).first();
-  if (!(await el.count().catch(() => 0))) return '';
-  await el.click({ force: true, timeout: 400 }).catch(() => {});
-  return best;
-}
-
 /** 跑一局，返回测量结果 */
 async function playOne(browser, runIndex) {
   // 每局独立计量：先清空服务端日志，否则 aiCalls 会把历史累计进来
@@ -127,92 +77,19 @@ async function playOne(browser, runIndex) {
   await page.goto(`${BASE}/?play=${Date.now()}`, { waitUntil: 'networkidle' });
   await page.evaluate(() => sessionStorage.clear());
   await page.reload({ waitUntil: 'networkidle' });
-  await page.click(MODE === 'march' ? '#btn-mode-march' : '#btn-mode-study');
-
-  const t0 = Date.now();
+  // 跑局逻辑走共用件（与影音审计同一实现），这里只挂"分幕计时"与进度打印
   const perAct = [];
-  let currentAct = '';
-  let actStart = t0;
-  let lastSig = '';
-  let lastProgress = Date.now();
-  let pacedFor = '';
-  const trace = [];
-  const visitedHotspots = new Set();
-  const askedTalk = new Set();     // 同一场交谈最多问一句（真人也会试一句就走）
-
-  for (;;) {
-    const s = await snap(page);
-    if (s.screens.includes('screen-end')) break;
-    if (Date.now() - t0 > 45 * 60 * 1000) throw new Error('试玩超时 45 分钟');
-
-    // 换幕计时（快速模式没有 #act-title，用 step 前缀兜底）
-    const actKey = s.act || s.step.split(':')[0];
-    if (actKey && actKey !== currentAct) {
-      if (currentAct) perAct.push({ act: currentAct, seconds: Math.round((Date.now() - actStart) / 1000) });
-      currentAct = actKey;
-      actStart = Date.now();
-      trace.push(`act ${actKey}`);
-      // 每局要十几分钟，必须持续报进度，否则看起来像卡死
-      console.log(`    [run ${runIndex}] ${((Date.now() - t0) / 1000).toFixed(0)}s → ${actKey}`);
-    }
-
-    const sig = [s.screens.join(), s.step, s.state, s.choices, s.cont, s.echoOk, s.mini, s.miniState].join('|');
-    if (sig !== lastSig) { lastSig = sig; lastProgress = Date.now(); }
-    if (Date.now() - lastProgress > 40000) {
-      throw new Error(`卡住 40s：screen=${s.screens.join(',')} step=${s.step} state=${s.state}；最近动作：${trace.slice(-8).join(' → ')}`);
-    }
-
-    // 人类节奏：每个"新的待操作画面"只等一次，等过的不重复等。
-    // 注意不能要求 state === 'awaiting'：askChoice 点完会把步骤置为 busy，
-    // 而结果面板的「继续」此时已经出现，若先判 busy 就会永远跳过它。
-    if (sig !== pacedFor && (s.choices || s.cont || s.echoOk || s.mini || s.talkEnd || s.march)) {
-      pacedFor = sig;
-      const wait = readingDelay(s.chars, SPEED);
-      if (wait) await page.waitForTimeout(wait);
-      continue;
-    }
-
-    if (s.echoOk) { trace.push('echo-ok'); await tap(page, '[data-action="echo-ok"]'); continue; }
-    if (s.cont) { trace.push('continue'); await tap(page, '[data-action="continue"]'); continue; }
-    if (s.aiRetry) { trace.push('ai-retry'); await tap(page, '[data-action="ai-retry"]'); continue; }
-    if (s.state === 'busy') { await page.waitForTimeout(300); continue; }
-    if (s.mini) {
-      const label = await applyMiniAction(page, s);
-      if (label) trace.push(label);
-      continue;
-    }
-    // 交谈：先问一句（贴近真人），再结束。必须排在通用选项之前：
-    // 快捷问句同样带 data-choice-index，先走通用分支会在这里无限提问。
-    if (s.talkEnd) {
-      if (s.talkQuick && !askedTalk.has(s.step) && STRATEGY !== 'thrifty') {
-        askedTalk.add(s.step);
-        trace.push('talk-ask');
-        await tap(page, '[data-action="talk-quick"]');
-        continue;
-      }
-      trace.push('talk-end');
-      await tap(page, '[data-action="talk-end"]');
-      continue;
-    }
-    if (s.choices) {
-      const label = await clickChoice(page, policy.pick(s.choices));
-      trace.push(`choice ${label}`);
-      continue;
-    }
-    if (s.screens.includes('screen-camp')) {
-      if (s.apOn > 0 && s.hotspots.length) {
-        const keyOf = (l) => `${s.act}|${l}`;
-        const label = pickHotspot(s.hotspots, { visited: visitedHotspots, keyOf, scoreOf: policy.score });
-        const clicked = await clickHotspot(page, [label], policy.score);
-        if (clicked) {
-          visitedHotspots.add(keyOf(clicked));
-          trace.push(`hotspot ${clicked}`);
-          continue;
-        }
-      }
-      if (s.march) { trace.push('march'); await tap(page, '[data-action="march"]'); continue; }
-    }
-    await page.waitForTimeout(200);
+  const actMarks = [];
+  const { seconds } = await playThrough(page, {
+    mode: MODE, speed: SPEED, strategy: STRATEGY,
+    onAct: (act, at) => {
+      actMarks.push({ act, at });
+      console.log(`    [run ${runIndex}] ${at}s → ${act}`);
+    },
+  });
+  for (let i = 0; i < actMarks.length; i++) {
+    const end = i + 1 < actMarks.length ? actMarks[i + 1].at : seconds;
+    perAct.push({ act: actMarks[i].act, seconds: Math.max(0, end - actMarks[i].at) });
   }
 
   // 等结算写完（标题先出、段落逐字、personal 最后）
@@ -222,7 +99,6 @@ async function playOne(browser, runIndex) {
     if (title && !/结算中/.test(title) && String(personal).trim()) break;
     await page.waitForTimeout(500);
   }
-  const seconds = Math.round((Date.now() - t0) / 1000);
   const endTitle = (await page.locator('#end-title').textContent().catch(() => '')) || '';
   const eyebrow = (await page.locator('#end-eyebrow').textContent().catch(() => '')) || '';
   const st = await readState(page);

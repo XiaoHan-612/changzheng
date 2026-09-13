@@ -168,3 +168,138 @@ export function pickHotspot(labels, { visited = new Set(), keyOf = (l) => l, sco
   }
   return best;
 }
+
+/**
+ * 试玩策略 = 「选第几个选项」+「优先点哪个热点」。
+ * 三种画像：稳扎稳打 / 保守求存 / 抢进度。热点优先靠标签关键词打分。
+ */
+export const STRATEGIES = {
+  balanced: { pick: () => 0, score: () => 0 },
+  thrifty: {
+    pick: (n) => Math.min(1, n - 1),
+    score: (label) => (/背囊|休息|分|塘/.test(label) ? 3 : /说话|问|交谈/.test(label) ? 1 : 0),
+  },
+  greedy: {
+    pick: () => 0,
+    score: (label) => (/陡坡|隘口|红旗|桥/.test(label) ? 3 : /说话|问|交谈/.test(label) ? 1 : 0),
+  },
+};
+
+/** 按策略点选项：目标下标不可见时退到最近的可见项（不能原地返回，否则会假死） */
+export async function clickChoice(page, index) {
+  const opts = page.locator('[data-choice-index]');
+  const n = await opts.count().catch(() => 0);
+  if (!n) return '';
+  const order = [...Array(n).keys()].sort((a, b) => Math.abs(a - index) - Math.abs(b - index));
+  for (const i of order) {
+    const el = opts.nth(i);
+    if (!(await el.isVisible().catch(() => false))) continue;
+    if (await el.isDisabled().catch(() => false)) continue;
+    const label = (await el.innerText().catch(() => '')).split('\n')[0].trim();
+    await el.click({ force: true, timeout: 400 }).catch(() => {});
+    return label || `#${i}`;
+  }
+  return '';
+}
+
+/**
+ * 完整跑一局（唯一实现，试玩测量与影音审计共用）。
+ *
+ * @param {object} opts
+ * @param {'study'|'march'|'quick'} opts.mode
+ * @param {'human'|'fast'} opts.speed 人类节奏（按正文字数等待）或零延迟
+ * @param {'balanced'|'thrifty'|'greedy'} opts.strategy
+ * @param {(s:object, ctx:object)=>void} [opts.onSnapshot] 每次快照回调（审计挂在这里）
+ * @param {(ev:object)=>void} [opts.onAct] 换幕回调（试玩计时挂在这里）
+ * @param {number} [opts.maxMs]
+ * @returns {Promise<{trace:string[], seconds:number, snapshot:object}>}
+ */
+export async function playThrough(page, {
+  mode = 'study', speed = 'fast', strategy = 'balanced',
+  onSnapshot = null, onAct = null, maxMs = 45 * 60 * 1000,
+} = {}) {
+  const policy = STRATEGIES[strategy] || STRATEGIES.balanced;
+  const t0 = Date.now();
+  const visited = new Set();
+  const asked = new Set();          // 同一场交谈最多问一句
+  const trace = [];
+  let pacedFor = '';
+  let lastSig = '';
+  let lastProgress = Date.now();
+  let currentAct = '';
+
+  await page.click(mode === 'quick' ? '#btn-mode-quick' : mode === 'march' ? '#btn-mode-march' : '#btn-mode-study');
+
+  for (;;) {
+    const s = await snap(page);
+    if (s.screens.includes('screen-end')) return { trace, seconds: Math.round((Date.now() - t0) / 1000), snapshot: s };
+    if (Date.now() - t0 > maxMs) throw new Error(`跑局超时 ${Math.round(maxMs / 60000)} 分钟`);
+
+    const actKey = s.act || s.step.split(':')[0];
+    if (actKey && actKey !== currentAct) {
+      currentAct = actKey;
+      if (onAct) onAct(actKey, Math.round((Date.now() - t0) / 1000));
+    }
+    if (onSnapshot) onSnapshot(s, { sinceStart: Math.round((Date.now() - t0) / 1000) });
+
+    const sig = [s.screens.join(), s.step, s.state, s.choices, s.cont, s.echoOk, s.mini, s.miniState].join('|');
+    if (sig !== lastSig) { lastSig = sig; lastProgress = Date.now(); }
+    if (Date.now() - lastProgress > 40000) {
+      throw new Error(`卡住 40s：screen=${s.screens.join(',')} step=${s.step} state=${s.state}；最近动作：${trace.slice(-8).join(' → ')}`);
+    }
+
+    // 人类节奏：每个"新的待操作画面"只等一次。不能要求 state==='awaiting'：
+    // askChoice 点完会置 busy，而结果面板的「继续」此时已经出现，先判 busy 会永远跳过它。
+    if (speed === 'human' && sig !== pacedFor
+      && (s.choices || s.cont || s.echoOk || s.mini || s.talkEnd || s.march)) {
+      pacedFor = sig;
+      await page.waitForTimeout(readingDelay(s.chars, speed));
+      continue;
+    }
+
+    if (s.echoOk) { trace.push('echo-ok'); await tap(page, '[data-action="echo-ok"]'); continue; }
+    if (s.cont) { trace.push('continue'); await tap(page, '[data-action="continue"]'); continue; }
+    if (s.aiRetry) { trace.push('ai-retry'); await tap(page, '[data-action="ai-retry"]'); continue; }
+    if (s.state === 'busy') { await page.waitForTimeout(300); continue; }
+    if (s.mini) {
+      const label = await applyMiniAction(page, s);
+      if (label) trace.push(label);
+      continue;
+    }
+    // 交谈：先问一句（贴近真人）再结束。必须排在通用选项之前：快捷问句也带 data-choice-index。
+    if (s.talkEnd) {
+      if (s.talkQuick && !asked.has(s.step) && strategy !== 'thrifty') {
+        asked.add(s.step);
+        trace.push('talk-ask');
+        await tap(page, '[data-action="talk-quick"]');
+        continue;
+      }
+      trace.push('talk-end');
+      await tap(page, '[data-action="talk-end"]');
+      continue;
+    }
+    if (s.choices) {
+      trace.push(`choice ${await clickChoice(page, policy.pick(s.choices))}`);
+      continue;
+    }
+    if (s.screens.includes('screen-camp')) {
+      if (s.apOn > 0 && s.hotspots.length) {
+        const keyOf = (l) => `${s.act}|${l}`;
+        const label = pickHotspot(s.hotspots, { visited, keyOf, scoreOf: policy.score });
+        const clicked = await clickHotspot(page, label);
+        if (clicked) { visited.add(keyOf(clicked)); trace.push(`hotspot ${clicked}`); continue; }
+      }
+      if (s.march) { trace.push('march'); await tap(page, '[data-action="march"]'); continue; }
+    }
+    await page.waitForTimeout(200);
+  }
+}
+
+/** 点一个指定文案的热点，返回是否点到 */
+export async function clickHotspot(page, label) {
+  const el = page.locator('[data-action="hotspot"]', { hasText: label }).first();
+  if (!(await el.count().catch(() => 0))) return '';
+  if (!(await el.isVisible().catch(() => false))) return '';
+  await el.click({ force: true, timeout: 400 }).catch(() => {});
+  return label;
+}
