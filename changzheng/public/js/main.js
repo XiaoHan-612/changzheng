@@ -2312,7 +2312,7 @@ async function runEnding() {
         '史实：' + (r?.knowledge || []).join('；'),
         '价值：' + (r?.values || []).join('；'),
         r?.suggest || '',
-        '场景：天津移动 5G+红色研学 / 党建数字课堂 / 校园思政',
+        '适用：课堂研学 / 党建学习 / 展馆讲解',
       ].join('\n');
       navigator.clipboard?.writeText(text).then(() => toast('报告已复制')).catch(() => toast('复制失败'));
     };

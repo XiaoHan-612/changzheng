@@ -424,7 +424,6 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .def-card .k { font-size: var(--fs-micro); color: var(--ink-2); letter-spacing: 0.08em; }
 .def-card .v { font-family: var(--font-num); font-size: 22px; color: var(--seal); margin-top: 4px; }
 .def-card .n { font-size: var(--fs-micro); color: var(--ink-2); margin-top: 4px; }
-.biz-strip { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-3); }
 .ai-inspector { position: fixed; right: var(--sp-4); bottom: var(--sp-4); width: 320px; max-height: 46vh; overflow: auto; z-index: var(--z-toast); padding: var(--sp-3); border-radius: var(--radius); }
 .ai-ins-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-2); font-family: var(--font-kai); color: var(--seal); }
 .ai-ins-body { display: flex; flex-direction: column; gap: 6px; }
