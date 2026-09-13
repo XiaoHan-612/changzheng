@@ -1,9 +1,10 @@
-/**
+﻿/**
  * 回归用例（真调）：
  * 1) 反复进出沙盘不会叠加 submit 监听（一次行动 = 一次 sim_turn 日志）
  * 2) 沙盘存档不会落在上一回合（日志与画面同回合）
  * 运行：npm run qa:regress
  */
+import { ensureServer } from './lib/server.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -27,22 +28,6 @@ function restoreRuntime(snap) {
   } catch { /* ignore */ }
 }
 
-async function ensureServer() {
-  try {
-    const r = await fetch(`${BASE}/api/config`);
-    if (r.ok) return;
-  } catch { /* start */ }
-  const child = spawn(process.execPath, ['server/index.js'], { cwd: ROOT, stdio: 'ignore', detached: true });
-  child.unref();
-  for (let i = 0; i < 40; i++) {
-    await sleep(300);
-    try {
-      const r = await fetch(`${BASE}/api/config`);
-      if (r.ok) return;
-    } catch { /* retry */ }
-  }
-  throw new Error('无法启动服务');
-}
 
 async function main() {
   const runtimeSnap = snapshotRuntime();

@@ -164,6 +164,9 @@
 }
 .hotspot:disabled { cursor: default; opacity: 0.35; }
 .hotspot:disabled .ember { animation: none; }
+/* 做过的热点与"没行动点"区分开：前者沉下去，后者仍可辨认 */
+.hotspot[data-hotspot-state="done"] { opacity: 0.28; filter: grayscale(0.5); }
+.hotspot[data-hotspot-state="done"] .hs-label { text-decoration: line-through; text-decoration-thickness: 1px; }
 
 /* 左侧 HUD */
 .hud-left {

@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "changzheng-juze",
   "version": "0.2.0",
   "description": "《长征·抉择》— 五幕 AI 科普互动游戏（赛道二）",
@@ -8,7 +8,7 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "npm run test:unit && npm run test:e2e && npm run qa:sandbox",
-    "test:unit": "node --test tests/unit/state.test.js tests/unit/config.test.js tests/unit/schema.test.js tests/unit/origin.test.js tests/unit/acts.test.js",
+    "test:unit": "node --test tests/unit/state.test.js tests/unit/config.test.js tests/unit/schema.test.js tests/unit/origin.test.js tests/unit/acts.test.js tests/unit/balance.test.js",
     "test:e2e": "node tests/e2e/full-run.mjs",
     "test:e2e:headed": "node tests/e2e/full-run.mjs --headed",
     "qa:smoke": "node tests/e2e/smoke.mjs",

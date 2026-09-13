@@ -33,7 +33,7 @@ test('applyOrigin 写入 origin 并结算五维', () => {
   assert.equal(origin.id, 'farm');
   assert.equal(s.origin, 'farm');
   assert.equal(s.体力, 77);        // 72 + 5
-  assert.equal(s.信念, 68);        // 70 − 2
+  assert.equal(s.信念, 56);        // 58 − 2
   assert.equal(changes.length, 2);
 });
 
@@ -57,13 +57,13 @@ test('出发前一问：答对加信念，答错不扣', () => {
   const rightState = createState();
   const right = applyOriginQuiz(rightState, ORIGIN_QUIZ.answerIndex);
   assert.equal(right.right, true);
-  assert.equal(rightState.信念, 73);            // 70 + 3
+  assert.equal(rightState.信念, 61);            // 58 + 3
   assert.deepEqual(rightState.originQuiz, { picked: 0, right: true });
 
   const wrongState = createState();
   const wrong = applyOriginQuiz(wrongState, ORIGIN_QUIZ.answerIndex + 1);
   assert.equal(wrong.right, false);
-  assert.equal(wrongState.信念, 70, '答错不应扣分');
+  assert.equal(wrongState.信念, 58, '答错不应扣分');
   assert.deepEqual(wrong.changes, []);
 });
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 自动试玩：测量「单局时长」与「资源曲线」，为数值调参提供唯一口径。
  *
  * 与 full-run 的区别：
@@ -13,6 +13,7 @@
  *
  * 产物：tests/e2e/artifacts/playtest-<mode>-<strategy>.json（每次覆盖同名），控制台打印汇总表。
  */
+import { ensureServer } from './lib/server.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -39,22 +40,6 @@ const RUNS = Math.max(1, Number(arg('runs', '1')) || 1);
 const SPEED = arg('speed', 'human');
 const WRITE_DOC = process.argv.includes('--doc');
 
-async function ensureServer() {
-  try {
-    const r = await fetch(`${BASE}/api/config`);
-    if (r.ok) return;
-  } catch { /* start */ }
-  const child = spawn(process.execPath, ['server/index.js'], { cwd: ROOT, stdio: 'ignore', detached: true });
-  child.unref();
-  for (let i = 0; i < 40; i++) {
-    await sleep(300);
-    try {
-      const r = await fetch(`${BASE}/api/config`);
-      if (r.ok) return;
-    } catch { /* retry */ }
-  }
-  throw new Error('无法启动服务');
-}
 
 const readState = (page) => page.evaluate((k) => {
   try { return JSON.parse(sessionStorage.getItem(k) || 'null'); } catch { return null; }

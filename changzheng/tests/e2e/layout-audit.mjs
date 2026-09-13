@@ -1,9 +1,10 @@
-/**
+﻿/**
  * 逐屏截图排查布局错位
  * 运行：node tests/e2e/layout-audit.mjs            # 1280 宽
  *       node tests/e2e/layout-audit.mjs --width 375 # 手机档（375 / 820 / 1280 三档逐屏验证）
  * 除了截图，还会自动报两类硬伤：① 页面横向溢出 ② 控件被挤出视口/点不到。
  */
+import { ensureServer } from './lib/server.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -75,22 +76,6 @@ async function probe(page, label) {
   return found;
 }
 
-async function ensureServer() {
-  try {
-    const r = await fetch(`${BASE}/api/config`);
-    if (r.ok) return;
-  } catch { /* start */ }
-  const child = spawn(process.execPath, ['server/index.js'], { cwd: ROOT, stdio: 'ignore', detached: true });
-  child.unref();
-  for (let i = 0; i < 40; i++) {
-    await sleep(300);
-    try {
-      const r = await fetch(`${BASE}/api/config`);
-      if (r.ok) return;
-    } catch { /* retry */ }
-  }
-  throw new Error('无法启动服务');
-}
 
 async function shot(page, name) {
   await page.screenshot({ path: path.join(ART, name + '.png') });

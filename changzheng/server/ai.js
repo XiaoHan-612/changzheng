@@ -1,6 +1,7 @@
 import { CONFIG } from './config.js';
 import { logAiCall } from './logger.js';
 import { missingFields } from './schema.js';
+import { normalizeEffects } from './balance.js';
 
 /**
  * 所有运行态智能决策必须走这里。禁止用独立算法替代模型判断。
@@ -158,6 +159,8 @@ export async function callGlm51(payload) {
       if (missing.length) {
         throw new Error(`模型返回缺少必需字段：${missing.join('、')}`);
       }
+      // 数值护栏：先归一化，再落日志（日志里看到的就是玩家实际收到的）
+      if ('effects' in parsed) parsed.effects = normalizeEffects(callType, parsed.effects);
 
       logAiCall({
         scene,
@@ -203,7 +206,10 @@ function buildSystemPrompt(callType, scene, operation) {
   const base = `你是《长征·抉择》的叙事与裁决引擎。题材：1934–1936 中国工农红军长征关键节点（于都河、湘江、遵义、金沙江、泸定桥、雪山草地、腊子口、会宁）。
 【语气】第二人称、克制、具体、有画面感；不堆口号，不戏说，不编造具体真实历史人物姓名。
 【史实】以提供的事实为锚；文学典型须可辨认为文学化记述。
-【护栏】禁止丑化红军战士；失败写代价与成长，不写羞辱。effects 单项 -20～+20。
+【护栏】禁止丑化红军战士；失败写代价与成长，不写羞辱。
+【数值】effects 单项 -8～+8（信念 -6～+6、粮食 -2～+2、好感 -4～+4），单次最多写 3 个维度，能不给就不给。
+失败、代价、赶时间一类结果**必须至少有一项为负**——不要让玩家觉得怎么选都不亏。
+信念只由"关键抉择"与"夜间议事"推动：小游戏成败不要给信念加分，连续同类场景也不要每次都加。
 【输出】只返回 JSON，不要任何其他文字。`;
 
   if (callType === 'scene_gen') {

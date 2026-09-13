@@ -982,6 +982,7 @@ function enterCampDay(act, day) {
   S.day = day;
   S.maxAp = apPerDay(act);
   S.ap = S.maxAp;
+  S.restCount = 0;                 // 新的一天：休息的恢复收益重置
   S.phase = 'camp';
   S.行动日志 = [];
   const scene = dayScene(act, day);
@@ -1119,12 +1120,14 @@ function renderHotspots(act, hotspots) {
     b.dataset.hotspot = h.kind || '';
     b.dataset.hotspotLabel = h.label || '';
     const apOut = S.ap <= 0 && h.kind !== 'march';
-    b.disabled = apOut;
+    const spent = hotspotSpent(act, h);
+    b.dataset.hotspotState = spent ? 'done' : 'open';
+    b.disabled = apOut || spent;
     b.innerHTML = `
       <span class="ember"></span>
       <span class="hs-card">
         <span class="hs-label">${h.label}</span>
-        <span class="hs-sub">${apOut ? '暮色已尽' : (h.sub || '')}</span>
+        <span class="hs-sub">${spent ? '已看过' : apOut ? '暮色已尽' : (h.sub || '')}</span>
       </span>`;
     b.onclick = () => onHotspot(act, h);
     box.appendChild(b);
@@ -1166,10 +1169,28 @@ const HOTSPOT_HANDLERS = {
   },
 };
 
+/**
+ * 可重复的热点类型。其余热点做过一次就置灰（isDone），
+ * 既防"反复点同一个热点刷资源/刷模型调用"，也让玩家必须去走没走过的地方。
+ * 「休息」不在其中：它是体力恢复阀，靠 restCount 递减而不是禁用。
+ */
+const REPEATABLE_HOTSPOTS = new Set(['fire', 'rest']);
+
+/** 这个热点是否已经做过（走与 HOTSPOT_HANDLERS 相同的 action||id 口径） */
+function hotspotSpent(act, h) {
+  if (!h || h.kind === 'march' || REPEATABLE_HOTSPOTS.has(h.kind)) return false;
+  return isDone(act.id, h.action || h.id);
+}
+
 async function onHotspot(act, h) {
   if (S?.busy) {
     // 切日/过场的瞬间仍在上一步的锁里，给个反馈别让玩家以为点坏了
     toast('上一步还在进行…', 1200);
+    return;
+  }
+  // 做过一次的热点不再重复结算（不扣行动点、不重复调模型）
+  if (hotspotSpent(act, h)) {
+    toast('这里已经看过了', 1600);
     return;
   }
   audio.playSfx('click');
@@ -1368,6 +1389,17 @@ async function doRest() {
   setStageBanner('休息', '/assets/scenes/camp_evening.jpg');
   setPortrait('你', '年轻战士', '你', '疲惫');
   setStagePanel('<p class="hint">靠着背囊眯一会儿。</p>');
+  // 体力恢复不交给模型：实测模型很少给正体力，一局净 −152 必然归零。
+  // 这里的保底让"休息"成为可控手段；同一天反复休息收益递减，避免刷体力。
+  S.restCount = (S.restCount || 0) + 1;
+  const heal = S.restCount === 1 ? 10 : S.restCount === 2 ? 5 : 0;
+  if (heal) {
+    flashEffects(applyEffects(S, { 体力: heal }));
+    appendCampLog(S, '休息', `缓过来一点（体力 +${heal}）`);
+  } else {
+    appendCampLog(S, '休息', '再歇也缓不过来多少了。');
+  }
+  renderStats(S);
   showThinking(true);
   let result;
   try {

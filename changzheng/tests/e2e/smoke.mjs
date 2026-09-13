@@ -1,6 +1,7 @@
 ﻿/**
  * E2E 鍐掔儫锛氭爣棰?鈫?钀ュ湴 鈫?涓€娆′簰鍔?鈫?鍥炶惀鍦? * 杩愯锛歯pm run qa:smoke
  */
+import { ensureServer } from './lib/server.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -25,26 +26,6 @@ function restoreRuntime(snap) {
   } catch { /* ignore */ }
 }
 
-async function ensureServer() {
-  try {
-    const r = await fetch(`${BASE}/api/config`);
-    if (r.ok) return null;
-  } catch { /* start */ }
-  const child = spawn(process.execPath, ['server/index.js'], {
-    cwd: ROOT,
-    stdio: 'ignore',
-    detached: true,
-  });
-  child.unref();
-  for (let i = 0; i < 30; i++) {
-    await sleep(300);
-    try {
-      const r = await fetch(`${BASE}/api/config`);
-      if (r.ok) return child;
-    } catch { /* retry */ }
-  }
-  throw new Error('server start failed');
-}
 
 async function main() {
   const runtimeSnap = snapshotRuntime();

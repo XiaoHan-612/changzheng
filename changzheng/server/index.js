@@ -10,6 +10,11 @@ import { callSim } from './sim.js';
 import { readSessionLogs, clearSessionLogs } from './logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// 代码指纹：server/*.js 的最新修改时间。测试用它判断"端口上跑的是不是当前代码"——
+// 早先复用旧进程导致服务端改动在测试里不生效，测出来的绿色是假绿。
+const CODE_STAMP = Math.max(...fs.readdirSync(__dirname).filter((f) => f.endsWith('.js'))
+  .map((f) => fs.statSync(path.join(__dirname, f)).mtimeMs));
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
@@ -86,6 +91,8 @@ app.get('/api/config', (_req, res) => {
     model: CONFIG.GLM_MODEL,
     reasoningEffort: CONFIG.GLM_REASONING_EFFORT,
     hasKey: !!CONFIG.GLM_API_KEY,
+    pid: process.pid,
+    codeStamp: CODE_STAMP,
     port: CONFIG.PORT,
     apiUrl: CONFIG.GLM_API_URL.replace(/\/[^/]*$/, '/***'),
     // 只回传掩码，不回传完整 key

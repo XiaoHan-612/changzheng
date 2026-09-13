@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 行军模式失败线真调：覆盖 15 类 AI 契约里唯一从没跑过的 failure_review。
  *
  * 做法（不靠硬刷体力，稳定复现）：开一局行军模式 → 把存档改成「断粮 + 体力见底」
@@ -7,6 +7,7 @@
  * 断言：failure_review 真调 1 次且 source=GLM；失败屏渲染出标题与段落，不是「结算中…」。
  * 运行：npm run qa:failure
  */
+import { ensureServer } from './lib/server.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -29,22 +30,6 @@ function restoreRuntime(snap) {
   } catch { /* ignore */ }
 }
 
-async function ensureServer() {
-  try {
-    const r = await fetch(`${BASE}/api/config`);
-    if (r.ok) return;
-  } catch { /* start */ }
-  const child = spawn(process.execPath, ['server/index.js'], { cwd: ROOT, stdio: 'ignore', detached: true });
-  child.unref();
-  for (let i = 0; i < 40; i++) {
-    await sleep(300);
-    try {
-      const r = await fetch(`${BASE}/api/config`);
-      if (r.ok) return;
-    } catch { /* retry */ }
-  }
-  throw new Error('无法启动服务');
-}
 
 // 与 full-run.mjs 同一套「交互契约」驱动：只认 data-* 标记，不认中文标签或屏内 id。
 // 这样新增玩法/改文案都不会让本用例失效。

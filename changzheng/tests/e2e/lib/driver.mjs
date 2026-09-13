@@ -36,6 +36,15 @@ export const snap = (page) => page.evaluate(() => {
     miniActions: mini ? [...mini.querySelectorAll('[data-mini-action]')].filter((e) => !e.disabled).map((e) => e.dataset.miniAction) : [],
     act: (document.getElementById('act-title')?.textContent || '').trim(),
     chars: visibleScreen ? visibleScreen.innerText.replace(/\s+/g, '').length : 0,
+    // 五维读数（HUD 顶栏）：让策略能像真人一样"没体力了先休息"
+    stats: (() => {
+      const out = {};
+      for (const el of document.querySelectorAll('#stats .stat')) {
+        const m = /^(体力|粮食|士气|信念|民心)(\d+)$/.exec((el.textContent || '').replace(/\s+/g, ''));
+        if (m) out[m[1]] = Number(m[2]);
+      }
+      return out;
+    })(),
   };
 });
 
@@ -174,14 +183,22 @@ export function pickHotspot(labels, { visited = new Set(), keyOf = (l) => l, sco
  * 三种画像：稳扎稳打 / 保守求存 / 抢进度。热点优先靠标签关键词打分。
  */
 export const STRATEGIES = {
-  balanced: { pick: () => 0, score: () => 0 },
+  // 三种策略都带"低于阈值先休息"的常识行为：不这么做，自动试玩永远测不出恢复阀的作用
+  balanced: {
+    pick: () => 0,
+    score: (label, s) => (s?.stats?.体力 <= 35 && /背囊|休息/.test(label) ? 5 : 0),
+  },
   thrifty: {
     pick: (n) => Math.min(1, n - 1),
-    score: (label) => (/背囊|休息|分|塘/.test(label) ? 3 : /说话|问|交谈/.test(label) ? 1 : 0),
+    score: (label, s) => (s?.stats?.体力 <= 50 && /背囊|休息/.test(label) ? 6
+      : /背囊|休息|分|塘/.test(label) ? 3
+        : /说话|问|交谈/.test(label) ? 1 : 0),
   },
   greedy: {
     pick: () => 0,
-    score: (label) => (/陡坡|隘口|红旗|桥/.test(label) ? 3 : /说话|问|交谈/.test(label) ? 1 : 0),
+    score: (label, s) => (s?.stats?.体力 <= 25 && /背囊|休息/.test(label) ? 6
+      : /陡坡|隘口|红旗|桥/.test(label) ? 3
+        : /说话|问|交谈/.test(label) ? 1 : 0),
   },
 };
 
@@ -285,7 +302,7 @@ export async function playThrough(page, {
     if (s.screens.includes('screen-camp')) {
       if (s.apOn > 0 && s.hotspots.length) {
         const keyOf = (l) => `${s.act}|${l}`;
-        const label = pickHotspot(s.hotspots, { visited, keyOf, scoreOf: policy.score });
+        const label = pickHotspot(s.hotspots, { visited, keyOf, scoreOf: (l) => policy.score(l, s) });
         const clicked = await clickHotspot(page, label);
         if (clicked) { visited.add(keyOf(clicked)); trace.push(`hotspot ${clicked}`); continue; }
       }

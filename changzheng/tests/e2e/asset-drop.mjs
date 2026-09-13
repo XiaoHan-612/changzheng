@@ -1,6 +1,7 @@
-// 验证「素材落盘即生效」：把新图放进 public/assets/scenes/ 后，
+﻿// 验证「素材落盘即生效」：把新图放进 public/assets/scenes/ 后，
 // 前端探测能得到它（HTTP 200 + 可解码），并且不会因为缺图而报错。
 // 用法：node tests/e2e/asset-drop.mjs
+import { ensureServer } from './lib/server.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -35,22 +36,6 @@ const AMBIENT = [
 // 代码支持 ogg → wav → 合成 三级回退；这里按实际存在的那个判定
 const AMBIENT_WAV = AMBIENT.map((p) => p.replace(/\.ogg$/, '.wav'));
 
-async function ensureServer() {
-  try {
-    const r = await fetch(`${BASE}/api/config`);
-    if (r.ok) return;
-  } catch { /* start */ }
-  const child = spawn(process.execPath, ['server/index.js'], { cwd: ROOT, stdio: 'ignore', detached: true });
-  child.unref();
-  for (let i = 0; i < 40; i++) {
-    await sleep(300);
-    try {
-      const r = await fetch(`${BASE}/api/config`);
-      if (r.ok) return;
-    } catch { /* retry */ }
-  }
-  throw new Error('无法启动服务');
-}
 
 async function main() {
   await ensureServer();

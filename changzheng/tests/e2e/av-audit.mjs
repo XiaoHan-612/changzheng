@@ -1,4 +1,4 @@
-// 影音运行时审计：验证「图真的用对了、声音真的响了」，而不只是流程跑得通。
+﻿// 影音运行时审计：验证「图真的用对了、声音真的响了」，而不只是流程跑得通。
 //
 // 为什么必须单独做这件事：
 //   sceneImage() 找不到图会静默退回占位图，playAmbient() 找不到文件会静默退回合成音。
@@ -15,6 +15,7 @@
 //   8) 无声率：/api/tts 未命中的台词里，哪些是"固定台词"（本该补音频），哪些是 AI 自由文本（结构性无声）
 //
 // 用法：npm run qa:av
+import { ensureServer } from './lib/server.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -81,22 +82,6 @@ const urlOf = (styleValue) => {
   return m ? m[1] : '';
 };
 
-async function ensureServer() {
-  try {
-    const r = await fetch(`${BASE}/api/config`);
-    if (r.ok) return;
-  } catch { /* start */ }
-  const child = spawn(process.execPath, ['server/index.js'], { cwd: ROOT, stdio: 'ignore', detached: true });
-  child.unref();
-  for (let i = 0; i < 40; i++) {
-    await sleep(300);
-    try {
-      const r = await fetch(`${BASE}/api/config`);
-      if (r.ok) return;
-    } catch { /* retry */ }
-  }
-  throw new Error('无法启动服务');
-}
 
 async function main() {
   await ensureServer();
