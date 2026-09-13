@@ -211,6 +211,7 @@ function portraitImage(name) {
  * 注意：同伴兜底必须放在专属立绘之后，否则"非同伴 NPC"会一律显示老班长的脸。
  */
 function showNpc(npc, { role, mood = '平静' } = {}) {
+  if (!npc) { setPortrait('你', role || '年轻战士', '你', mood); return; }
   const comp = COMPANIONS.find((c) => npc.includes(c.name));
   setPortrait(npc, role || comp?.role || '同行者', comp?.ava || npc.slice(0, 1), mood,
     portraitImage(npc) || comp?.img);
