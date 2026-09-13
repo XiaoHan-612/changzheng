@@ -470,7 +470,8 @@ function openJournal() {
   const jPanel = document.querySelector('#screen-journal .journal');
   if (jPanel) {
     jPanel.style.backgroundImage = mapImg
-      ? `linear-gradient(160deg, rgba(38,33,25,0.62), rgba(20,19,17,0.8)), url('${mapImg}')`
+      // 浅色纸纱：路线图只作水印透出来，墨字才读得清（旧版是压暗渐变，那是深色方案留下的）
+      ? `linear-gradient(160deg, rgba(244,237,223,0.9), rgba(230,218,195,0.94)), url('${mapImg}')`
       : '';
   }
   const order = actsData?.order || [];
@@ -729,7 +730,8 @@ function showEcho({ title, play, real, fic }) {
     const cinema = document.querySelector('#screen-echo .echo-cinema');
     if (cinema) {
       cinema.style.backgroundImage = paper
-        ? `linear-gradient(160deg, rgba(40,34,24,0.6), rgba(22,20,18,0.78)), url('${paper}')`
+        // 同上：纸纱盖在纸纹上，保持浅底墨字
+        ? `linear-gradient(160deg, rgba(244,237,223,0.9), rgba(230,218,195,0.94)), url('${paper}')`
         : '';
     }
     // 史实回响的播报点：有史实卡就念卡名（命中 14 张标题的 TTS 缓存），没有才念固定旁白

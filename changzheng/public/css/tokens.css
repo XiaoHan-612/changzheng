@@ -1,20 +1,69 @@
 /* ═══ 设计变量（全站唯一真相）═══
-   style.css / cinema.css / sandbox.css / minigames.css 共用 */
+   方向：战地手记 —— 内容层是米黄做旧纸上的墨字，界面骨架是压暗的墨色，
+   让插画（水墨淡彩 + 做旧纸）透出来。style / cinema / sandbox / minigames 共用。 */
 :root {
-  --bg: #0f1216;
-  --bg2: #171b20;
-  --paper: #e8dcc8;
-  --paper-dim: #c9bfa8;
-  --muted: #8a8478;
-  --ink: #2c2416;
-  --red: #8b2e2e;
-  --red-bright: #c23a2e;
-  --gold: #c4a35a;
-  --teal: #5c6b73;
-  --line: rgba(232, 220, 200, 0.14);
-  --panel: rgba(18, 22, 28, 0.92);
-  --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
-  --radius: 14px;
-  --font: "Noto Serif SC", "Songti SC", "SimSun", "Microsoft YaHei", serif;
-  --font-ui: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  /* ── 纸（内容层）── */
+  --paper-0: #f0e8d6;   /* 主纸面 */
+  --paper-1: #e7dbc2;   /* 抬起的纸 */
+  --paper-2: #dccdaf;   /* 内嵌凹槽 */
+  --paper-edge: #b9a884;
+  --rule: rgba(36, 29, 20, 0.18);
+  --rule-strong: rgba(36, 29, 20, 0.34);
+
+  /* ── 墨（文字与骨架）── */
+  --ink-0: #241d14;     /* 正文 */
+  --ink-1: #4a3d2c;     /* 次级 */
+  --ink-2: #6f5f47;     /* 弱化 */
+  --ink-bg: rgba(18, 14, 10, 0.80);
+  --ink-bg-2: rgba(14, 11, 8, 0.90);
+  --ink-line: rgba(232, 220, 200, 0.16);
+
+  /* ── 印章与旧金 ── */
+  --seal: #9b2d24;
+  --seal-bright: #b83a2c;
+  --seal-deep: #6f1f18;
+  --gold: #a8863f;
+  --gold-soft: rgba(168, 134, 63, 0.28);
+
+  /* ── 兼容旧变量名（既有样式仍引用）── */
+  --bg: #0e0b08;
+  --bg2: #17120d;
+  --paper: #ece2cd;          /* 压在插画上的浅色文字 */
+  --paper-dim: #c7bba1;
+  --muted: #8d8474;
+  --ink: #241d14;
+  --red: #9b2d24;
+  --red-bright: #b83a2c;
+  --teal: #5f6a65;
+  --line: rgba(194, 161, 92, 0.22);
+  --line-soft: rgba(194, 161, 92, 0.12);
+  --panel: rgba(34, 27, 19, 0.95);
+  --panel-2: rgba(25, 20, 14, 0.97);
+  --shadow: 0 18px 44px rgba(12, 8, 5, 0.55);
+  --shadow-paper: 0 1px 0 rgba(255, 250, 238, 0.5) inset,
+                  0 -1px 0 rgba(36, 29, 20, 0.12) inset,
+                  0 10px 24px rgba(10, 7, 4, 0.42);
+  --radius: 3px;             /* 纸是切出来的，不是圆角卡片 */
+  --radius-lg: 4px;
+
+  --paper-tex: url('/assets/scenes/echo_paper.jpg');
+  /* 折痕与纸纹：纯 CSS，不额外增加素材 */
+  --crease: repeating-linear-gradient(180deg, rgba(36,29,20,0.045) 0 1px, transparent 1px 74px);
+  --grain: repeating-linear-gradient(92deg, rgba(36,29,20,0.035) 0 1px, transparent 1px 5px);
+
+  --font: "Songti SC", "Noto Serif SC", "SimSun", "Microsoft YaHei", serif;
+  --font-kai: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", serif;
+  --font-ui: "Songti SC", "Noto Serif SC", "SimSun", "Microsoft YaHei", serif;
+  --font-num: Georgia, "Times New Roman", serif;
+}
+
+/* 纸面：内容层的统一材质（主纸 / 抬起纸 / 凹槽） */
+.paper-surface {
+  background-color: var(--paper-1);
+  background-image: linear-gradient(180deg, rgba(255,252,244,0.55), rgba(214,200,172,0.35)), var(--paper-tex);
+  background-size: auto, cover;
+  background-position: center, center 40%;
+  background-blend-mode: normal, multiply;
+  color: var(--ink-0);
+  box-shadow: var(--shadow-paper);
 }
