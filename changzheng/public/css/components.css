@@ -251,10 +251,11 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .ap-dots { display: flex; gap: 6px; }
 .ap-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--rule-strong); background: transparent; }
 .ap-dot.on { background: var(--gold); }
-.hud-hint { flex: 1; font-size: 12px; line-height: var(--lh-normal); color: var(--paper-dim); }
-.companion-rail { display: flex; flex-direction: column; gap: 6px; }
-.comp-item { display: flex; align-items: center; gap: var(--sp-2); padding: 4px 6px; border-radius: var(--radius-inset); background: var(--ink-veil); border: 1px solid var(--line-soft); }
-.comp-ava { width: 28px; height: 28px; border-radius: 50%; background-size: cover; background-position: center; border: 1px solid var(--gold-soft); box-shadow: 0 0 0 1px var(--seal-veil); flex-shrink: 0; }
+.hud-hint { font-size: var(--fs-micro); line-height: 1.7; color: var(--paper-dim); }
+/* 同伴改成两列小头像：竖排四行太占高度 */
+.companion-rail { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+.comp-item { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: var(--radius-inset); background: var(--ink-veil); border: 1px solid var(--line-soft); }
+.comp-ava { width: 24px; height: 24px; border-radius: 50%; background-size: cover; background-position: center; border: 1px solid var(--gold-soft); box-shadow: 0 0 0 1px var(--seal-veil); flex-shrink: 0; }
 .comp-meta { display: none; }
 .comp-aff { font-family: var(--font-num); font-size: var(--fs-micro); color: var(--paper-dim); }
 
