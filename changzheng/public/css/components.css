@@ -40,12 +40,9 @@
   color: var(--paper);
   border: 1px solid var(--line);
 }
-.rule-ink { border: none; border-top: 1px solid var(--rule); }
-.seal-mark {
-  display: inline-grid; place-items: center;
-  border: 2px solid var(--seal); color: var(--seal);
-  border-radius: 50%; font-family: var(--font-display); letter-spacing: 0.12em;
-}
+/* 分隔线用区块 .blk-rule、印章用区块 .blk-seal（都在 framework.css）。
+   这里原先还有 `.rule-ink` / `.seal-mark` 两份"材质词汇"，全仓没人引用——
+   同一个语义留两套实现迟早漂移，已删（2026-09-13）。 */
 
 /* ═══ 组件层 ═══
    app 专属组件：每个类**只定义一次**，颜色/字号/圆角/间距全部来自 tokens。
@@ -376,7 +373,9 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 
 /* ───────── 史实回响（tpl-drawer）───────── */
 .echo-cinema { position: relative; border-radius: var(--radius); animation: fade-in var(--dur-slow) var(--ease-out) both; }
-.echo-seal { position: absolute; right: 28px; top: 24px; width: 60px; height: 60px; display: grid; place-items: center; border: 2px solid var(--seal); border-radius: 50%; color: var(--seal); font-family: var(--font-display); font-size: var(--fs-h3); letter-spacing: 0.12em; animation: seal-stamp var(--dur-base) var(--ease-stamp) 0.12s both; pointer-events: none; }
+/* 印章的长相走区块 .blk-seal（framework.css：尺寸/朱红描边/字体/静态 -8°），
+   这里只剩"放在哪儿"与钤印动效——与 .sheet-kicker 同一种分工。 */
+.echo-seal { position: absolute; right: 28px; top: 24px; animation: seal-stamp var(--dur-base) var(--ease-stamp) 0.12s both; pointer-events: none; }
 .echo-head { margin-bottom: var(--sp-4); padding-right: 76px; }
 .echo-head h2 { font-family: var(--font-display); font-size: var(--fs-h1); letter-spacing: var(--ls-title); color: var(--ink-0); margin-top: var(--sp-2); }
 .echo-tag { display: inline-block; padding: 1px 9px; border-radius: var(--radius-inset); border: 1px solid var(--rule-strong); font-size: var(--fs-micro); color: var(--ink-2); }
@@ -443,7 +442,7 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .sb-main { position: absolute; left: 272px; right: var(--sp-4); top: 64px; bottom: var(--sp-5); z-index: var(--z-hud); display: flex; flex-direction: column; gap: var(--sp-3); }
 .sb-feed { flex: 1; min-height: 0; overflow: auto; padding: var(--sp-5); border-radius: var(--radius); }
 .sb-feed .say { margin-bottom: var(--sp-3); font-family: var(--font); font-size: 15px; line-height: var(--lh-loose); color: var(--ink-0); }
-.sb-feed .npcsay, .sb-feed .npc .who { font-family: var(--font-kai); color: var(--seal); }
+.sb-feed .npc .who { font-family: var(--font-kai); color: var(--seal); }
 .sb-feed .npc { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-2); }
 .sb-feed .turn { font-family: var(--font-num); font-size: var(--fs-micro); color: var(--ink-2); letter-spacing: 0.1em; margin-bottom: 4px; }
 .sb-form { display: flex; gap: var(--sp-2); }
@@ -503,4 +502,13 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
   .journey { display: none; }
   .hud-left { width: 132px; }
   .sb-world, .sb-main, .tpl-world .tpl-rail, .tpl-world .tpl-body { position: static; left: auto; right: auto; top: auto; bottom: auto; width: auto; margin: var(--sp-4); }
+}
+
+/* 低动效偏好：循环/装饰类动画在这里关。
+   必须写在**组件层**：framework.css 里写同名规则会被本文件后面的声明盖掉（同为一个类选择器，后加载者胜），
+   所以原先写在框架层的那两条一直是"写了不生效"（2026-09-13 修）。
+   余烬是循环脉冲、钤印是旋转放大，都属于"请少动"该关掉的东西；静态 -8° 由 .blk-seal 的 transform 提供。 */
+@media (prefers-reduced-motion: reduce) {
+  .hotspot .ember, .j-node.now .j-dot, .march-cta.urgent { animation: none; }
+  .echo-seal { animation: none; }
 }

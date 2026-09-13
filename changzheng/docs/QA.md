@@ -20,7 +20,7 @@
 | `npm run qa:inspect` | 素材体检：格式/尺寸/时长/重复（含立绘） | 素材体检通过 |
 | `npm run qa:handoff` | 交接文档与代码契约一致（场景/环境床/TTS/立绘） | 可以交接 |
 | `node tests/e2e/layout-audit.mjs --width 820` | 逐屏布局硬伤（横向溢出/控件出界/点按区） | 820 宽 0 处横向溢出 |
-| `npm run qa:audit` | 日志 schema 审计 | 字段缺失 0（新记录）、FALLBACK 0 |
+| `npm run qa:audit` | 日志 schema 审计（按 `contractOk` 戳记分「本版本 / 历史」两拨算账） | 本版本字段缺失 0、FALLBACK 0；历史违约单列并注明成因 |
 
 ## 手工（真调）
 
@@ -37,5 +37,6 @@
 
 - **无 MOCK**：未配置 Key 会直接报错并写 `source=ERROR`；演示前务必先用「设置 → 测试连通」确认  
 - **无离线能力（当前）**：断网即 `source=ERROR`，所有 AI 内容走「重试／跳过」。风险预案见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)——**备选方案，尚未开发**  
+- **日志按 8MB 轮转**（`server/logger.js`：超上限只保留最后 2000 行）——单日反复跑测试会把当天最早的记录裁掉（2026-09-13 那天就裁掉两行，审计的「历史缺失」从 16 变 14）。演示/答辩要留全量证据，就在开跑前把 `logs/` 里当天的文件归档或删掉、只跑那一局（或临时调大 `MAX_BYTES`）  
 - 预置语音仅覆盖固定台词；LLM 自由回复无声  
 - 头像/场景为 AI 生成，已裁水印  

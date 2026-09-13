@@ -84,8 +84,9 @@
 | `ember` 余烬 | 营地热点、行程当前节点、告急启程键 | 组件自身 CSS |
 | 微视差 | 封面 `.title-bg`、营地 `.pano-img` | `bindParallax()`（位移 ≤8px，只动 `transform`） |
 
-`prefers-reduced-motion` 下**位移类全部关掉、只留淡入**（`--motion-scale` 归零）。
-验收靠 `npm run qa:motion`：动效截图拍不到，只能量计算样式——animation-name 是否为预期、逐条入场延迟是否 0/60/120ms、减动效下位移是否真的关掉。
+`prefers-reduced-motion` 下**位移类全部关掉、只留淡入**（`--motion-scale` 归零），循环类（余烬、钤印）也在组件层显式关掉——
+关它们的规则必须写在 `components.css`：写在 `framework.css` 会被后加载的同名声明盖掉，等于没写（2026-09-13 修，`qa:motion` 有两条断言看着）。
+验收靠 `npm run qa:motion`：动效截图拍不到，只能量计算样式——animation-name 是否为预期、逐条入场延迟是否 0/60/120ms、减动效下位移与循环动画是否真的关掉。
 三条踩过的坑：**居中元素必须用 `fade-in` 而不是 `ink-in`**（后者的 keyframes 把 `transform` 收成 `none`，会吃掉 `translateX(-50%)`）；
 **同一元素重复渲染要重放动画必须"摘类→强制重排→挂类"**（浏览器不会因为内容变了就重启动画），实现只有 `replayAnim()` 一处；
 **屏入场只在"确实从隐藏转为可见"时重放**——交谈每轮都会重渲染舞台屏，按旧写法每轮都重放一次纸卷上滑，读起来像"又换了一屏"（现在 `showScreen()` 先记 `entering` 再决定，2026-09-13 批三）。
@@ -113,8 +114,8 @@
 | `.ink-surface` | 压在插画上的骨架（HUD、顶栏、岔路题字） | 暖墨半透明；文字 `paper`；**子树里的区块自动换纸色系**（kicker 转旧金、title/body 转纸白、lead/note 转纸灰） |
 | `.blk-stat` | 数值签、状态签（唯一实现） | 标签 `kai` 11–12px + 数字 `num` 15–16px 等宽；默认墨纱，落在纸面自动换浅纱；状态只走描边与底纹 |
 | `.blk-choice` | 选项、菜单项（唯一实现） | 由 `step.js` 的 `choiceButton()` 产出（结构契约写在那个函数的注释里）：序号徽章 `.ic`、主文案 + `.ch-sub`、代价预告 `.ch-extra`（`.trend` / `.risk`）、键盘序号 `.kbd-hint`。容器只负责竖排（`.choices` / `.choice-row`） |
-| `.rule-ink` | 分隔线 | 1px `rule` |
-| `.seal-mark` | 印章、钤记 | 朱红描边圆形，仅小面积 |
+| `.blk-rule` | 分隔线（唯一实现） | 1px `rule`；`.rule-ink` 是它的旧重复实现，已删（全仓无人引用） |
+| `.blk-seal` | 印章、钤记（唯一实现） | 朱红描边圆形，仅小面积；回响页的 `.echo-seal` 只负责**放在哪儿 + 钤印动效**，长相全走这个区块（`.seal-mark` 是旧重复实现，已删） |
 | `.btn` / `.btn.primary` / `.btn.ghost` | 纸片 / 印章 / 幽灵 | 纸面里的按钮用纸片态；朱红只给"确认类"动作 |
 
 排版角色：标题位用 `display`，说话人 / 选项 / 数值签标签用 `kai`，长叙事用 `serif`，数字与型号用 `num`（`tabular-nums`，数值切换时不左右跳动）。

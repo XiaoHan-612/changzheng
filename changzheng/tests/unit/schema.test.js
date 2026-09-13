@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { REQUIRED, missingFields } from '../../server/schema.js';
+import { REQUIRED, missingFields, contractStamp } from '../../server/schema.js';
 
 test('契约表覆盖 16 类 callType', () => {
   assert.equal(Object.keys(REQUIRED).length, 16);
@@ -53,4 +53,15 @@ test('回归：模型把 answer_index 键名写坏时必须报出来', () => {
   // 宽松解析后照样成对象，界面拿不到正确答案却照常渲染。
   const broken = { question: 'q', options: ['a', 'b'], ',answer_index': 0, explain: 'x' };
   assert.deepEqual(missingFields('quiz_generate', broken), ['answer_index']);
+});
+
+test('契约戳记：落库时盖的那一笔账', () => {
+  // 合规 / 不合规
+  assert.equal(contractStamp('npc_chat', { reply: '好' }), true);
+  assert.equal(contractStamp('npc_chat', { mood: '平静' }), false);
+  assert.equal(contractStamp('sim_turn', [{ feasible: 'yes', narrative: 'x' }]), false);
+  // 不判定（null）：没带回响应（ERROR 记录）或没登记的类型——不能替它们说"合规"
+  assert.equal(contractStamp('npc_chat', undefined), null);
+  assert.equal(contractStamp('npc_chat', null), null);
+  assert.equal(contractStamp('some_future_type', { a: 1 }), null);
 });

@@ -158,7 +158,9 @@
 .blk-choice .ch-sub { font-family: var(--font); font-size: 12px; color: var(--ink-2); }
 .blk-choice .kbd-hint { font-family: var(--font-num); font-size: var(--fs-micro); color: var(--ink-2); }
 /* 选项的"代价预告"：模型给的倾向（.trend）+ 作者标注的风险（.risk，决定实际后果）。
-   它们是选项的一部分，所以和选项块放一起——否则又会出现"两套选项实现"。 */
+   它们是选项的一部分，所以和选项块放一起——否则又会出现"两套选项实现"。
+   注意 `.r-low/.r-mid/.r-high` 是 main.js 用模板串拼出来的（`risk r-${risk}`），
+   静态扫描"有没有人用"会误报，三个值都由代码产出。 */
 .blk-choice .ch-extra { display: flex; flex-wrap: wrap; gap: var(--sp-2); width: 100%; margin-top: 2px; }
 .blk-choice .trend { font-style: normal; font-size: var(--fs-micro); color: var(--seal); white-space: nowrap; }
 .blk-choice .risk {
@@ -221,8 +223,10 @@
 .anim-ink { animation: ink-in var(--dur-slow) var(--ease-ink) both; }
 .anim-fade { animation: fade-in var(--dur-base) var(--ease-out) both; }
 .anim-rise { animation: sheet-rise var(--dur-slow) var(--ease-out) both; }
-.anim-stamp { animation: seal-stamp var(--dur-base) var(--ease-stamp) 0.1s both; }
-.anim-ember { animation: ember 2.4s ease-in-out infinite; }
+/* 钤印（seal-stamp）与余烬（ember）不在这张工具类表里：它们各有节奏不同的使用点
+   （印章 0.12s、热点 2.8s、进度点 2.4s、告急键 1.6s），由各自组件直接声明动画；
+   早先留的 .anim-stamp / .anim-ember 两个工具类全仓没人用，已删（2026-09-13）。
+   关键帧仍在下面，`qa:motion` 量的是"这些效果到底有没有挂在真实元素上"。 */
 /* 逐条入场：列表里第 n 项延后 n×60ms */
 .anim-stagger > * { animation: ink-in var(--dur-slow) var(--ease-ink) both; }
 .anim-stagger > *:nth-child(1) { animation-delay: 0ms; }
@@ -238,11 +242,11 @@
   animation: scene-wipe var(--dur-scene) var(--ease-out) both;
 }
 
-/* 低动效偏好：只留淡入，去掉位移与旋转 */
+/* 低动效偏好：只留淡入，去掉位移与旋转。
+   这里只关框架自己的类；**组件里的**循环动画（余烬、钤印）在 components.css 关——
+   同一个类选择器写在框架层会被后加载的组件层盖掉，写了等于没写（2026-09-13 修）。 */
 @media (prefers-reduced-motion: reduce) {
   :root { --motion-scale: 0.01; }
   .anim-ink, .anim-stagger > *, .anim-rise { animation: none; }
-  .anim-stamp { animation: none; transform: rotate(-8deg); }
   .scene-wipe { display: none; }
-  .hotspot .ember, .anim-ember { animation: none; }
 }

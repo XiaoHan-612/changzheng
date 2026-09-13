@@ -40,3 +40,19 @@ export function missingFields(callType, res) {
     return !keys.some((k) => res[k] !== undefined && res[k] !== null);
   });
 }
+
+/**
+ * 契约戳记：这条记录带回来的响应是否满足必需字段（用同一张表判定）。
+ *
+ * 为什么要有它：审计要能回答"**当前版本**有没有违约"，而 logs/ 是逐日累积的，
+ * 里面混着守卫上线前的旧记录（旧标注 GLM-5.1、旧进程写入的数组响应），分不出来就成了一笔永远挂着的账。
+ * 戳记在 logger 里算——落库只有一处，调用点想漏也漏不掉（`server/sim.js` 就漏接过整张表）。
+ * 注意它只是**记账**：真正的拦截仍在调用点（不合规就重试，不落 GLM 记录）。
+ *
+ * @returns {boolean|null} true=合规；false=不合规（该响不该落库）；null=不判定（未登记类型 / 没带回响应）
+ */
+export function contractStamp(callType, res) {
+  if (!REQUIRED[callType]) return null;
+  if (res === undefined || res === null) return null;
+  return missingFields(callType, res).length === 0;
+}

@@ -103,6 +103,25 @@ const calm = await page.evaluate(() => {
 check('减动效：位移类被关掉', calm.riseName, 'none');
 check('减动效：淡入仍保留', calm.fadeName, 'fade-in');
 
+// 循环/装饰动画（余烬、钤印）必须在**组件层**关掉：写在 framework.css 里会被后加载的组件层盖掉，
+// 曾因此"写了不生效"（2026-09-13 修）。这里造两个临时节点量计算样式——比翻样式表可靠。
+const calmLoop = await page.evaluate(() => {
+  const hotspot = document.createElement('div');
+  hotspot.className = 'hotspot';
+  const ember = document.createElement('span');
+  ember.className = 'ember';
+  hotspot.appendChild(ember);
+  const seal = document.createElement('div');
+  seal.className = 'blk-seal echo-seal';
+  document.body.append(hotspot, seal);
+  const out = { ember: getComputedStyle(ember).animationName, seal: getComputedStyle(seal).animationName };
+  hotspot.remove();
+  seal.remove();
+  return out;
+});
+check('减动效：余烬停摆', calmLoop.ember, 'none');
+check('减动效：钤印停摆', calmLoop.seal, 'none');
+
 console.log('动效体检（量的是计算样式）：');
 console.table(rows);
 console.log(`减动效偏好：--motion-scale=${calm.scale}　（位移关、只留淡入，符合文档口径）`);

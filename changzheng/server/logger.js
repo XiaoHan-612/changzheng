@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { CONFIG } from './config.js';
+import { contractStamp } from './schema.js';
 
 const LOG_PATH = path.resolve(CONFIG.LOG_DIR);
 if (!fs.existsSync(LOG_PATH)) fs.mkdirSync(LOG_PATH, { recursive: true });
@@ -24,11 +25,15 @@ function todayFile() {
 }
 
 export function logAiCall(entry) {
+  // 契约戳记：落库只有这一处，所以"这条记录的响应合不合契约"在这里算一次就不会漏。
+  // 历史记录没有这个字段，审计据此把"本版本"与"旧版本/旧进程"分开（见 scripts/audit-logs.mjs）。
+  const stamp = contractStamp(entry.callType, entry.response);
   const record = {
     id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     timestamp: new Date().toISOString(),
     model: CONFIG.GLM_MODEL,
     ...entry,
+    ...(stamp === null ? {} : { contractOk: stamp }),
   };
   const day = todayFile();
   const session = path.join(LOG_PATH, 'session-full.jsonl');
