@@ -173,6 +173,7 @@
 
 .blk-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .blk-actions.end { justify-content: flex-end; }
+.blk-actions.center { justify-content: center; }
 .blk-btn {
   font-family: var(--font-kai); font-size: var(--fs-label); letter-spacing: var(--ls-label);
   padding: 9px 18px; cursor: pointer; border-radius: var(--radius);

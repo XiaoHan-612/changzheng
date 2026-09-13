@@ -117,7 +117,12 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 24. **测试会复用旧服务，让服务端改动"假绿"** —— 早先每个 e2e 脚本各写一份 `ensureServer()`，只判断端口上有没有服务。于是一个几小时前启动的进程会被一直复用：**服务端代码改了，测试却还在跑旧代码**，绿灯是假的（本人在数值护栏上踩过：日志里单次 +15，钳制明明写了却"没生效"）。现在统一走 `tests/e2e/lib/server.mjs`：服务端在 `/api/config` 暴露 `pid` 与 `codeStamp`（`server/*.js` 最新 mtime），测试启动前比对，代码比进程新就杀掉重启；迁移期旧服务不暴露 pid 时按端口反查监听进程。改服务端代码后跑测试，看到 `restarted` 才算真跑。
 25. **数值改动要同时改三处** —— ①`server/balance.js` 的钳制表（单维单次上限 + 单次最多 3 维 + 信念只允许在 `branch_judge`/`night_resolve` 正向增长）；②`server/ai.js` 提示词里的【数值】段落；③`tests/unit/balance.test.js`。只改其一会出现"提示词说 ±8、实际还能 +15"这类不一致。实测口径：一局 AI 净变化应为体力 −20～−30、信念 +5 左右，终局落在体力 20–45 / 信念 50–85。
 26. **评委/调试入口由「设置 → 展示」控制** —— `public/js/features.js` 的 `FEATURES.devTools` 是默认值（当前 false），运行时开关写在 localStorage（`czjc_devtools`）。关掉时 `body` 没有 `.dev-tools`，CSS 隐藏所有 `.dev-only` 元素：标题页「评委演示」与模型署名、顶栏「答辩」「记录」与模型标签。**答辩/路演要展示真调日志时，在设置里勾一下即可**，不必改代码。相关测试已改成不依赖这些入口（full-run 直接读 `/api/logs` 计数）。
-27. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
+27. **玩法都在板屏上（`tpl-board`），宿主只有一条路** —— 小游戏原先挤在舞台纸卷里（上面还顶着给对白用的人物立绘），批四给它们建了 `#screen-board`：人物在舞台屏交代任务 → 切板屏玩 → 切回舞台屏结算（`say()` 与「继续」键都在舞台）。
+   新增/搬迁玩法照抄这套：`const board = openBoard({ title, bg })` + `mountMini(board, name, id)`（内部会 `markMini`），状态用区块 `.blk-stat` 经 `stats(board.stats, [...])` 写进板头；**别再回到 `setStagePanel`**，也别在玩法里自己拼标题。截图/体检用 `__czScreens.mini(name)`（玩法都在幕深处，跑一整幕太贵）。
+   坑：`runSentry` 的三个处置键此前用 `.choice-btn`——**这个类在 CSS 里根本不存在**，渲染出来是浏览器默认按钮（同类的还有 `.mg-hint` / `.t-desc` / `.t-count` / `.grab-*`，都是框架重做删掉 `minigames.css` 时的漏网）。`npm run qa:board` 就是盯这类事故的：元素必须在屏上、契约标记必须真带 `data-mini-action`。
+   另一条：e2e 的「五子棋恰好 1 次」断言只靠**可选营地热点**（两个小鬼）触发——act4 的强制链里没有它，营地里那 2 点暮色花在哪由流程决定，偶尔会落空（2026-09-13 遇到一次，重跑即过）。失败信息现在会带「营地历次热点 apN:[…]」用于定位；要稳定覆盖就在 `tests/e2e/full-run.mjs` 的营地分支里保住那条 gomoku 抢先点击。
+
+28. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
 
 ## 六、下一步建议（按价值排序）
 

@@ -426,6 +426,22 @@ function exposeSheetHooks() {
       showOverlay('screen-fire');
       renderFireMenu(currentActDef());
     },
+    // 玩法板同理：四个玩法都在幕深处，截图/体检直接把它们摆到板屏上
+    mini: (name) => {
+      if (!S) return false;
+      const games = {
+        fishing: ['金色的鱼钩', (host, o) => runFishing(host, o)],
+        needle: ['弯针成钩', (host, o) => runBendNeedle(host, o)],
+        school: ['夜校识字', (host, o) => runNightSchool(host, o)],
+        candy: ['分糖', (host, o) => runCandy(host, o)],
+        sentry: ['夜岗', (host, o) => runSentry(S.tonightPassword, host, o)],
+      };
+      const spec = games[name];
+      if (!spec) return false;
+      const board = openBoard({ title: spec[0] });
+      spec[1](mountMini(board, name, 'mini-host'), { stats: board.stats });
+      return true;
+    },
   };
 }
 
@@ -1522,10 +1538,11 @@ async function doSchool() {
   showScreen('screen-stage');
   setStageBanner('夜校识字', '/assets/scenes/school_close.jpg');
   showNpc('文化教员', { role: '夜校', mood: '耐心' });
-  setStagePanel('<div id="school-host"></div>');
-  markMini($('school-host'), 'school');
+  setStagePanel('');                                  // 玩法不在纸卷里，正文区留空
   await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
-  const op = await runNightSchool($('school-host'));
+  const board = openBoard({ title: '夜校识字', bg: '/assets/scenes/school_close.jpg' });
+  const op = await runNightSchool(mountMini(board, 'school', 'school-host'), { stats: board.stats });
+  showScreen('screen-stage');                         // 结算回到对白屏：人物 + 叙事 + 继续
   S.tonightPassword = op.detail?.password || '瑞金';
   markLine(S, 'school');
   showThinking(true);
@@ -1555,10 +1572,11 @@ async function doCandy() {
   showScreen('screen-stage');
   setStageBanner('分糖', sceneImage('/assets/scenes/sugar_close.jpg', '/assets/scenes/camp_pano.jpg'));
   setPortrait('红小鬼', '16岁小战士', '鬼', '倔强', '/assets/characters/xiaogui.png');
-  setStagePanel('<div id="candy-host"></div>');
-  markMini($('candy-host'), 'candy');
+  setStagePanel('');
   await say('红小鬼', '我兜里有三颗糖。你说，给谁？');
-  const op = await runCandy($('candy-host'));
+  const board = openBoard({ title: '分糖', bg: sceneImage('/assets/scenes/sugar_close.jpg', '/assets/scenes/camp_pano.jpg') });
+  const op = await runCandy(mountMini(board, 'candy', 'candy-host'), { stats: board.stats });
+  showScreen('screen-stage');
   S.sugarPlan = op.detail || null;
   markLine(S, 'candy');
   showThinking(true);
@@ -1589,10 +1607,11 @@ async function doSentry() {
   showScreen('screen-stage');
   setStageBanner('夜岗', sceneImage('/assets/scenes/sentry_night.jpg', '/assets/scenes/camp_pano.jpg'));
   setPortrait('哨兵', '夜哨', '哨', '警觉');
-  setStagePanel('<div id="sentry-host"></div>');
-  markMini($('sentry-host'), 'sentry');
+  setStagePanel('');
   await say('哨兵', '后半夜归你。听不清就再听一遍，别急着开枪。');
-  const op = await runSentry(S.tonightPassword, $('sentry-host'));
+  const board = openBoard({ title: '夜岗', bg: sceneImage('/assets/scenes/sentry_night.jpg', '/assets/scenes/camp_pano.jpg') });
+  const op = await runSentry(S.tonightPassword, mountMini(board, 'sentry', 'sentry-host'), { stats: board.stats });
+  showScreen('screen-stage');
   S.sentryScore = op.score;
   markLine(S, 'sentry');
   showThinking(true);
@@ -1713,22 +1732,49 @@ async function doRoster() {
   await waitBtn('继续');
 }
 
+/**
+ * 打开玩法板（tpl-board）：题名 + 数值签 + 玩法区都由这里起头。
+ *
+ * 为什么要有这一屏：小游戏原先挤在舞台纸卷里（上面还顶着给对白用的人物立绘），
+ * 而样板页画好的"游戏名 + 数值签 + 玩法区 + 动作区"没有地方落地。
+ * 玩法自己的状态（鱼篓/咬钩、信号 x/5…）由玩法通过 `{ stats }` 写进板头，
+ * 这里只负责把板摆出来 —— 各玩法别再自己拼标题与数值签（2026-09-13 批四）。
+ */
+function openBoard({ title = '', bg = '' } = {}) {
+  showScreen('screen-board');
+  const act = currentActDef();
+  $('board-kicker').textContent = act ? `${act.title} · 第 ${S?.day || 1} 日` : '玩法';
+  $('board-title').textContent = title;
+  $('board-bg').style.backgroundImage = bg ? `url('${bg}')` : '';
+  $('board-stats').innerHTML = '';
+  const body = $('board-body');
+  body.innerHTML = '';
+  return { body, stats: $('board-stats') };
+}
+
+/** 装一个玩法：板屏开好、host 就位、契约声明齐，交给 minigames.js 的 runXxx */
+function mountMini(board, name, id) {
+  board.body.innerHTML = `<div id="${id}"></div>`;
+  return markMini($(id), name);
+}
+
 async function doFishing(act, forced) {
   step('fishing', 'minigame');
   showScreen('screen-stage');
   // 弯针 → 咬钩起竿（与报名信息一致：先做钩，再钓鱼）
   setStageBanner('金色的鱼钩 · 弯针', '/assets/scenes/pond_close.jpg');
   setPortrait('老班长', '炊事班长', '班', '专注', '/assets/characters/laoban.png');
-  setStagePanel('<div id="needle-host"></div>');
-  markMini($('needle-host'), 'needle');
+  setStagePanel('');
   await say('老班长', '鱼钩是缝衣针弯的。手上稳着点，别掰断。');
-  await runBendNeedle($('needle-host'));
+  let board = openBoard({ title: '弯针成钩', bg: '/assets/scenes/pond_close.jpg' });
+  await runBendNeedle(mountMini(board, 'needle', 'needle-host'), { stats: board.stats });
+  showScreen('screen-stage');
 
   setStageBanner('金色的鱼钩 · 起竿', '/assets/scenes/pond_close.jpg');
-  setStagePanel('<div id="fish-host"></div>');
-  markMini($('fish-host'), 'fishing');
   await say('老班长', '漂相看真了再起竿。晃是假的，沉才是口。', 'laoban_hook');
-  const op = await runFishing($('fish-host'));
+  board = openBoard({ title: '金色的鱼钩', bg: '/assets/scenes/pond_close.jpg' });
+  const op = await runFishing(mountMini(board, 'fishing', 'fish-host'), { stats: board.stats });
+  showScreen('screen-stage');
   S.fishingBest = Math.max(S.fishingBest || 0, op.score);
   markLine(S, 'fishing');
   showThinking(true);

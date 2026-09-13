@@ -93,6 +93,8 @@ async function run() {
   let didGomoku = false;
   let didOillamp = false;
   const visitedHotspots = new Set();
+  // 营地每次都出现了哪些热点（供覆盖类断言失败时定位：是"没出现"还是"没点到"）
+  const campSeen = [];
   let lastSig = '';
   let lastProgress = Date.now();
   const trace = [];
@@ -107,6 +109,10 @@ async function run() {
     if (s.step === 'gomoku') didGomoku = true;
     if (s.step === 'act2:oillamp') didOillamp = true;
     if (s.screens.includes('screen-end')) break;
+    if (s.screens.includes('screen-camp') && s.hotspots.length) {
+      const row = `ap${s.apOn}:[${s.hotspots.join('|')}]`;
+      if (campSeen[campSeen.length - 1] !== row) campSeen.push(row);
+    }
 
     const sig = [s.screens.join(), s.act, s.step, s.state, s.choices, s.cont, s.mini, s.miniState].join('|');
     if (sig !== lastSig) { lastSig = sig; lastProgress = Date.now(); }
@@ -252,15 +258,15 @@ async function run() {
   if (logCount < 20) throw new Error('日志过少: ' + logCount);
   if (soupTimes !== 1) throw new Error(`分汤重复结算: ${soupTimes} 次`);
   if (fishTimes !== 1) throw new Error(`钓鱼重复结算: ${fishTimes} 次`);
-  if (candyTimes !== 1) throw new Error(`分糖未按预期触发: ${candyTimes} 次`);
-  if (sentryTimes !== 1) throw new Error(`夜岗未按预期触发: ${sentryTimes} 次`);
+  if (candyTimes !== 1) throw new Error(`分糖未按预期触发: ${candyTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  if (sentryTimes !== 1) throw new Error(`夜岗未按预期触发: ${sentryTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
   // 快速模式跳过营地日，可选的五子棋不会触发
-  if (!QUICK && gomokuTimes !== 1) throw new Error(`五子棋未按预期触发: ${gomokuTimes} 次`);
-  if (ludingTimes !== 1) throw new Error(`泸定桥未按预期触发: ${ludingTimes} 次`);
+  if (!QUICK && gomokuTimes !== 1) throw new Error(`五子棋未按预期触发: ${gomokuTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  if (ludingTimes !== 1) throw new Error(`泸定桥未按预期触发: ${ludingTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
   if (nightTimes !== 2) throw new Error(`夜间抉择应有 night_options + night_resolve 两条: ${nightTimes}`);
   // 快速模式跳过开场设定与营地日
   if (!QUICK && !seenSteps.has('origin')) throw new Error('开场出身设定（step=origin）未出现');
-  if (!QUICK && oillampTimes !== 1) throw new Error(`二幕「油灯下的地图」未按预期触发: ${oillampTimes} 次`);
+  if (!QUICK && oillampTimes !== 1) throw new Error(`二幕「油灯下的地图」未按预期触发: ${oillampTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
   if (sources.some((s) => s !== 'GLM')) throw new Error('出现非真调来源（已移除 MOCK）: ' + sources.join(','));
   if (ttsHits.length < 5) throw new Error(`语音缓存命中过少（${ttsHits.length}），检查 say() 的文本与 voiceId 是否与 TTS 清单一致`);
 

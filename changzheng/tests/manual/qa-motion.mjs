@@ -14,7 +14,12 @@ const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.on('dialog', (d) => d.accept().catch(() => {}));
 await page.goto(`${BASE}/?motion=${Date.now()}`, { waitUntil: 'networkidle' });
-await page.evaluate(() => sessionStorage.clear());
+await page.evaluate(() => {
+  sessionStorage.clear();
+  // 展示开关打开：玩法板那一屏要走 __czScreens.mini（玩法都在幕深处，跑一整幕太贵）。
+  // 它只多挂一个截图入口、多露几个 dev-only 按钮，不改变任何屏的样式与动效。
+  localStorage.setItem('czjc_devtools', '1');
+});
 await page.reload({ waitUntil: 'networkidle' });
 
 const rows = [];
@@ -86,6 +91,11 @@ for (let i = 0; i < 40; i++) {                        // 回响层打开前可�
 await page.waitForTimeout(400);
 check('回响印章钤印', await animOf('#screen-echo .echo-seal'), 'seal-stamp 0.12s');
 check('回响两栏逐条', await animOf('#screen-echo .echo-grid > *:nth-child(2)'), 'ink-in 0.06s');
+
+// ⑤b 玩法板：tpl-board 的入场（这一屏批四才真接上，之前没有任何页面用它）
+await page.evaluate(() => window.__czScreens?.mini?.('needle'));
+await page.waitForTimeout(300);
+check('玩法板入场（纸卷上滑）', await animOf('#screen-board .tpl-body'), 'sheet-rise 0s');
 
 // ⑥ 减动效偏好：位移类全部关掉，只留淡入（这是文档写明的降级口径）
 await page.emulateMedia({ reducedMotion: 'reduce' });

@@ -20,6 +20,7 @@
 | `npm run qa:inspect` | 素材体检：格式/尺寸/时长/重复（含立绘） | 素材体检通过 |
 | `npm run qa:handoff` | 交接文档与代码契约一致（场景/环境床/TTS/立绘） | 可以交接 |
 | `node tests/e2e/layout-audit.mjs --width 820` | 逐屏布局硬伤（横向溢出/控件出界/点按区） | 820 宽 0 处横向溢出 |
+| `npm run qa:board` | **玩法板体检**：五个玩法逐屏摆到板屏上（板屏壳/数值签/契约标记/第一步可点/离开清空） | 36 项全 ✓ |
 | `npm run qa:audit` | 日志 schema 审计（按 `contractOk` 戳记分「本版本 / 历史」两拨算账） | 本版本字段缺失 0、FALLBACK 0；历史违约单列并注明成因 |
 
 ## 手工（真调）

@@ -93,6 +93,13 @@ export function showScreen(id) {
     const panel = $('stage-panel');
     if (panel) panel.innerHTML = '';
   }
+  if (id !== 'screen-board') {
+    // 玩法板同理：离开时清空玩法区与数值签，别让上一局的小游戏容器留着（可能还挂着监听）
+    const bb = $('board-body');
+    if (bb) bb.innerHTML = '';
+    const bs = $('board-stats');
+    if (bs) bs.innerHTML = '';
+  }
   if (id === 'screen-camp') {
     const b = $('stage-banner');
     if (b) b.textContent = '';

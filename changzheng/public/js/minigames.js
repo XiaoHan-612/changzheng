@@ -29,20 +29,41 @@ function mount(parent, root) {
 }
 
 /**
+ * 玩法板的数值签：把这一局的状态写进板头（鱼篓/咬钩、信号 x/5、还剩 N 颗…）。
+ * 值只用区块 .blk-stat —— 不另写一套"玩法数值"的样式（批四统一口径）。
+ * 文案都是代码里的固定词，不含模型返回，所以直接拼。
+ */
+function stats(host, items) {
+  if (!host) return;
+  host.innerHTML = items
+    .filter(Boolean)
+    .map(([label, value, cls]) => `<span class="blk-stat ${cls || ''}">${label}<b>${value}</b></span>`)
+    .join('');
+}
+
+/**
  * 钓鱼：漂相三档，空格/点击起竿
+ * @param {HTMLElement} container 玩法区（板屏的 #board-body 里的 host）
+ * @param {{stats?: HTMLElement}} [opts] opts.stats 是板头的数值签容器
  * @returns {Promise<{score:number, detail:object}>}
  */
-export function runFishing(container) {
+export function runFishing(container, opts = {}) {
   return new Promise((resolve) => {
     const W = 420;
     const H = 240;
+    // 画布配色：能对上 tokens 的就从 CSS 变量读（改了调色板这里跟着变），
+    // 剩下的水面/告警色是这幅画自己的色，不属于界面语义，所以留在这里并写明。
+    const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    const PAL = {
+      water: '#1e3a44', waterDeep: '#152820', alert: '#e07a5f',   // 画的水色与告警红，仅此处使用
+      bank: cssVar('--ink-0'), gold: cssVar('--gold'), paper: cssVar('--paper-0'), seal: cssVar('--seal'),
+    };
+    const FONT_DISPLAY = `16px ${cssVar('--font-display')}`;      // 画布要自己写字体栈，从 token 读，别抄一份
     container.innerHTML = `
-      <p class="hint">漂相三档：<b>晃</b>=假口 · <b>沉</b>=真口 · <b>黑漂</b>=大物。看到真口/黑漂时按【空格】或点「起竿」。共 3 竿。</p>
+      <p class="blk-note">漂相三档：<b>晃</b>=假口 · <b>沉</b>=真口 · <b>黑漂</b>=大物。看到真口/黑漂时按【空格】或点「起竿」。共 3 竿。</p>
       <canvas class="mini" id="fish-canvas" width="${W}" height="${H}"></canvas>
-      <div style="text-align:center;margin-bottom:8px">
-        <span id="fish-status" class="muted">点「抛竿」开始</span>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:center">
+      <p id="fish-status" class="hint">点「抛竿」开始</p>
+      <div class="blk-actions center">
         <button type="button" class="btn primary" id="fish-cast" data-mini-action="cast">抛竿</button>
         <button type="button" class="btn" id="fish-hook" data-mini-action="hook" disabled>起竿 (空格)</button>
       </div>
@@ -76,8 +97,8 @@ export function runFishing(container) {
 
       ctx.clearRect(0, 0, W, H);
       const g = ctx.createLinearGradient(0, 80, 0, H);
-      g.addColorStop(0, '#1e3a44');
-      g.addColorStop(1, '#152820');
+      g.addColorStop(0, PAL.water);
+      g.addColorStop(1, PAL.waterDeep);
       ctx.fillStyle = g;
       ctx.fillRect(0, 80, W, H - 80);
       ctx.strokeStyle = 'rgba(200,220,210,0.08)';
@@ -91,9 +112,9 @@ export function runFishing(container) {
         }
         ctx.stroke();
       }
-      ctx.fillStyle = '#2a2418';
+      ctx.fillStyle = PAL.bank;
       ctx.fillRect(0, 70, W, 14);
-      ctx.strokeStyle = '#c4a35a';
+      ctx.strokeStyle = PAL.gold;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(40, 60);
@@ -105,22 +126,31 @@ export function runFishing(container) {
       ctx.moveTo(180, 40);
       ctx.lineTo(260, floatY);
       ctx.stroke();
-      ctx.fillStyle = biteType === 'black' && phase === 'window' ? '#e07a5f' : '#e8dcc8';
+      ctx.fillStyle = biteType === 'black' && phase === 'window' ? PAL.alert : PAL.paper;
       ctx.beginPath();
       ctx.arc(260, floatY, 5, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#8b2e2e';
+      ctx.fillStyle = PAL.seal;
       ctx.fillRect(257, floatY - 14, 6, 10);
 
       if (phase === 'done') {
         ctx.fillStyle = 'rgba(10,12,14,0.55)';
         ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = '#c4a35a';
-        ctx.font = '16px serif';
+        ctx.fillStyle = PAL.gold;
+        ctx.font = FONT_DISPLAY;
         ctx.textAlign = 'center';
         ctx.fillText('三竿结束', W / 2, H / 2);
       }
       raf = requestAnimationFrame(draw);
+    }
+
+    /** 板头数值签：鱼篓=入篓的（score≥0.5），咬钩=本局出现的咬口数 */
+    function refreshStats() {
+      stats(opts.stats, [
+        ['鱼篓', hits.filter((h) => h.score >= 0.5).length],
+        ['咬钩', hits.length],
+        ['竿', `${Math.min(castIndex + 1, TOTAL)}/${TOTAL}`],
+      ]);
     }
 
     function resetFloat() {
@@ -132,6 +162,7 @@ export function runFishing(container) {
       btnCast.disabled = castIndex >= TOTAL;
       container.dataset.miniState = castIndex >= TOTAL ? 'done' : 'idle';
       status.textContent = castIndex >= TOTAL ? '三竿结束' : `第 ${castIndex + 1}/${TOTAL} 竿 — 点「抛竿」`;
+      refreshStats();
     }
 
     function scheduleBite() {
@@ -259,12 +290,17 @@ export function runFishing(container) {
       origResolve(v);
     };
 
+    refreshStats();          // 开局就把数值签摆上（0 也是信息）
     draw();
   });
 }
 
 /** 夜校识字：3 小关 */
-export function runNightSchool(container) {
+/** 夜校识字：3 小关
+ * @param {HTMLElement} container 玩法区
+ * @param {{stats?: HTMLElement}} [opts]
+ */
+export function runNightSchool(container, opts = {}) {
   return new Promise((resolve) => {
     const rounds = [
       {
@@ -291,19 +327,20 @@ export function runNightSchool(container) {
 
     function render() {
       if (idx >= rounds.length) {
-        const score = correct / rounds.length;
+        stats(opts.stats, [['识字', `${correct}/${rounds.length}`], ['口令', '瑞金']]);
         container.innerHTML = `
           <div class="float-result">
             <div class="big">${correct} / ${rounds.length}</div>
             <div class="score">口令「瑞金」已写入营地记忆</div>
           </div>`;
-        resolve({ score, detail: { correct, total: rounds.length, password: '瑞金' } });
+        resolve({ score: correct / rounds.length, detail: { correct, total: rounds.length, password: '瑞金' } });
         return;
       }
       const r = rounds[idx];
+      stats(opts.stats, [['第', `${idx + 1}/${rounds.length} 关`], ['识字', `${correct}/${rounds.length}`]]);
       container.innerHTML = `
-        <p class="hint">夜校 · 第 ${idx + 1}/${rounds.length} 关 · ${r.tip}</p>
-        <p style="font-family:var(--font);font-size:17px;margin:12px 0 16px">${r.q}</p>
+        <p class="blk-note">${r.tip}</p>
+        <p class="blk-body">${r.q}</p>
         <div class="choices" id="school-opts"></div>`;
       const box = container.querySelector('#school-opts');
       r.opts.forEach((t, i) => {
@@ -323,16 +360,16 @@ export function runNightSchool(container) {
 }
 
 /**
- * 红小鬼 · 分糖（移植自原型 runCandy）
- * 点一颗糖 → 点一个人给出；也能「自己收好」。
+ * 红小鬼 · 分糖：点一颗糖 → 点一个人给出；也能「自己收好」。
+ * @param {HTMLElement} container 玩法区
+ * @param {{stats?: HTMLElement}} [opts]
  */
-export function runCandy(container) {
+export function runCandy(container, opts = {}) {
   return new Promise((resolve) => {
     const root = h('div');
     mount(container, root);
-    root.appendChild(h('div', { class: 'mg-title', text: '分糖' }));
     root.appendChild(h('div', {
-      class: 'mg-hint',
+      class: 'blk-note',
       text: '三颗糖。点一颗糖，再点一个人给出；也可以「自己收好」。',
     }));
 
@@ -385,7 +422,7 @@ export function runCandy(container) {
         given[t.id] += 1;
         left -= 1;
         cards[t.id].cnt.textContent = `${given[t.id]} 颗`;
-        leftLabel.textContent = `还剩 ${left} 颗`;
+        refreshStats();
         pickIdx = null;
         confirmBtn.disabled = false;
         audio.playSfx('click');
@@ -400,12 +437,18 @@ export function runCandy(container) {
     const confirmBtn = h('button', { class: 'btn primary', type: 'button', text: '就这样' });
     confirmBtn.dataset.miniAction = 'confirm';
     confirmBtn.disabled = true;
-    const leftLabel = h('div', { class: 'score-line', text: '还剩 3 颗' });
+    /** 板头数值签：还剩几颗 + 给出去几颗 */
+    function refreshStats() {
+      stats(opts.stats, [
+        ['还剩', left],
+        ['已给出', 3 - left],
+      ]);
+    }
 
     root.appendChild(tray);
     root.appendChild(row);
-    root.appendChild(h('div', { class: 'mg-row' }, [selfBtn, confirmBtn]));
-    root.appendChild(leftLabel);
+    root.appendChild(h('div', { class: 'blk-actions' }, [selfBtn, confirmBtn]));
+    refreshStats();
 
     selfBtn.onclick = () => {
       if (left > 0) {
@@ -413,7 +456,7 @@ export function runCandy(container) {
         left = 0;
         candies.forEach((c) => c.classList.add('used'));
         candies.forEach((c) => { c.setAttribute('aria-disabled', 'true'); delete c.dataset.miniAction; });
-        leftLabel.textContent = '你把剩下的糖收回兜里';
+        refreshStats();
         confirmBtn.disabled = false;
         selfBtn.disabled = true;
       }
@@ -436,14 +479,15 @@ export function runCandy(container) {
  * 哨兵 · 夜岗（移植自原型 runSentry）
  * 5 个信号，判断后处置；若在夜校学过口令，这里会用上。
  * @param {string} knownPassword 今晚口令（可空）
+ * @param {HTMLElement} container 玩法区
+ * @param {{stats?: HTMLElement}} [opts]
  */
-export function runSentry(knownPassword, container) {
+export function runSentry(knownPassword, container, opts = {}) {
   return new Promise((resolve) => {
     const root = h('div');
     mount(container, root);
-    root.appendChild(h('div', { class: 'mg-title', text: '夜岗' }));
     root.appendChild(h('div', {
-      class: 'mg-hint',
+      class: 'blk-note',
       text: '五个信号。判断后选择处置。若在夜校学过口令，这里会用到。',
     }));
 
@@ -452,15 +496,25 @@ export function runSentry(knownPassword, container) {
     box.appendChild(sig);
     root.appendChild(box);
 
-    const row = h('div', { class: 'mg-row' });
-    const btnA = h('button', { class: 'choice-btn', type: 'button' });
-    const btnB = h('button', { class: 'choice-btn', type: 'button' });
-    const btnC = h('button', { class: 'choice-btn', type: 'button' });
-    [btnA, btnB, btnC].forEach((b) => { b.dataset.miniAction = 'answer'; });
+    const row = h('div', { class: 'blk-actions center' });
+    // 处置键就是"选项"：走唯一的 choiceButton()（此前用 .choice-btn，那个类在 CSS 里
+    // 根本不存在，渲染出来是浏览器默认按钮——2026-09-13 批四修）
+    const opts3 = [0, 1, 2].map((i) => {
+      const b = choiceButton({ label: '', index: i, keyboard: false });
+      b.dataset.miniAction = 'answer';
+      return b;
+    });
+    const [btnA, btnB, btnC] = opts3;
     row.append(btnA, btnB, btnC);
     root.appendChild(row);
-    const prog = h('div', { class: 'score-line', text: '信号 1 / 5' });
-    root.appendChild(prog);
+
+    /** 板头数值签：第几个信号 + 处置得当几次 */
+    function refreshStats() {
+      stats(opts.stats, [
+        ['信号', `${Math.min(idx + 1, events.length)}/${events.length}`],
+        ['得当', hits],
+      ]);
+    }
 
     const events = [
       {
@@ -513,7 +567,7 @@ export function runSentry(knownPassword, container) {
         return;
       }
       const ev = events[idx];
-      prog.textContent = `信号 ${idx + 1} / ${events.length}`;
+      refreshStats();
       sig.innerHTML = '';
       sig.appendChild(h('div', { class: 'sig-type', text: ev.type }));
       sig.appendChild(h('div', { class: 'sig-main', text: ev.main }));
@@ -521,7 +575,7 @@ export function runSentry(knownPassword, container) {
 
       const opts = [btnA, btnB, btnC];
       ev.options.forEach((label, i) => {
-        opts[i].textContent = label;
+        opts[i].querySelector('.ch-text b').textContent = label;   // choiceButton 的文案槽在 .ch-text b
         opts[i].onclick = () => {
           const ok = i === ev.correct;
           if (ok) hits += 1;
@@ -537,24 +591,31 @@ export function runSentry(knownPassword, container) {
   });
 }
 
-/** 弯针成钩（钓鱼线铺垫，无 AI 调用） */
-export function runBendNeedle(container) {
+/** 弯针成钩（钓鱼线铺垫，无 AI 调用）
+ * @param {HTMLElement} container 玩法区
+ * @param {{stats?: HTMLElement}} [opts]
+ */
+export function runBendNeedle(container, opts = {}) {
   return new Promise((resolve) => {
     const root = h('div');
     mount(container, root);
-    root.appendChild(h('div', { class: 'mg-title', text: '弯针成钩' }));
-    root.appendChild(h('div', { class: 'mg-hint', text: '缝衣针在火上烤过，沿三点弯出钩形。' }));
-    const label = h('div', { class: 'mg-hint', text: '1. 针眼端固定' });
-    const bar = h('div', { class: 'score-line', text: '进度 □□□' });
+    root.appendChild(h('div', { class: 'blk-note', text: '缝衣针在火上烤过，沿三点弯出钩形。' }));
+    const label = h('div', { class: 'hint', text: '1. 针眼端固定' });
+    const bar = h('div', { class: 'blk-progress' });
+    const steps = ['1. 针眼端固定', '2. 中段支点', '3. 弯出钩尖'];
     const btn = h('button', { class: 'btn primary', type: 'button', text: '弯折 1/3' });
     btn.dataset.miniAction = 'bend';
-    root.append(label, btn, bar);
+    root.append(label, bar, h('div', { class: 'blk-actions center' }, [btn]));
     let i = 0;
-    const steps = ['1. 针眼端固定', '2. 中段支点', '3. 弯出钩尖'];
+    function refresh() {
+      bar.innerHTML = [0, 1, 2].map((n) => `<span class="dot${n < i ? ' on' : ''}"></span>`).join('');
+      stats(opts.stats, [['进度', `${i}/3`]]);
+    }
+    refresh();
     btn.onclick = () => {
       i += 1;
       audio.playSfx('hook');
-      bar.textContent = '进度 ' + '■'.repeat(i) + '□'.repeat(3 - i);
+      refresh();
       if (i >= 3) {
         btn.disabled = true;
         label.textContent = '钩弯好了。很硬，能用。';

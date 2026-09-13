@@ -105,18 +105,18 @@ async function intoEcho(page) {
  * 深层屏走不到时，用 __czScreens 直接把屏摆出来（内容仍走各屏自己的渲染）。
  * 浮层屏（overlay）由渲染函数自己 showOverlay——先 showScreen 会把底下的营地屏也一起藏掉。
  */
-async function jump(page, id, prep) {
-  const ok = await page.evaluate(([id, prep]) => {
+async function jump(page, id, prep, arg) {
+  const ok = await page.evaluate(([id, prep, arg]) => {
     const api = window.__czScreens;
     if (!api) return false;
     const overlay = document.getElementById(id)?.classList.contains('overlay');
-    if (overlay && prep && typeof api[prep] === 'function') api[prep]();
+    if (overlay && prep && typeof api[prep] === 'function') api[prep](arg);
     else {
       api.show(id);
-      if (prep && typeof api[prep] === 'function') api[prep]();
+      if (prep && typeof api[prep] === 'function') api[prep](arg);
     }
     return true;
-  }, [id, prep || '']);
+  }, [id, prep || '', arg ?? '']);
   if (!ok) throw new Error(`没有 __czScreens 钩子：把「设置 → 展示」打开后再截图（缺 ${id}）`);
   await page.waitForTimeout(400);
 }
@@ -223,6 +223,14 @@ const BATCHES = {
         await jump(p, 'screen-fire', 'fire');
       },
     },
+  ],
+  4: [
+    // 玩法板五屏共用 tpl-board：都走 __czScreens.mini（玩法都在幕深处，跑一整幕太贵）
+    { name: '01-needle', setup: async (p) => { await intoCamp(p); await jump(p, 'screen-board', 'mini', 'needle'); } },
+    { name: '02-fishing', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'fishing'); } },
+    { name: '03-school', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'school'); } },
+    { name: '04-candy', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'candy'); } },
+    { name: '05-sentry', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'sentry'); } },
   ],
 };
 

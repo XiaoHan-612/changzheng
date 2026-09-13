@@ -58,13 +58,13 @@
   overflow: hidden;
 }
 .screen.overlay { background: var(--scrim); z-index: var(--z-overlay); }
-.pano-img, .title-bg, .cut-stage, .quiz-bg, .night-bg, .end-bg, .path-bg, .sandbox-bg {
+.pano-img, .title-bg, .cut-stage, .quiz-bg, .night-bg, .end-bg, .path-bg, .sandbox-bg, .board-bg {
   position: absolute; inset: 0; background-size: cover; background-position: center;
 }
 .pano-img { transition: background-image var(--dur-scene) var(--ease-out), transform var(--dur-base) var(--ease-out); }
 /* transform 过渡给"微视差"用（bindParallax 改 translate，不改背景位置） */
 .title-bg { filter: saturate(0.8) brightness(0.7); transition: transform var(--dur-base) var(--ease-out); }
-.title-bg::after, .cut-stage::after, .path-bg::after {
+.title-bg::after, .cut-stage::after, .path-bg::after, .board-bg::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(180deg, var(--scrim-soft), var(--scrim));
 }
@@ -324,6 +324,14 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 /* 选项本身不再在这里定义：它是区块（blk-choice），唯一定义处在 framework.css。
    .choices / .choice-row 只是"把选项竖排起来"的容器布局。 */
 
+/* ───────── 玩法板（tpl-board）───────── */
+/* 玩法屏的壳：题名（blk-kicker/blk-title）+ 数值签（blk-stat-row）+ 玩法区。
+   板身走 .paper-surface 材质、面积由模板给（.tpl-board .tpl-body），这里只管"怎么排"。
+   各玩法的启动统一走 main.js 的 openBoard()，别在玩法里自己拼标题与数值签。 */
+.board-head { display: flex; flex-direction: column; }
+.board-body { display: flex; flex-direction: column; gap: var(--sp-2); }
+.board-body .mini { align-self: center; border-radius: var(--radius-inset); }
+
 /* ───────── 答题 / 岔路 / 夜间 / 终局 ───────── */
 .quiz-panel { width: min(var(--panel-w), 92vw); max-height: var(--panel-h); overflow: auto; }
 .night-panel { width: min(var(--panel-w), 92vw); max-height: var(--panel-h); overflow: auto; text-align: left; }
@@ -469,6 +477,11 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .target-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
 .target-card { padding: var(--sp-3); border-radius: var(--radius-inset); border: 1px solid var(--rule-strong); background-color: var(--paper-0); cursor: pointer; text-align: center; }
 .target-card .t-name { font-family: var(--font-kai); font-size: var(--fs-label); color: var(--ink-0); }
+/* 描述与计数此前没有样式（框架重做时 minigames.css 被删，这两个类没跟着搬过来），
+   渲染出来是默认字体字号——批四补上（2026-09-13）。 */
+.target-card .t-desc { font-size: var(--fs-micro); line-height: var(--lh-normal); color: var(--ink-2); margin-top: 4px; }
+.target-card .t-count { font-family: var(--font-num); font-size: var(--fs-label); color: var(--seal); margin-top: 6px; }
+.target-card[aria-disabled="true"] { opacity: 0.55; }
 .candy-tray { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .candy { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--rule-strong); background: radial-gradient(circle at 35% 30%, var(--gold), var(--seal)); cursor: pointer; }
 .candy.used { opacity: 0.35; }

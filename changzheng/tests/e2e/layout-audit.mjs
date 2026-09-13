@@ -195,6 +195,27 @@ async function main() {
     await page.click('#btn-defense-close');
   }
 
+  // 玩法板五屏（tpl-board）：走 __czScreens.mini 逐屏摆出来体检——玩法都在幕深处，
+  // 让它自己跑一整幕既慢又烧调用。展示开关关着时钩子不存在，跳过并说明。
+  await page.evaluate(() => localStorage.setItem('czjc_devtools', '1'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.click('#btn-mode-study').catch(() => {});
+  await page.waitForTimeout(200);
+  await passOrigin(page);
+  try { await page.click('#btn-cut-skip'); } catch { /* optional */ }
+  await page.waitForTimeout(500);
+  const hasHook = await page.evaluate(() => !!window.__czScreens?.mini);
+  if (hasHook) {
+    for (const name of ['needle', 'fishing', 'school', 'candy', 'sentry']) {
+      await page.evaluate((n) => window.__czScreens.mini(n), name);
+      await page.waitForTimeout(700);
+      await shot(page, `12-board-${name}`);
+    }
+  } else {
+    console.log('WARN: 没有 __czScreens.mini 钩子，跳过玩法板五屏');
+  }
+  await page.evaluate(() => localStorage.removeItem('czjc_devtools'));
+
   // 沙盘
   await page.goto(`${BASE}/?layout2=${Date.now()}`, { waitUntil: 'networkidle' });
   await page.click('#btn-mode-sandbox');

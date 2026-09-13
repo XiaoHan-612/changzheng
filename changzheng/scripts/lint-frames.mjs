@@ -36,7 +36,7 @@ for (const [, id, attrs] of sections) {
   if (hit.length === 0) problems.push(`${id} 没有模板类（应为 ${TEMPLATES.join(' / ')} 之一）`);
   else if (hit.length > 1) problems.push(`${id} 同时挂了多个模板类：${hit.join(', ')}`);
 }
-if (!problems.length) ok.push(`17 个屏幕都有且只有一个模板类`);
+if (!problems.length) ok.push(`${sections.length} 个屏幕都有且只有一个模板类`);
 
 // 2) 页面专属选择器必须为 0
 let pageSelectors = 0;
