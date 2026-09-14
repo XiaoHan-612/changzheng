@@ -10,11 +10,30 @@
 
 | 项 | 值 |
 |---|---|
-| 远端 | `https://github.com/XiaoHan-612/changzheng` — **私有仓库** |
+| 远端 | `https://github.com/XiaoHan-612/changzheng` |
 | 默认分支 | `main` |
 | 协作方式 | 所有人直接改 `main`：**开工先拉、收工就推**，一个批次一个提交 |
 
-仓库是私有的。新人（或新的 agent 运行环境）**必须先被加为 collaborator** —— 在仓库页面 → `Settings` → `Collaborators` → `Add people`。没加就 `clone`，会收到 403。
+**可见性以实测为准，别信口头约定**：`git ls-remote` 不带凭据能读到 refs = 公开；报认证失败 = 私有。
+
+```powershell
+git -c credential.helper= ls-remote https://github.com/XiaoHan-612/changzheng.git
+```
+
+| 可见性 | 克隆 | 推送 |
+|---|---|---|
+| **公开**（2026-09-14 实测如此） | 任何人可克隆，**不需要邀请** | **仍要被加为协作者**（`Settings → Collaborators and roles → Add people`，权限选 **Write**，且**对方要点接受邀请**；Pending 不算，邀请 7 天过期） |
+| 私有（若改成私有） | 也必须先被加为协作者并接受邀请 | 同上 |
+
+想改可见性：仓库页 `Settings → General → 底部 Danger Zone → Change visibility`。
+
+### 拉不下来 / 推不上去 的判定顺序
+
+1. **推不上去（403）** → 99% 是没被加为协作者，或加了但没接受邀请。确认 `Settings → Collaborators` 里他的状态是 `Write` 而不是 `Pending` / `Read`。
+2. **克隆也失败，但按上表仓库是公开的** → 多半是本机**凭据污染**：凭据管理器里存着一个对该仓库无权限的旧账号，GitHub 会对公开仓库也回 403/404。处理：Windows → 控制面板 → 凭据管理器 → Windows 凭据 → 删掉 `git:https://github.com`，再克隆；
+   或克隆时显式指定账号：`git clone https://<你的用户名>@github.com/XiaoHan-612/changzheng.git`。
+3. **URL 写错**：漏 `.git`、用户名拼错（`git remote -v` 核对）。
+4. **网络/代理**：公司网/校园网拦 `github.com`（`curl -I https://github.com` 试）；走 SSH 的话先 `ssh -T git@github.com` 看返回的是哪个账号——不是自己的就换 key。
 
 ---
 
