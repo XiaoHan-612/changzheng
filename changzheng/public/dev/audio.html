@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>音频试听 · 长征·抉择</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/css/fonts.css" />
+  <link rel="stylesheet" href="/css/tokens.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/framework.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <style>
+    /* 试听页是开发工具（样板页同款做法）：布局写在页面里，材质与颜色仍走 tokens */
+    body { padding: var(--sp-5); background-color: var(--paper-1); }
+    h1 { font-family: var(--font-display); font-size: var(--fs-h1); letter-spacing: var(--ls-title); margin-bottom: var(--sp-2); }
+    h2 { font-family: var(--font-kai); font-size: var(--fs-h3); color: var(--seal); margin: var(--sp-5) 0 var(--sp-2); }
+    .lead { color: var(--ink-1); font-family: var(--font); line-height: var(--lh-normal); max-width: 62ch; }
+    .rows { display: flex; flex-direction: column; gap: 6px; max-width: 860px; }
+    .row { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 10px; border: 1px solid var(--rule); border-radius: var(--radius-inset); background-color: var(--paper-0); }
+    .row .name { font-family: var(--font-kai); min-width: 132px; color: var(--ink-0); }
+    .row .path { font-family: var(--font-num); font-size: var(--fs-micro); color: var(--ink-2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row .desc { font-size: var(--fs-micro); color: var(--ink-2); }
+    .badge { font-size: var(--fs-micro); padding: 1px 7px; border-radius: var(--radius-inset); border: 1px solid var(--rule-strong); color: var(--ink-2); white-space: nowrap; }
+    .badge.ok { color: var(--ok); border-color: var(--ok); }
+    .badge.miss { color: var(--bad); border-color: var(--bad); }
+    .bar { display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; margin: var(--sp-3) 0; }
+    pre#state { margin-top: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--rule); border-radius: var(--radius-inset); background-color: var(--paper-0); font-size: var(--fs-micro); color: var(--ink-1); overflow: auto; max-height: 260px; }
+    .note { font-size: var(--fs-micro); color: var(--ink-2); margin-top: var(--sp-2); }
+  </style>
+</head>
+<body>
+  <h1>音频试听</h1>
+  <p class="lead">
+    这一页按**框架真实路径**发声（不另写一套播放代码），所以你在这里听到的，就是游戏里会播的。
+    每行左边是名字，右边是它现在实际用的文件：<span class="badge ok">已就位</span> 用文件、
+    <span class="badge miss">缺文件</span> 走合成兜底或静默——缺的素材由音频模型按名字落盘即可补齐。
+  </p>
+
+  <div class="bar">
+    <button type="button" class="btn primary" id="btn-walk">顺序试听（环境床 → 音效 → 台词）</button>
+    <button type="button" class="btn" id="btn-mute">静音开关</button>
+    <span id="mute-state" class="badge">声音开</span>
+    <span class="note">提示：浏览器要求先有一次点击才能出声，随便点一下页面即可。</span>
+  </div>
+
+  <h2>环境床（ambient）</h2>
+  <div class="rows" id="rows-ambient"></div>
+
+  <h2>BGM（bgm）</h2>
+  <div class="rows" id="rows-bgm"></div>
+
+  <h2>音效（sfx）</h2>
+  <p class="note">点一下就放；括号里是它的用途。合成音与预录文件都是这个入口。</p>
+  <div class="rows" id="rows-sfx"></div>
+
+  <h2>台词 / 语音（voice）</h2>
+  <p class="note">走「预置录音 → TTS 缓存 → 静默」三级；这里列的是预置清单里的固定台词。</p>
+  <div class="rows" id="rows-voice"></div>
+
+  <h2>框架内部状态（<code>__czAudio.state()</code>）</h2>
+  <p class="note">desired = 该响什么；actual = 现在在响什么；missing = 声明了但还没有文件的账。</p>
+  <pre id="state">—</pre>
+
+  <script type="module">
+    // 只 import 门面：这一页是"框架的真实用户"，不碰内部实现（也就不可能绕过框架发声）
+    import { audio, AMBIENT_FILE, BGM_FILE, SFX_TABLE, sfxFile } from '/js/audio/index.js';
+
+    const el = (tag, attrs = {}, text = '') => {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) (k === 'class' ? n.className = v : n.setAttribute(k, v));
+      if (text) n.textContent = text;
+      return n;
+    };
+    const head = (el) => new Promise((r) => fetch(el, { method: 'HEAD' }).then((x) => r(x.ok)).catch(() => r(false)));
+
+    /** 一行：名字 + 文件路径/状态 + 播放键 */
+    function row(host, { name, path, desc, label = '播放', onPlay, badgeText, badgeClass }) {
+      const r = el('div', { class: 'row' });
+      r.append(el('span', { class: 'name' }, name));
+      r.append(el('span', { class: 'path' }, path || '—'));
+      if (desc) r.append(el('span', { class: 'desc' }, desc));
+      const badge = el('span', { class: `badge ${badgeClass || ''}` }, badgeText || '…');
+      r.append(badge);
+      const b = el('button', { type: 'button', class: 'btn sm' }, label);
+      b.onclick = () => onPlay();
+      r.append(b);
+      host.append(r);
+      return badge;
+    }
+
+    const $ = (id) => document.getElementById(id);
+
+    /* ── 环境床 ── */
+    for (const [kind, path] of Object.entries(AMBIENT_FILE)) {
+      const badge = row($('rows-ambient'), {
+        name: kind, path, desc: '循环底噪',
+        onPlay: () => audio.ambient.play(kind),
+      });
+      head(path).then((ok) => {
+        badge.textContent = ok ? '已就位' : '缺文件 · 合成兜底';
+        badge.className = `badge ${ok ? 'ok' : 'miss'}`;
+      });
+      // 一个"停止"键放在末尾（只做一次）
+      if (kind === Object.keys(AMBIENT_FILE)[0]) {
+        row($('rows-ambient'), { name: '（停止环境床）', path: 'audio.ambient.stop()', onPlay: () => audio.ambient.stop(), label: '停' });
+      }
+    }
+
+    /* ── BGM ── */
+    for (const [kind, path] of Object.entries(BGM_FILE)) {
+      const badge = row($('rows-bgm'), {
+        name: kind, path, desc: '章节配乐',
+        onPlay: () => audio.bgm.play(kind),
+      });
+      head(path).then((ok) => {
+        badge.textContent = ok ? '已就位' : '缺文件 · 静默';
+        badge.className = `badge ${ok ? 'ok' : 'miss'}`;
+      });
+    }
+
+    /* ── 音效 ── */
+    for (const [name, entry] of Object.entries(SFX_TABLE)) {
+      const badge = row($('rows-sfx'), {
+        name, path: sfxFile(name), desc: entry.desc || '',
+        onPlay: () => audio.sfx(name),
+      });
+      head(sfxFile(name)).then((ok) => {
+        badge.textContent = ok ? '预录文件' : '合成音';
+        badge.className = `badge ${ok ? 'ok' : ''}`;
+      });
+    }
+
+    /* ── 台词 ── */
+    fetch('/audio/voice-lines.json')
+      .then((r) => (r.ok ? r.json() : { lines: [] }))
+      .then((j) => {
+        const lines = Array.isArray(j) ? j : (j.lines || []);
+        if (!lines.length) {
+          $('rows-voice').append(el('div', { class: 'row' }, '预置清单为空'));
+          return;
+        }
+        for (const l of lines) {
+          const text = l.text || (Array.isArray(l.match) ? l.match[0] : '') || '';
+          row($('rows-voice'), {
+            name: l.id,
+            path: l.file,
+            desc: text.slice(0, 26),
+            onPlay: () => audio.speak({ text, voiceId: l.id }),
+          });
+        }
+      });
+
+    /* ── 顺序试听 ── */
+    $('btn-walk').onclick = async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      audio.ambient.play('depart'); await wait(3500);        // ① 开场环境床（河水 + 夜）
+      audio.sfx('march'); await wait(1200);                  // ② 行军鼓点
+      audio.sfx('correct'); await wait(900);                 // ③ 答对
+      audio.sfx('wrong'); await wait(900);                   // ④ 答错
+      audio.sfx('echo'); await wait(1500);                   // ⑤ 史实回响盖章
+      await audio.speak({ text: '漂相看真了再起竿。晃是假的，沉才是口。', voiceId: 'laoban' });  // ⑥ 老班长
+      await audio.speak({ text: '后半夜归你。听不清就再听一遍。', voiceId: 'sentry' });          // ⑦ 哨兵
+    };
+
+    /* ── 静音开关 ── */
+    $('btn-mute').onclick = () => {
+      audio.setMuted(!audio.muted);
+      $('mute-state').textContent = audio.muted ? '已静音' : '声音开';
+      $('mute-state').className = `badge ${audio.muted ? 'miss' : 'ok'}`;
+    };
+
+    /* ── 状态回显 ── */
+    const tick = () => { $('state').textContent = JSON.stringify(audio.state(), null, 2); };
+    tick();
+    setInterval(tick, 500);
+
+    // 首次点击解锁（浏览器自动播放策略）：页面任意处点一下都算
+    window.addEventListener('pointerdown', () => audio.boot(), { once: false });
+  </script>
+</body>
+</html>

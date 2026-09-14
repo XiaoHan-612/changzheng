@@ -29,10 +29,12 @@ changzheng/
       sandbox.js        # 沙盘循环 v2（事件图卡、语音、存档、目标/记忆、模型收尾）
       state.js          # 资源/好感/附身线/行动点/失败判定（可单测）
       origin.js         # 开场出身三选一 + 出发前一问（纯本地）
-      audio/            # 音频框架：index（门面）/ mix（混音表）/ fade（音量斜坡）/ scene-table（场景声明表）
-                        #             core（desired-actual + reconcile）/ channels/{ambient,bgm,sfx,voice}
+      audio/            # 音频框架：index（门面）/ mix（混音表）/ fade（音量斜坡）
+                        #             scene-table + sfx-table（声明表）/ core（desired-actual + reconcile）
+                        #             channels/{ambient,bgm,sfx,voice}
       origin 以外的 data.js / ui.js / ai-client.js / features.js
     dev/framework.html  # 样板页：区块四态 + 7 模板缩略（qa:proof 出图）
+    dev/audio.html      # 音频试听页：按通道逐个点播，标出用文件/合成兜底/缺文件
     fonts/              # 五族自托管字体（tools/build-fonts.mjs 生成）
     assets/scenes|characters|events/
     audio/ambient|sfx|cache|reactions|voices/

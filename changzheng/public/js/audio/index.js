@@ -6,7 +6,7 @@
  *   audio.boot();                            // 首次手势解锁 + 挂自愈触发点（import 时已自动挂，可再调）
  *   audio.scene({ act, label });             // 关键时机①：进屏/换幕（按声明表起停环境床与 BGM）
  *   audio.scene('sandbox' | 'title' | 'luding' | 'ending')   // 不在幕轴上的独立场景
- *   audio.sfx('click');                      // 关键时机②：交互
+ *   audio.sfx('click');                      // 关键时机②：交互（名字见 sfx-table.js；同名文件落盘即覆盖合成音）
  *   await audio.speak({ text, actorId });    // 关键时机③：台词（预置 → TTS 缓存 → 静默）
  *   audio.setMuted(true);                    // 关键时机④：静音开关（取消即按意图恢复）
  *
@@ -19,7 +19,8 @@
 import { AudioCore } from './core.js';
 import { AmbientChannel, AMBIENT_FILE } from './channels/ambient.js';
 import { BgmChannel, BGM_FILE } from './channels/bgm.js';
-import { SfxChannel, SFX_NAMES } from './channels/sfx.js';
+import { SfxChannel } from './channels/sfx.js';
+import { SFX_TABLE, SFX_NAMES, sfxFile } from './sfx-table.js';
 import { VoiceChannel, ACTOR_VOICE } from './channels/voice.js';
 import { ACT_SOUNDS, DAY_SOUNDS, SCENE_SOUNDS, FALLBACK_SOUNDS, soundsFor } from './scene-table.js';
 
@@ -77,5 +78,5 @@ audio.boot();
 // （muted / ctx / desired 该响什么 / actual 现在在响什么）
 window.__czAudio = audio;
 
-export { AMBIENT_FILE, BGM_FILE, SFX_NAMES, ACTOR_VOICE };
+export { AMBIENT_FILE, BGM_FILE, SFX_TABLE, SFX_NAMES, sfxFile, ACTOR_VOICE };
 export { ACT_SOUNDS, DAY_SOUNDS, SCENE_SOUNDS, FALLBACK_SOUNDS, soundsFor };

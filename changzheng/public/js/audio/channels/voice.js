@@ -36,10 +36,12 @@ export class VoiceChannel {
 
   reconcile() { /* no-op：语音由台词触发，不参与 desired/actual */ }
 
+  /** 停当前这句（被打断、静音、切场景时调）。闪避由"谁在播谁负责"决定，见 _playFile */
   stop() {
     if (this.el) {
       try { this.el.pause(); this.el.currentTime = 0; } catch { /* ignore */ }
       this.el = null;
+      this.core.duck(false);
     }
   }
 
@@ -118,7 +120,12 @@ export class VoiceChannel {
     }
   }
 
-  /** 播一个音频文件，返回 Promise（被打断/出错都会 resolve） */
+  /**
+   * 播一个音频文件，返回 Promise（被打断/出错都会 resolve）。
+   *
+   * 打断语义：新句开场先停旧句（同时只响一路人声）。注意 `done` 里**只有当前这句**才解除闪避——
+   * 否则旧句的收尾回调会把新句的闪避一起解掉（背景在台词中间突然变响，踩过）。
+   */
   _playFile(file) {
     this.core.ensure();
     this.stop();
@@ -128,7 +135,8 @@ export class VoiceChannel {
       this.el = el;
       this.core.duck(true);                 // 台词期间压低背景（BGM 重、环境床轻）
       const done = () => {
-        if (this.el === el) this.el = null;
+        if (this.el !== el) { resolve(); return; }   // 已被新句顶替：不要动闪避、不要清 el
+        this.el = null;
         this.core.duck(false);
         resolve();
       };

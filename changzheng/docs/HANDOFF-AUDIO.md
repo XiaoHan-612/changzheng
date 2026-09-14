@@ -44,6 +44,11 @@
 
 ## 三、产线 ② 操作音效
 
+**落盘即生效（批 3 起）**：`public/audio/sfx/<name>.ogg` 按名字放进目录就自动顶替合成音，
+**不用改任何代码**（`.wav` 也认得，按同名约定）。现有名字与用途：`click` 点击 · `cast` 抛竿 ·
+`hook` 起竿 · `splash` 入水 · `echo` 回响盖章 · `correct` 答对 · `wrong` 答错 · `march` 行军鼓点 ·
+`day` 新的一日。缺文件时走合成兜底（能听但粗糙），`npm run qa:audio` 会列出"还在用合成"的有哪些；
+
 现有合成音效名（保持一致，替换时同名覆盖即可）：`click`、`cast`（抛竿入水）、`hook`（起竿）、`splash`、`echo`（回响盖章）、`correct`、`wrong`、`march`（行军鼓点）、`day`。
 
 新增建议：`sentry_step`（脚步由远及近）、`sentry_growl`（野兽低吼）、`chain_clank`（铁索）、`snow_step`（踩雪）。
