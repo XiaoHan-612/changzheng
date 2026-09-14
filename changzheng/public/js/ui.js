@@ -73,7 +73,19 @@ export function bindParallax(screenId, layerSel, depth = 8) {
   screen.addEventListener('pointerleave', () => { layer.style.transform = 'scale(1.04)'; });
 }
 
+/**
+ * 切屏。**只负责"哪一屏可见"与入场动效，不碰任何屏内部的容器。**
+ *
+ * 以前这里会跨模块清理（舞台正文、玩法区、对白区都归它管），于是"换屏"这一个动作统管了所有屏的
+ * 内部状态，还逼得 `openBoard()` 用 cloneNode 换节点来躲它。现在改成：
+ *   离开的屏 → 广播 `screen:hide`，由那一屏**自己登记的清理函数**收拾（见 modules/screens）
+ *   进入的屏 → 广播 `screen:show`
+ */
 export function showScreen(id) {
+  // 先记下"原本可见的普通屏"（浮层屏不算：它们由 showOverlay 管，可能与底屏同时可见）
+  const leaving = [...document.querySelectorAll('.screen:not(.overlay)')]
+    .filter((el) => !el.classList.contains('hidden') && el.id !== id)
+    .map((el) => el.id);
   document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
   const el = $(id);
   if (el) {
@@ -86,36 +98,20 @@ export function showScreen(id) {
       replayAnim(entranceTarget(el), ENTRANCE[tpl] || 'anim-fade');
     }
   }
-  if (id !== 'screen-stage') {
-    // 离开舞台屏时把舞台内容一起清掉：否则小游戏容器会作为"残留节点"留在 DOM 里，
-    // 既有重复 id，也会让"元素存在即当前场景"的判断出错。
-    document.querySelectorAll('#sheet-actions').forEach((n) => { n.innerHTML = ''; });
-    const panel = $('stage-panel');
-    if (panel) panel.innerHTML = '';
-  }
-  if (id !== 'screen-board') {
-    // 玩法板同理：离开时清空玩法区与数值签，别让上一局的小游戏容器留着（可能还挂着监听）
-    const bb = $('board-body');
-    if (bb) bb.innerHTML = '';
-    const bs = $('board-stats');
-    if (bs) bs.innerHTML = '';
-  }
-  if (id === 'screen-camp') {
-    const b = $('stage-banner');
-    if (b) b.textContent = '';
-    const dlg = $('dlg-body');
-    if (dlg) dlg.textContent = '';
-  }
+  for (const left of leaving) kernel.emit('screen:hide', { id: left });
+  kernel.emit('screen:show', { id });
 }
 
 export function showOverlay(id) {
   $(id)?.classList.remove('hidden');
   syncOverlayState();
+  kernel.emit('screen:show', { id });
 }
 
 export function hideOverlay(id) {
   $(id)?.classList.add('hidden');
   syncOverlayState();
+  kernel.emit('screen:hide', { id });
 }
 
 /**

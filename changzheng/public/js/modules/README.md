@@ -71,5 +71,6 @@ kernel.api('audio')?.sfx?.('click');
 |---|---|
 | [`audio/`](audio/index.js) | 最标准的订阅者：把总线事件翻译成 `public/js/audio/` 框架的调用；`api` 里给诊断/体检留了只读查询 |
 | [`shell/`](shell/index.js) | 最薄的一层：外壳对事件的反应（静音图标、ctx 挂起提示）；示范"读别人状态走 `kernel.api`" |
+| [`screens/`](screens/index.js) | **屏的生命周期归属**：宿主用 `own(屏id, 清理函数)` 登记自己的清理，离开时只清自己的容器（取代 `showScreen` 越界清别人）；示范"状态放模块级变量，不挂描述符" |
 
 后续批次（state / screens / games / ai / flow）的迁移顺序与范围见 `../../docs/BUS.md` §六。

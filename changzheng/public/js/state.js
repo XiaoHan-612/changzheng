@@ -32,7 +32,8 @@ export function createState() {
     origin: null,          // 开场出身（origin.js 的 ORIGINS.id）
     originQuiz: null,      // 开场问答结果 { picked, right }
     phase: 'title',
-    busy: false,
+    // 注意：没有 busy 字段。"忙不忙"是运行时概念，由内核资源 'flow' 管（见 docs/BUS.md），
+    // 早先放在这里会被写进存档、并在两处靠"手工置 false"绕过不可重入锁（批 3 收口）。
     doneKeys: {},
     choiceLog: [],
     actSummaries: [],

@@ -27,7 +27,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 |---|---|---|
 | `public/js/main.js` | 主线状态机：五幕、营地日、强制链、对决、失败/终局、篝火夜；**玩法宿主** `openBoard()` + `mountMini()` | 最大的文件；热点用 `HOTSPOT_HANDLERS` 映射表分发，**加玩法只加一行**；玩法一律挂板屏（见第 27 条） |
 | `public/js/kernel/` | **内核**（新）：`bus`（事件总线）/ `contracts`（事件契约唯一真源）/ `plugins`（模块描述符）/ `kernel`（注册·接线·ready·诊断）/ `wiring`（模块清单）/ `resources`（显式锁）/ `snapshot`（只读快照）/ `diag`（事件流黑匣子） | 架构与规矩见 [`BUS.md`](BUS.md)；**模块集合不写死**——加模块只动 `wiring.js` 清单与模块自己的文件 |
-| `public/js/modules/` | **IP 模块**（新）：已挂 `audio`（声音总入口，订阅事件后调 `audio/` 框架）与 `chrome`（外壳对事件的反应：静音图标、ctx 挂起提示）；`games/` 是交互游戏插件契约 + 模板 | 批 2 起逐个迁入；**业务发声音只发事件**（`sfx:play`/`voice:say`/`scene:enter`/`flow:act-enter`），`qa:audio` 会拦直接 import 音频门面的写法 |
+| `public/js/modules/` | **IP 模块**（新）：已挂 `audio`（声音总入口）/ `shell`（外壳反应：静音图标、ctx 挂起、锁被占提示）/ `screens`（屏生命周期归属：宿主登记自己的清理）；`games/` 是交互游戏插件契约 + 模板 | 批 2 起逐个迁入；**业务发声音只发事件**（`sfx:play`/`voice:say`/`scene:enter`/`flow:act-enter`），`qa:audio` 会拦直接 import 音频门面的写法 |
 | `public/js/step.js` | **交互契约**：`step()` / `askChoice()` / **`choiceButton()`（选项唯一构建处）** / `waitContinue()` / `markMini()` | 新增玩法只要声明契约，测试与自动化无需改动；详见 ARCHITECTURE 的「交互契约」 |
 | `public/js/minigames.js` | **8 个玩法**：钓鱼/弯针/夜校识字/分糖/夜岗/五子棋/泸定桥/陡坡 | 统一返回 `{score, detail, summary?}`，本地只判手感，结算走 `/api/decide`；状态经 `stats(host, [...])` 写进板头数值签 |
 | `public/js/state.js` | 资源/好感/附身线/行动点/每日场景/失败判定 | 纯函数、可单测；新增资源维度要同时改 `applyEffects` 的钳制表 |
@@ -189,7 +189,21 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
    `kernel/modules/…` → 模块静默加载失败（只有冒烟测试才发现）。现在 `loadModules()` 显式
    `new URL('../' + path, import.meta.url)`，且 `qa:bus` 运行时断言"清单里的模块都真的注册了、无加载失败"。
 
-33. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
+33. **锁与屏：批 3 收口的两个语义（写错就出"点了没反应"或"元素残留"）**
+   - **流程锁只占在"用户入口"**：`withLock(fn, { from: 'user' })` 占不到就广播 `resource:blocked`
+     （shell 模块负责提示）；**流程内部**（幕末强制链 `runForcedChain`、快速模式的主玩法）用
+     `{ from: 'flow' }`——既可能是第一棒、也可能是被嵌套，占不到就直接跑（占着的一定是自己这条流程）。
+     这样原来那两处"手工 `S.busy = false` 再进流程"的补丁就结构性消失了。**`busy` 已从 `state.js` 删除**
+     （运行时概念不该进存档），要判断"忙不忙"用 `kernel.resources.isHeld('flow')`。
+   - **屏只能清自己的 DOM**：`showScreen()` 只切可见性 + 放入场动效，然后广播 `screen:hide` / `screen:show`；
+     各屏宿主用 `kernel.api('screens').own(屏id, 清理函数)` 登记自己的清理（渲染与清理写在一起）。
+     于是 `openBoard()` 不再依赖"showScreen 会顺手清"、也不再 `cloneNode` 换节点躲它——**自己先清自己的容器**。
+   - 三个连带检查：`qa:bus` 断言"启动后无残留锁"与"屏清理已登记（stage/board）"；`qa:board` 断言
+     "离开板屏后玩法区已清空"；`layout-audit` 逐屏截图（浮层与屏切换最容易在这里露馅）。
+   - 模块内的状态放**模块级变量**，别挂描述符上（描述符只放方法与规定字段）——`this.owners.set is not a function`
+     这个错就是总线体检当场抓到的。
+
+34. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
 
 ## 六、下一步建议（按价值排序）
 

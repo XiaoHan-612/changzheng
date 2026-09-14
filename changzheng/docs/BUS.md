@@ -3,7 +3,7 @@
 > **一句话**：模块之间不直接调用，全部挂在一条事件总线上；谁听什么写在模块自己的描述符里，
 > 内核负责接线；跨模块读数据走只读快照。加模块/加玩法**不需要改内核，也不需要改别人的文件**。
 >
-> 状态：**批 1、批 2 已落地**（内核地基；audio 与 shell 两个模块已挂上总线）。
+> 状态：**批 1–3 已落地**（内核地基；audio 与 shell 挂上总线；去越界 + 锁显式化）。
 > 后续批次把 state / screens / games / ai / flow 逐个迁进来，顺序见 §六。**迁移期间游戏始终可运行**。
 
 ---
@@ -44,7 +44,33 @@ public/js/modules/         IP 模块（业务）
 3. **事件名先登记**：发/听的名字必须在 `kernel/contracts.js` 里，否则记契约违规（console.error + 诊断）。
 4. **模块必须在清单里**：`kernel/wiring.js` 的 `MODULES` 是"系统里有哪些模块"的唯一真相。
 
-外加一条（批 3 落地）：**屏只能清自己的 DOM**——`showScreen` 广播 `screen:hide`，各屏自己收拾。
+外加一条（批 3 已落地）：**屏只能清自己的 DOM**——`showScreen` 只广播 `screen:hide`，各屏宿主用
+`kernel.api('screens').own(屏id, 清理函数)` 登记自己的清理（渲染与清理住在一起）。详 §三点五。
+
+### 三点五、锁与屏：批 3 收口的两个语义
+
+**① 流程锁（内核资源 `flow`）只占在"用户入口"**
+
+```js
+// 用户入口（点热点 / 启程 / 篝火菜单）：占不到就明说 —— 广播 resource:blocked，shell 模块提示
+await withLock(fn, { from: 'user', label: '启程' });
+// 流程内部（幕末强制链、快速模式）：既可能是第一棒、也可能是被嵌套，占不到就直接跑（占着的一定是自己这条流程）
+await withLock(fn, { from: 'flow', label: '幕末流程' });
+```
+
+于是原来那两处"手工把 `S.busy` 置 false 再进流程"的补丁**结构性消失**（那是不可重入锁逼出来的，
+顺序错了还静默失效）。同时 `busy` 从**存档状态**搬进**运行时资源**——它本来就不该写进玩家存档
+（`state.js` 的 `busy` 字段已删，单测同步）。
+
+**② 屏的清理归属**
+
+```js
+kernel.api('screens').own('screen-board', clearBoard);   // 谁渲染这屏，谁登记它的清理
+```
+
+`showScreen()` 现在只做两件事：切可见性 + 放入场动效，然后广播 `screen:hide`（离开的屏）与
+`screen:show`（进入的屏）。**它不再碰任何屏内部的容器**——`openBoard()` 因此可以自己清自己的容器，
+不必再用 `cloneNode` 换节点、也不必保证"先 showScreen 再挂 host"的时序。
 
 ## 四、模块之间怎么协作（三条正道）
 
@@ -57,12 +83,13 @@ kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调�
 事件清单见 `kernel/contracts.js`（那张表本身就是文档）；当前 21 条，分五组：
 `boot:*` · `screen:*`/`scene:*`/`flow:*` · `state:*`/`hotspot:*`/`choice:*`/`line:*` · `ai:*` · `sfx:*`/`voice:*`/`audio:*` · `resource:*`。
 
-### 已挂上总线的模块（批 2）
+### 已挂上总线的模块（批 2–3）
 
 | 模块 | 订阅 | 说明 |
 |---|---|---|
 | `modules/audio` | `flow:act-enter` · `scene:enter` · `sfx:play` · `voice:say` · `audio:toggle-mute` | **声音的唯一入口**：把事件翻译成 `public/js/audio/` 框架的调用（场景表/通道/静音模型都在框架里）。业务代码从此不认识音频 API |
-| `modules/shell` | `audio:muted` · `audio:suspended` | 外壳对事件的反应：顶栏静音图标、ctx 挂起的提示（过去是 main.js 手工注入回调 + 直接读 `audio.muted`） |
+| `modules/shell` | `audio:muted` · `audio:suspended` · `resource:blocked` | 外壳对事件的反应：顶栏静音图标、ctx 挂起的提示、**"上一步还在进行…"的提示**（过去每个调用点各写一遍 toast） |
+| `modules/screens` | `screen:show` · `screen:hide` | **屏的生命周期归属**：各屏宿主用 `own(screenId, onHide)` 登记自己的清理；离开时只调那一屏自己登记的清理函数（取代 `showScreen` 越界清别人容器的做法，见 §三点五） |
 
 **发声音就发事件**（别再调音频门面——`qa:audio` 会拦）：
 
@@ -87,7 +114,7 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 |---|---|---|
 | 1 | 内核地基（本文档 + 内核七件套 + 契约 + 模块/玩法契约 + 四条 lint + `qa:bus`） | ✅ 已完成 |
 | 2 | **audio 挂总线**（声音总入口）+ shell（外壳对事件的反应） | ✅ 已完成 |
-| 3 | 去越界（`screen:hide` 各屏自清）+ 锁显式化（`resources` 收编 `S.busy` 与 `data-step-state`） | ⏳ |
+| 3 | **去越界**（`screen:hide` 各屏自清）+ **锁显式化**（`resources` 收编 `S.busy`） | ✅ 已完成 |
 | 4 | state 挂总线 + 只读快照（消掉"绕纯函数直改字段"） | ⏳ |
 | 5 | screens / games / sandbox 挂总线（玩法宿主变服务，现有 8 个玩法改成插件形状） | ⏳ |
 | 6 | ai 挂总线 + registry/run 重写（每类预算、预取、`qa:ai` 度量）+ 50 处手工 `showThinking` 收编 | ⏳ |

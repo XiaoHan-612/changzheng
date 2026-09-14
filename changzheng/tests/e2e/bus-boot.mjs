@@ -69,6 +69,19 @@ const loaded = await page.evaluate(() => {
 check('清单模块全部注册', (loaded?.expect || []).every((n) => loaded?.names?.includes(n)) ? 'yes' : `no(${(loaded?.expect || []).filter((n) => !loaded?.names?.includes(n)).join(',')})`, 'yes');
 check('模块加载无失败', (loaded?.loadErrors || []).length, 0);
 
+// 批 3 的两条新不变量
+const batch3 = await page.evaluate(() => {
+  const k = window.__czKernel;
+  const screens = k.api('screens');
+  return {
+    heldLocks: Object.keys(k.resources.held()),          // 启动后不该有人还占着锁
+    owners: screens ? screens.owners() : null,           // 屏清理必须真的登记上（stage / board）
+    blocked: k.diag.events({ name: 'resource:blocked' }).length,
+  };
+});
+check('启动后无残留锁', (batch3.heldLocks || []).length, 0);
+check('屏清理已登记', ['screen-stage', 'screen-board'].every((s) => (batch3.owners || []).includes(s)) ? 'yes' : `no(${(batch3.owners || []).join(',')})`, 'yes');
+
 console.log('总线体检（运行时）：');
 console.table(rows);
 console.log(`契约表 ${flow?.eventsDeclared ?? 0} 条事件；事件流 ${flow?.total ?? 0} 笔（其中 boot:ready ${flow?.ready ?? 0}）`);

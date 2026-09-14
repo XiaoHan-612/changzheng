@@ -20,6 +20,7 @@ export default {
   subscriptions: {
     'audio:muted': 'onMuted',
     'audio:suspended': 'onSuspended',
+    'resource:blocked': 'onBlocked',
   },
 
   init(kernel) {
@@ -41,5 +42,11 @@ export default {
 
   onSuspended(p) {
     toast(p.message, 4000);
+  },
+
+  /** 流程锁被别人占着：玩家刚点的那一下没生效，给个交代（不再由每个调用点各写一遍提示） */
+  onBlocked(p) {
+    if (p.name !== 'flow') return;              // 目前只有流程锁需要提示
+    toast('上一步还在进行…', 1200);
   },
 };

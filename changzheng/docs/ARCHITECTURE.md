@@ -26,7 +26,8 @@ changzheng/
       kernel/           # 【新】内核：bus / contracts(事件契约) / plugins / kernel / wiring(模块清单)
                         #        / resources(显式锁) / snapshot(只读快照) / diag(事件流黑匣子)
                         #        架构与新模块怎么加见 docs/BUS.md
-      modules/          # 【新】IP 模块：README + games/（交互游戏插件契约与模板）
+      modules/          # 【新】IP 模块：audio（声音总入口）/ shell（外壳反应）/ screens（屏生命周期归属）
+                        #        / games/（交互游戏插件契约与模板）
       main.js           # 流程状态机（批 7 会拆成 modules/flow/*）（幕、营地、强制链、锁、篝火夜、玩法宿主 openBoard/mountMini）
       step.js           # 交互契约（setStep / askChoice / choiceButton / waitContinue / markMini）
       minigames.js      # 8 个玩法（本地判手感，结算走 /api/decide）
@@ -70,7 +71,7 @@ UI 事件 → main.js(withLock) → ai-client → POST /api/decide
        → applyEffects(state) → 史实回响(echo) → 下一屏
 ```
 
-目标形态（每批往前挪一步；**批 2 已落地 audio 与 chrome 两个模块**）：
+目标形态（每批往前挪一步；**批 2–3 已落地 audio / shell / screens 三个模块 + 锁与屏的语义收口**）：
 
 ```
         ┌─────────────── kernel（bus / contracts / resources / snapshot / diag）───────────────┐

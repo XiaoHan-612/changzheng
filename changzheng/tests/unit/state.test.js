@@ -43,11 +43,11 @@ test('减员：没有 loss 声明的抉择永不减员', () => {
   assert.equal(resolveLoss({ options: [{ label: 'A', risk: 'high' }] }, 0, s), null);
 });
 
-test('createState 默认五维与锁字段', () => {
+test('createState 默认五维（锁字段已移出：忙不忙由内核资源管）', () => {
   const s = createState();
   assert.equal(s.体力, 72);
   assert.equal(s.ap, 2);
-  assert.equal(s.busy, false);
+  assert.equal('busy' in s, false);   // 存档里不该再有运行时字段（批 3 收口）
   assert.deepEqual(s.doneKeys, {});
 });
 

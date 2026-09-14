@@ -19,7 +19,9 @@ export function createResources({ bus, onEvent } = {}) {
     /** 申请独占；返回 true = 拿到了，false = 别人正占着（调用方决定提示还是排队） */
     claim(name, who) {
       if (held.has(name)) {
-        onEvent?.({ kind: 'resource-blocked', name, who, holder: held.get(name) });
+        const holder = held.get(name);
+        onEvent?.({ kind: 'resource-blocked', name, who, holder });
+        bus.emit('resource:blocked', { name, who, holder });   // 广播：UI 给反馈（谁占着也一并带上）
         return false;
       }
       held.set(name, who);

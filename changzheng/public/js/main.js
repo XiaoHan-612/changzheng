@@ -387,7 +387,7 @@ function offerResume() {
 }
 
 function resumeRun(saved) {
-  S = { ...createState(), ...saved, busy: false };
+  S = { ...createState(), ...saved };
   setTopbar(true);
   renderStats(S);
   renderAp(S);
@@ -496,6 +496,11 @@ function bindChrome() {
   };
   $('btn-settings').onclick = () => openSettings();
   $('btn-settings2').onclick = () => openSettings();
+  // 屏的生命周期归属：这两屏的渲染代码在 main.js 里，清理也写在它们旁边（见 modules/screens）
+  const screensApi = kernel.api('screens');
+  screensApi?.own('screen-stage', clearStage);
+  screensApi?.own('screen-board', clearBoard);
+
   const muteBtn = $('btn-mute');
   if (muteBtn) {
     // 只发命令：静音状态由 audio 模块持有，图标与提示由 chrome 模块订阅 audio:muted 更新
@@ -987,14 +992,12 @@ async function runQuickAct(act) {
   renderJourney();
   const talkHotspot = (dayScene(act, 1).hotspots || []).find((h) => h.kind === 'talk');
   if (talkHotspot) {
-    // 快速模式常在 finishAct 的锁内被调用，先释放锁再进流程（沿用行军按钮的既有做法）
-    S.busy = false;
-    await withLock(() => doTalk(act, talkHotspot));
+    // 快速模式常在 finishAct 的锁内被调用：内部流转交给 withLock 的 from:'flow' 处理，不用手工解锁
+    await withLock(() => doTalk(act, talkHotspot), { from: 'flow', label: '快速演示' });
     renderStats(S);
     renderCompanions(S);
     saveState(S);
   }
-  S.busy = false;
   await runForcedChain(act);
 }
 
@@ -1176,7 +1179,7 @@ function bindMarchButton(act) {
 function updateMarchButton() {
   const btn = $('btn-march-fixed');
   if (!btn) return;
-  if (S?.busy) {
+  if (kernel.resources.isHeld('flow')) {      // 忙不忙由流程锁说了算（不再看存档里的字段）
     btn.disabled = true;
     btn.classList.remove('urgent');
     btn.textContent = '…';
@@ -1279,11 +1282,7 @@ function hotspotSpent(act, h) {
 }
 
 async function onHotspot(act, h) {
-  if (S?.busy) {
-    // 切日/过场的瞬间仍在上一步的锁里，给个反馈别让玩家以为点坏了
-    toast('上一步还在进行…', 1200);
-    return;
-  }
+  // 忙不忙由流程锁说了算（锁被占时 withLock 会广播 resource:blocked，由 shell 模块提示）
   // 做过一次的热点不再重复结算（不扣行动点、不重复调模型）
   if (hotspotSpent(act, h)) {
     toast('这里已经看过了', 1600);
@@ -1304,9 +1303,8 @@ async function onHotspot(act, h) {
         return;
       }
       await marchTransition('离开 ' + act.title);
-      S.busy = false;
-      await runForcedChain(act);
-    });
+      await runForcedChain(act);              // 同一条流程内：runForcedChain 自己知道要不要占锁
+    }, { from: 'user', label: '启程' });
   }
   if (S.ap <= 0) {
     toast('天黑了 → 点右下「启程」');
@@ -1374,7 +1372,7 @@ function renderFireMenu(act) {
     b.disabled = S.ap <= 0;
     b.onclick = async () => {
       hideOverlay('screen-fire');
-      if (S.ap <= 0 || S.busy) { showScreen('screen-camp'); return; }
+      if (S.ap <= 0 || kernel.resources.isHeld('flow')) { showScreen('screen-camp'); return; }
       await withLock(async () => {
         S.ap -= 1;
         S.行动日志.push(f.label);
@@ -1390,7 +1388,7 @@ function renderFireMenu(act) {
         showScreen('screen-camp');
         const ds2 = dayScene(act, S.day);
         $('pano-img').style.backgroundImage = `url('${sceneImage(ds2.alt, ds2.pano)}')`;
-      });
+      }, { from: 'user', label: '篝火菜单' });
     };
     box.appendChild(b);
   });
@@ -1764,14 +1762,23 @@ function openBoard({ title = '', bg = '' } = {}) {
   $('board-kicker').textContent = act ? `${act.title} · 第 ${S?.day || 1} 日` : '玩法';
   $('board-title').textContent = title;
   $('board-bg').style.backgroundImage = bg ? `url('${bg}')` : '';
-  // 数值签容器每局换一个新节点：上一局若还有定时器/动画在跑，它持有的是旧节点，
-  // 写进去也落在已丢弃的 DOM 上，不会串写到这一局的板头（2026-09-13 体检抓到过串写）。
-  const oldStats = $('board-stats');
-  const statsHost = oldStats.cloneNode(false);
-  oldStats.replaceWith(statsHost);
-  const body = $('board-body');
-  body.innerHTML = '';
-  return { body, stats: statsHost };
+  // 玩法板**自己清自己的容器**（不再指望 showScreen 顺手清、也不再 cloneNode 换节点躲它）：
+  // 上一局的残留节点在这里被丢弃，即使还有旧定时器持着它的引用，写入也落在已丢弃的 DOM 上。
+  clearBoard();
+  return { body: $('board-body'), stats: $('board-stats') };
+}
+
+/** 舞台屏与玩法板屏各自的清理（登记给 screens 模块；渲染与清理住在一起，谁也不会忘） */
+function clearStage() {
+  document.querySelectorAll('#sheet-actions').forEach((n) => { n.innerHTML = ''; });
+  const panel = $('stage-panel'); if (panel) panel.innerHTML = '';
+  const banner = $('stage-banner'); if (banner) banner.textContent = '';
+  const dlg = $('dlg-body'); if (dlg) dlg.textContent = '';
+}
+
+function clearBoard() {
+  const body = $('board-body'); if (body) body.innerHTML = '';
+  const stats = $('board-stats'); if (stats) stats.innerHTML = '';
 }
 
 /** 装一个玩法：板屏开好、host 就位、契约声明齐，交给 minigames.js 的 runXxx */
@@ -1967,15 +1974,38 @@ async function doLuding(act) {
 // 「继续」统一走 step.js 的 waitContinue（带 data-action 契约标记）
 const waitBtn = waitContinue;
 
-async function withLock(fn) {
-  if (S && S.busy) return;
-  if (S) S.busy = true;
-  updateMarchButton?.();
-  try {
-    await fn();
-  } finally {
-    if (S) S.busy = false;
+/**
+ * 流程锁（内核资源 'flow'）。语义在批 3 收口为两条：
+ *
+ *   ① **入口**（`from: 'user'`）：玩家动作进来的第一棒。锁被别人占着就**明说**——
+ *      广播 `resource:blocked`（shell 模块负责提示），而不是悄悄 return。
+ *   ② **流程内部**（`from: 'flow'`）：幕末强制链、快速模式这类"既可能是第一棒、也可能被嵌在流程里"的环节。
+ *      已被占就直接跑（占着的一定是自己这条流程），没被占就自己占上。
+ *
+ * 这样就不需要原来那两处"手工把 S.busy 置 false 再进流程"的 hack——那是不可重入锁逼出来的补丁，
+ * 而且顺序错了就静默失效。同时"忙"从**存档状态**（S.busy）变成了**运行时资源**（内核持有），
+ * 这本来就是运行时概念，不该写进玩家存档。
+ */
+async function withLock(fn, { from = 'user', label = 'flow' } = {}) {
+  const isHeld = kernel.resources.isHeld('flow');
+  if (isHeld && from === 'user') {
+    kernel.resources.claim('flow', label);      // 故意再申请一次：失败会广播 resource:blocked，由 shell 提示
+    return;
+  }
+  const mine = !isHeld;
+  if (mine) {
+    kernel.resources.claim('flow', label);
+    setStepState('busy');                      // 与 step 状态联动：自动化据此"等待"，而不是"该点却点不动"
     updateMarchButton?.();
+  }
+  try {
+    return await fn();
+  } finally {
+    if (mine) {
+      kernel.resources.release('flow', label);
+      setStepState('awaiting');
+      updateMarchButton?.();
+    }
   }
 }
 
@@ -2004,7 +2034,9 @@ async function runForcedChain(act) {
       markDone(act.id, 'quiz');
     }
     await finishAct(act);
-  });
+    // from:'flow'：这一棒既可能是玩家点「启程」进来的（那时锁已由入口占下），
+    // 也可能是快速模式/幕末链里被嵌套调用（同一条流程）。两种情况都不该互相拒绝。
+  }, { from: 'flow', label: '幕末流程' });
 }
 
 /**

@@ -42,6 +42,7 @@ export const EVENTS = {
   // ── 内核资源（把 S.busy 这类"独占"提成可观测的东西）──
   'resource:claim': { note: '申请独占资源；已被占则失败（调用方自行决定等还是提示）', fields: ['name', 'who'] },
   'resource:release': { note: '释放独占资源', fields: ['name', 'who'] },
+  'resource:blocked': { note: '申请独占资源失败（别人占着）——UI 据此给反馈，别再在每个调用点各写一遍提示', fields: ['name', 'who'], optional: ['holder'] },
 };
 
 /** 事件是否已登记 */
