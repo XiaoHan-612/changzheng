@@ -121,6 +121,9 @@ sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 
 
 ## 五、关键文件
 
+> 音频相关（环境床 / BGM / 音效 / 语音）**正在按 [`AUDIO-SYSTEM.md`](AUDIO-SYSTEM.md) 重写成统一框架**：
+> 设计稿已定、分批实施（骨架+静音模型 → 场景声明表+BGM → 注册表+试听页）。动手前先读那份。
+
 ```
 server/
   index.js      路由（/api/decide /api/sim /api/config /api/logs）

@@ -121,7 +121,8 @@ public/audio/bgm/huining_bgm.ogg    五幕·会宁（汇合、暖调、收束）
 **混音**：BGM 音量应低于环境床（建议 0.18 vs 环境床 0.32）；人声播放时自动闪避（duck 到 40%，300ms 淡入淡出）。
 **红线**：无版权素材或已授权；**不含人声**（避免与台词抢）；不用强节奏与打击乐重音；整体克制，符合历史题材。
 
-**代码侧（必须先做，否则文件放进去不会被加载）**：加 `BGM_FILE` 映射 + `audio.playBgm(kind)` / `stopBgm()`，与 `playAmbient` 同一套回退约定（文件缺失就静音，不影响流程）；同时把 `public/audio/bgm/` 加进 `scripts/check-audio.mjs` 的扫描目录，并在 `qa:av` 增加"每幕 BGM 播放成功"的断言。这一步约半天，不依赖音频模型，可随时先做。
+**代码侧（正在按 [`AUDIO-SYSTEM.md`](AUDIO-SYSTEM.md) 重写，BGM 通道是框架里的平级通道）**：
+旧说明（重写完成后作废）：：加 `BGM_FILE` 映射 + `audio.playBgm(kind)` / `stopBgm()`，与 `playAmbient` 同一套回退约定（文件缺失就静音，不影响流程）；同时把 `public/audio/bgm/` 加进 `scripts/check-audio.mjs` 的扫描目录，并在 `qa:av` 增加"每幕 BGM 播放成功"的断言。这一步约半天，不依赖音频模型，可随时先做。
 
 ## 七、红线与验收
 

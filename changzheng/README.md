@@ -54,7 +54,7 @@ npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md · tts:manife
 ## 文档
 
 - **`docs/HANDOFF-CODE.md`** — 给下一个代码 agent：模块地图、状态机、callType 契约、已知坑（接手先读这份）
-- **`docs/DESIGN-SYSTEM.md`** — 视觉体系与逐批打磨进度（改界面先读）· **`logs/README.md`** — 日志目录各文件的职责
+- **`docs/DESIGN-SYSTEM.md`** — 视觉体系与逐批打磨进度（改界面先读）· **`docs/AUDIO-SYSTEM.md`** — 音频框架（改声音先读）· **`logs/README.md`** — 日志目录各文件的职责
 - **`docs/HANDOFF-ART.md`** / **`docs/HANDOFF-AUDIO.md`** — 给生图 / 音频模型
 - `docs/ASSETS.md` — 素材清单（可勾选）· `docs/TTS-MANIFEST.md` — 语音哈希清单
 - `docs/ARCHITECTURE.md` · `docs/QA.md` · `docs/SCORING.md` · `docs/PITCH.md`
