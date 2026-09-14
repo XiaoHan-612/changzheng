@@ -12,11 +12,11 @@ export const MIX = {
   /** 总音量。要整体压低就只动这一个数 */
   master: 0.75,
 
-  /** 四条通道的电平（相对 master） */
+  /** 四条通道的电平（相对 master）。sfx 那一档直接引用下面 sfx.level，避免两处各写一个数 */
   bus: {
     ambient: 0.80,
     bgm: 0.80,      // BGM 的"低"由下面 bgm.level 决定，总线保持平直
-    sfx: 0.85,
+    sfx: 0.85,      // 与 sfx.level 同源（见下）
     voice: 1.00,
   },
 
@@ -40,6 +40,7 @@ export const MIX = {
   },
 
   sfx: {
+    /** 音效总电平（就是总线上那一档；配方里只写相对量，别再乘一次） */
     level: 0.85,
     /** 同名音效在该窗口内不重复播（防连点糊成一片） */
     throttleMs: 60,

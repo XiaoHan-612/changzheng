@@ -91,7 +91,7 @@ export class SfxChannel {
     f.type = 'lowpass';
     f.frequency.value = Math.min(4000, freq * 4);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol * MIX.sfx.level, t + attack);
+    g.gain.exponentialRampToValueAtTime(vol, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(f);
     f.connect(g);
@@ -113,7 +113,7 @@ export class SfxChannel {
     f.type = type;
     f.frequency.value = cut;
     f.Q.value = q;
-    g.gain.setValueAtTime(vol * MIX.sfx.level, t);
+    g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(f);
     f.connect(g);
