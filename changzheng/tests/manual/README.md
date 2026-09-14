@@ -8,6 +8,7 @@
 | `framework-proof.mjs` | `npm run qa:proof` — 把区块四态 + 7 个整页模板 + 亮度对照渲成 `framework-proof.png`，改框架时看这一张 |
 | `screen-sheet.mjs` | `npm run qa:screens -- <批次>` — 按批把页面截成统一尺寸并拼成 `screen-sheet-<n>.png`，同时写逐页纸面占比；加 `--width 820` 出窄屏版（`screen-sheet-<n>-820.png`，不写占比） |
 | `qa-hud.mjs` | `npm run qa:hud` — 顶栏 3 倍特写 + 逐元素量字体/字号/颜色/对比度，排查数值与顶栏排版 |
+| `audio-listen.mjs` | `node tests/manual/audio-listen.mjs [--keep-open]` — **音频试听驱动**：开一个可见的 Chrome，按 ①标题静音 ②营地环境床 ③点热点音效 ④台词语音 ⑤静音 3 秒 ⑥取消静音立即恢复 的顺序放一遍并打印状态，给有耳朵的人逐个确认（无头浏览器没有音频输出，听感只能靠人；`--keep-open` 放完不关窗） |
 | `qa-board.mjs` | `npm run qa:board` — 玩法板体检：8 个玩法逐屏摆到板屏上，验板屏壳（题名/数值签）、玩法关键元素、契约标记与"第一步能不能点"，离开板屏是否清干净 |
 | `qa-motion.mjs` | `npm run qa:motion` — 动效体检：量计算样式，确认五个标准效果真的挂上、逐条入场延迟正确、减动效偏好下位移关掉 |
 | `qa-screens.mjs` | 逐屏截图 + 量各屏边界，排查布局溢出 |
