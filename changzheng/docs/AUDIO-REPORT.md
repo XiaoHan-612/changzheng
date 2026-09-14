@@ -1,5 +1,5 @@
 # 音频体检报告
-> 由 `npm run qa:audio` 生成 · 共 55 个文件（ambient 8 · cache 20 · voices 21 · reactions 6）
+> 由 `npm run qa:audio` 生成 · 共 55 个文件（ambient 8 · bgm 0 · cache 20 · voices 21 · reactions 6）
 | 文件 | 容器 | 采样 | 声道 | 时长 | 体积 | HTTP | MIME | 可解码 |
 |---|---|---|---|---|---|---|---|---|
 | `public/audio/ambient/depart_river.ogg` | vorbis | 44100 | 1 | 24.4s | 117 KB | 200 | audio/ogg | ✅ |

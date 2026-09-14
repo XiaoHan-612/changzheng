@@ -93,6 +93,11 @@ export class AudioCore {
     }
   }
 
+  /** 语音在播时压低背景（BGM 重闪避、环境床轻闪避）；语音结束回位 */
+  duck(on) {
+    for (const ch of Object.values(this.channels)) ch.duck?.(on);
+  }
+
   /** 某条通道现在是否真的在响（测试与调试用；不看实现细节） */
   isPlaying(name) {
     return !!this.channels[name]?.playing?.();

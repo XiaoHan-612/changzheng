@@ -349,7 +349,7 @@ export async function bindSandbox({ onExit }) {
   const saved = loadWorld();
   const state = { world: saved || createSandboxWorld(), busy: false, restored: !!saved };
 
-  audio.ambient.play('camp');
+  audio.scene('sandbox');       // 自由行军：只铺环境床，不配乐（见 scene-table.js）
   renderWorld(state.world);
   if (state.restored) {
     pushFeed(`<div class="turn">
@@ -425,7 +425,7 @@ export async function bindSandbox({ onExit }) {
   if (reset) {
     reset.onclick = () => {
       clearWorld();
-      audio.ambient.stop();
+      audio.scene('title');
       exit();
     };
   }

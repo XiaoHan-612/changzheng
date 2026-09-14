@@ -2,7 +2,7 @@
 
 > 你只负责**产音频**。三条产线：**① 环境床 ogg ② 操作音效 ③ 固定台词 TTS**。
 > 固定台词的**精确文本、哈希文件名、音色建议**已在 [`TTS-MANIFEST.md`](TTS-MANIFEST.md) 里列好，照表产出即可。
-> 代码侧接口已就绪，不需要改代码：`POST /api/tts` + `public/js/audio.js`。
+> 代码侧接口已就绪，不需要改代码：`POST /api/tts` + 音频框架（`public/js/audio/`，见 [`AUDIO-SYSTEM.md`](AUDIO-SYSTEM.md)）。
 
 ## 一、三层架构（策划案 §2.6.1）
 
@@ -38,6 +38,7 @@
 | 四幕·雪山日 | `public/audio/ambient/snow_wind.ogg` | 雪风，高频风声 | 20–30s |
 | 四幕·草地日 | `public/audio/ambient/grass_fire.ogg` | 风 + 火，水汽感 | 20–30s |
 | 五幕·会宁 | `public/audio/ambient/huining_low.ogg` | 低人流嘈杂 + 远号，**不抢人声** | 20–30s |
+| 兜底（幕轴上找不到的场景） | `public/audio/ambient/wind.ogg` | 通用风床：新场景还没配声音时的底噪，**别太有辨识度**（它会被用在意料之外的地方） | 20–30s |
 
 要求：首尾各留 200ms 静音便于循环；无音乐性旋律（避免情绪过载）；响度 -24 LUFS 左右。
 
@@ -121,8 +122,11 @@ public/audio/bgm/huining_bgm.ogg    五幕·会宁（汇合、暖调、收束）
 **混音**：BGM 音量应低于环境床（建议 0.18 vs 环境床 0.32）；人声播放时自动闪避（duck 到 40%，300ms 淡入淡出）。
 **红线**：无版权素材或已授权；**不含人声**（避免与台词抢）；不用强节奏与打击乐重音；整体克制，符合历史题材。
 
-**代码侧（正在按 [`AUDIO-SYSTEM.md`](AUDIO-SYSTEM.md) 重写，BGM 通道是框架里的平级通道）**：
-旧说明（重写完成后作废）：：加 `BGM_FILE` 映射 + `audio.playBgm(kind)` / `stopBgm()`，与 `playAmbient` 同一套回退约定（文件缺失就静音，不影响流程）；同时把 `public/audio/bgm/` 加进 `scripts/check-audio.mjs` 的扫描目录，并在 `qa:av` 增加"每幕 BGM 播放成功"的断言。这一步约半天，不依赖音频模型，可随时先做。
+**代码侧已就绪（批 2，2026-09-14）**：`public/js/audio/channels/bgm.js` 的 `BGM_FILE` 已按上面的名字建好，
+场景表（`public/js/audio/scene-table.js`）已把每一幕/每个场景指向对应曲名，`public/audio/bgm/` 已纳入
+`npm run qa:audio` 的扫描与"缺曲记账"。
+**你只要把 `.ogg` 按上面的名字放进 `public/audio/bgm/` 就自动生效**（代码无需改动）；放之前该场景
+只放环境床、不会报错——`qa:audio` 的提示段会列出"还没有 BGM 文件（N 首）：…"。当前缺这 8 首。
 
 ## 七、红线与验收
 

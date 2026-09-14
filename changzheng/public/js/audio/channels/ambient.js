@@ -9,6 +9,7 @@
  * 合成兜底的循环定时器由本通道持有，stop 时一并清掉。
  */
 import { MIX } from '../mix.js';
+import { fadeElement, cancelFade } from '../fade.js';
 
 /** 环境床文件映射（音频模型按 docs/HANDOFF-AUDIO.md 的表把文件放进 public/audio/ambient/） */
 export const AMBIENT_FILE = {
@@ -20,6 +21,7 @@ export const AMBIENT_FILE = {
   snow: '/audio/ambient/snow_wind.ogg',
   camp: '/audio/ambient/grass_fire.ogg',
   huining: '/audio/ambient/huining_low.ogg',
+  wind: '/audio/ambient/wind.ogg',        // 兜底场景的通用风床（未产出时走合成兜底，qa:audio 会列出）
 };
 
 function noiseBuffer(ctx, seconds = 2) {
@@ -38,6 +40,7 @@ function noiseBuffer(ctx, seconds = 2) {
 export class AmbientChannel {
   constructor(core) {
     this.core = core;
+    this.ducked = false;
     this.el = null;          // 文件版：current <audio>
     this.nodes = [];         // 合成版：current 节点
     this.current = null;     // 现在在响的 kind（actual）
@@ -58,7 +61,19 @@ export class AmbientChannel {
   }
 
   describe() {
-    return { kind: this.current, src: this.el ? this.el.src.split('/').pop() : (this.nodes.length ? 'synth' : null), playing: this.playing() };
+    return {
+      kind: this.current,
+      src: this.el ? this.el.src.split('/').pop() : (this.nodes.length ? 'synth' : null),
+      playing: this.playing(),
+      volume: this.el ? +this.el.volume.toFixed(3) : null,
+      ducked: this.ducked,
+    };
+  }
+
+  /** 语音在播时轻闪避（让台词更清楚），结束回位 */
+  duck(on) {
+    this.ducked = !!on;
+    if (this.el) fadeElement(this.el, MIX.ambient.level * (this.ducked ? MIX.voice.duckAmbient : 1), MIX.ambient.fadeOutMs);
   }
 
   /** 让 actual 追上 desired：该起的起、该停的停 */
@@ -87,14 +102,16 @@ export class AmbientChannel {
       };
       const el = new Audio(file);
       el.loop = true;
-      el.volume = MIX.ambient.level;
+      el.volume = 0;                                  // 起播淡入（切场景不会"啪"地一声）
       this.el = el;
       el.onerror = fallback;
       // 被外部暂停（浏览器切后台 / 系统休眠）→ 稍后自愈；我们自己静音停的不算（core.muted 时不触发）
       el.addEventListener('pause', () => {
         if (!this.core.muted && this.core.desired.ambient === kind) this.core.reconcile();
       });
-      el.play().catch(fallback);
+      el.play()
+        .then(() => fadeElement(el, MIX.ambient.level * (this.ducked ? MIX.voice.duckAmbient : 1), MIX.ambient.fadeInMs))
+        .catch(fallback);
       // 文件 404 时部分浏览器不触发 error，用 fetch 兜一次
       fetch(file, { method: 'HEAD' })
         .then((r) => { if (!r.ok) fallback(); })
@@ -226,6 +243,7 @@ export class AmbientChannel {
   /** 停掉当前声音（不动意图）；清定时器、断节点、停元素 */
   _stopSound() {
     if (this.el) {
+      cancelFade(this.el);
       try { this.el.pause(); this.el.currentTime = 0; } catch { /* ignore */ }
       this.el = null;
     }

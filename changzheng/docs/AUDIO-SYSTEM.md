@@ -2,7 +2,7 @@
 
 > **方向一句话**：一次重写，之后**所有**音频都从一个门面走；加环境床 / BGM / 音效 / 台词都只在**声明表**里加一行。
 > 结构刻意与视觉那套一一对应：**值 → 框架 → 通道 → 声明表 → 守卫/体检**（见 §二）。
-> 状态：**批 1 已落地**（骨架 + 静音模型 + 调用点全部收进门面）；批 2（场景声明表 + BGM）、
+> 状态：**批 1、批 2 已落地**（骨架 + 静音模型 + 全部调用点收进门面；场景声明表 + BGM 通道 + 闪避）。
 > 批 3（音效注册表 + 语音收口 + 试听页）待做。分批计划见 §九。
 > 已拍板：BGM 有文件就放 · 播放走 `<audio>` 元素（抗 ctx 挂起）· 保留合成兜底但审计显式列出 · 操作音效继续合成。
 
@@ -47,8 +47,9 @@ audio/                     ← 已落地（批 1）：旧 public/js/audio.js 已
     ambient.js             # 环境床：AMBIENT_FILE 映射 + 文件(.ogg→.wav) → 合成兜底；循环
     sfx.js                 # 音效：SFX_NAMES + 合成配方 + 同名节流（批 3 换成注册表 + 文件覆盖）
     voice.js               # 语音：ACTOR_VOICE + voice-lines.json 目录 → /api/tts 缓存 → 静默；支持 { file } 直给
-  scene-table.js           # 【声明·批 2】屏 → { ambient, bgm }
-  bgm.js                   # 【批 2】BGM 通道
+  fade.js                  # 元素音量斜坡（淡入/闪避共用一处，别在通道里各写 setInterval）
+  scene-table.js           # 【声明】场景 → { ambient, bgm }（唯一场景真相）
+  channels/bgm.js          # 【批 2 已落地】BGM 通道（有文件就放，缺文件静默并记账）
 ```
 
 ---
@@ -108,7 +109,7 @@ reconcile(): 让 actual 追上 desired —— 该起的起（带淡入）、该�
 | 通道 | 回退链 / 策略 | 音量（mix.js 给） | 备注 |
 |---|---|---|---|
 | **ambient** | `.ogg → .wav → 合成兜底`；循环；切场景 800ms 淡入淡出 | **0.7**（实测：0.32 时只有 −37 dBFS，比一般游戏床低一档多，听不出在不在响；0.7 ≈ −28 dBFS） | 兜底**在审计里显式列出**（"正在兜底"是可见状态，不是静默） |
-| **bgm** | `public/audio/bgm/<kind>_bgm.ogg`；60–120s 可循环；起停 1.2s 淡入淡出 | ~0.18（低于环境床） | 语音播放时 duck 到 40%；**当前文件未产出**，落盘即生效 |
+| **bgm** | `public/audio/bgm/<kind>_bgm.ogg`；60–120s 可循环；起播 1.2s 淡入 | ~0.18（低于环境床） | 语音播放时 duck 到 40%；**文件未产出时该场景只放环境床**（静默、记账在 `state().actual.bgm.missing` 与 `qa:audio`），落盘即生效 |
 | **sfx** | 注册表：合成配方（默认）或**同名文件覆盖**（预录后自动顶替） | ~0.85 | ≤0.4s；同名 60ms 节流；未知名字告警 |
 | **voice** | 预置目录 `voice-lines.json` → TTS 缓存 `/api/tts` → 静默 | 1.0 | 新句打断旧句；播放期间闪避 BGM（最大）与环境床（轻） |
 
@@ -119,10 +120,10 @@ reconcile(): 让 actual 追上 desired —— 该起的起（带淡入）、该�
 | 想加什么 | 怎么做 |
 |---|---|
 | 新环境床 | `scene-table.js` 加一行 + 文件按命名约定落盘（`public/audio/ambient/<kind>.ogg`）→ **落盘即生效** |
-| 新 BGM | 表里加一行 + `public/audio/bgm/<kind>_bgm.ogg` → 落盘即生效 |
+| 新 BGM | **② 已就绪**：`channels/bgm.js` 的 `BGM_FILE` 加一行 + 场景表指向它 + `public/audio/bgm/<kind>_bgm.ogg` 落盘即生效 |
 | 新音效 | `sfx-table.js` 加一条配方；或直接把 `<name>.ogg` 放进 `public/audio/sfx/` 覆盖合成音 |
 | 新台词 / 新角色语音 | `data/tts-lines.json` 加条 + `ACTOR_VOICE` 加一行 → `npm run tts:manifest` 产出文件名交给音频模型 |
-| 新屏（新场景） | `scene-table.js` 加一行；守卫会核对"每个屏都有声音声明"（漏了会报） |
+| 新屏（新场景） | `audio.scene('新场景名')` 或走幕轴（`{ act, label }`）→ 在 `scene-table.js` 的 `SCENE_SOUNDS` 加一行。**守卫会核对**：场景表写的 kind 必须在文件映射里存在，否则 `qa:audio` 报错（写错 kind = 静默无声） |
 | 新玩法 / 新小游戏 | 若要用自己的床：表里加一行；只加音效：直接用已注册的 sfx |
 
 ---
@@ -147,10 +148,14 @@ reconcile(): 让 actual 追上 desired —— 该起的起（带淡入）、该�
 - 混音 lint + `qa:smoke` 断言保住；`docs/AUDIO-SYSTEM.md` 从"设计稿"转"实现说明"
 - 验收：`test:unit` / `qa:smoke` / `qa:av` / `test:e2e` 全绿，且听感与现状一致
 
-**批 2 · 声明式场景表 + BGM 通道**
-- `scene-table.js` + `audio.scene()` 接管所有场景切换（`ambientFor`、沙盘硬编码全部进表）
-- `bgm.js`：文件循环 + 淡入淡出 + 语音闪避；`qa:audio` 扫描 `bgm/`
-- 验收：缺 BGM 文件时静默不报错、落盘即生效；"每幕环境床/BGM"体检出表
+**批 2 · 声明式场景表 + BGM 通道**（✅ 已完成）
+- 已落地：`scene-table.js`（幕轴 `ACT_SOUNDS` / 分日 `DAY_SOUNDS` / 独立场景 `SCENE_SOUNDS` / 兜底）+
+  `audio.scene()` 接管全部场景切换（`ambientFor` 已删除、沙盘硬编码已进表）；`bgm.js` 通道（元素循环 +
+  淡入 + 语音闪避 + 缺文件记账）；`fade.js` 音量斜坡；语音播放期间 BGM 重闪避／环境床轻闪避
+- 守卫：`qa:audio` 增「场景表 ↔ 文件映射 ↔ 磁盘」对账 + 新增「app 代码不许直调 `audio.ambient/bgm.play`」；
+  `qa:handoff` 修好（它原先还指着已删除的 `public/js/audio.js`）
+- 实测：`audio-listen --measure` 里 `desired.bgm='depart'`、`actual.bgm.missing=['depart']`（缺文件按设计静默）；
+  环境床淡入实测 0→0.7（中途读数 0.576）
 
 **批 3 · 注册表 + 语音收口 + 试听页**
 - `sfx-table.js`（配方 + 同名文件覆盖）、语音打断/闪避策略、`dev/audio.html` 试听页

@@ -4,7 +4,8 @@
  *   import { audio } from './audio/index.js';
  *
  *   audio.boot();                            // 首次手势解锁 + 挂自愈触发点（import 时已自动挂，可再调）
- *   audio.ambient.play('camp');              // 关键时机①：进屏/换幕（批 2 起改由 audio.scene('camp') 声明）
+ *   audio.scene({ act, label });             // 关键时机①：进屏/换幕（按声明表起停环境床与 BGM）
+ *   audio.scene('sandbox' | 'title' | 'luding' | 'ending')   // 不在幕轴上的独立场景
  *   audio.sfx('click');                      // 关键时机②：交互
  *   await audio.speak({ text, actorId });    // 关键时机③：台词（预置 → TTS 缓存 → 静默）
  *   audio.setMuted(true);                    // 关键时机④：静音开关（取消即按意图恢复）
@@ -17,13 +18,16 @@
  */
 import { AudioCore } from './core.js';
 import { AmbientChannel, AMBIENT_FILE } from './channels/ambient.js';
+import { BgmChannel, BGM_FILE } from './channels/bgm.js';
 import { SfxChannel, SFX_NAMES } from './channels/sfx.js';
 import { VoiceChannel, ACTOR_VOICE } from './channels/voice.js';
+import { ACT_SOUNDS, DAY_SOUNDS, SCENE_SOUNDS, FALLBACK_SOUNDS, soundsFor } from './scene-table.js';
 
 export class Audio {
   constructor() {
     this.core = new AudioCore();
     this.ambient = this.core.register('ambient', new AmbientChannel(this.core));
+    this.bgm = this.core.register('bgm', new BgmChannel(this.core));
     this.sfxChannel = this.core.register('sfx', new SfxChannel(this.core));
     this.voice = this.core.register('voice', new VoiceChannel(this.core));
     this.core.boot();
@@ -33,6 +37,16 @@ export class Audio {
 
   /** 幂等；import 时已自动挂好监听，显式调用用于"进游戏时再解锁一次" */
   boot() { this.core.boot(); this.core.ensure(); }
+
+  /**
+   * 切场景：按声明表（scene-table.js）起停环境床与 BGM。
+   * @param {string|{act?:object, day?:number, label?:string}} spec
+   */
+  scene(spec) {
+    const s = soundsFor(spec);
+    this.core.desire('ambient', s.ambient);
+    this.core.desire('bgm', s.bgm);
+  }
 
   /** 音效：名字见 channels/sfx.js 的 SFX_NAMES（批 3 起提供同名文件覆盖） */
   sfx(name) { this.sfxChannel.play(name); }
@@ -63,4 +77,5 @@ audio.boot();
 // （muted / ctx / desired 该响什么 / actual 现在在响什么）
 window.__czAudio = audio;
 
-export { AMBIENT_FILE, SFX_NAMES, ACTOR_VOICE };
+export { AMBIENT_FILE, BGM_FILE, SFX_NAMES, ACTOR_VOICE };
+export { ACT_SOUNDS, DAY_SOUNDS, SCENE_SOUNDS, FALLBACK_SOUNDS, soundsFor };

@@ -94,6 +94,7 @@ async function main() {
   const problems = [];
   const errs = [];
   const badStatus = [];
+  const pendingAssets = [];      // 声明了但素材未产出（信息，不算问题）
   const ttsUrls = new Set();
   const checkedCamp = new Set();
   const stageSeen = new Map();    // step → Set(实际用过的图)
@@ -105,7 +106,14 @@ async function main() {
   page.on('response', (r) => {
     const u = r.url();
     if (!/\/(assets|audio)\//.test(u)) return;
-    if (r.status() >= 400) badStatus.push(`${r.status()} ${u.replace(BASE, '')}`);
+    if (r.status() >= 400) {
+      const rel = u.replace(BASE, '').split('?')[0];
+      // 素材还没产出（磁盘上就没有这个文件）不算故障：BGM 是"有文件就放"，缺曲由代码静默降级、
+      // 由 qa:audio 记账。但**文件明明在磁盘上却 4xx** 一定是服务端/路径的真问题。
+      const onDisk = fs.existsSync(path.join(ROOT, 'public', rel.replace(/^\//, '')));
+      if (onDisk) badStatus.push(`${r.status()} ${rel}`);
+      else pendingAssets.push(`${r.status()} ${rel}`);
+    }
   });
   page.on('response', async (r) => {
     if (!r.url().includes('/api/tts')) return;
@@ -263,6 +271,12 @@ async function main() {
   await browser.close();
 
   for (const b of badStatus) problems.push(`资源请求失败：${b}`);
+  if (pendingAssets.length) {
+    const uniq = [...new Set(pendingAssets)];
+    console.log(`
+[信息] ${uniq.length} 个声明了但素材未产出的资源（代码按设计静默降级）：`);
+    for (const u of uniq.slice(0, 12)) console.log('  · ' + u);
+  }
   for (const t of ttsCheck) if (t.status !== 200) problems.push(`TTS 音频不可达：${t.url} → HTTP ${t.status}`);
   for (const [u, ok] of Object.entries(decodable)) if (!ok) problems.push(`TTS 音频无法解码：${u}`);
   if (!ambientOk.length) problems.push('整局没有一次成功的环境床播放（说明全在走合成兜底）');
@@ -285,6 +299,7 @@ async function main() {
     未命中_AI自由文本: uniqDynamic.length,
     音效音源数: av.sfx,
     资源请求失败数: badStatus.length,
+    待产出素材数: [...new Set(pendingAssets)].length,
     pageErrors: errs,
     问题: problems,
   };

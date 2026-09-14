@@ -658,7 +658,7 @@ async function startSandbox() {
   if (sbLogs) sbLogs.onclick = () => $('btn-logs')?.click();
   await bindSandbox({
     onExit: () => {
-      audio.ambient.stop();
+      audio.scene('title');
       showScreen('screen-title');
       setTopbar(false);
     },
@@ -1089,7 +1089,7 @@ function enterCampDay(act, day) {
   $('day-num').textContent = String(day);
   $('day-max').textContent = String(act.apDays || 1);
   $('camp-hint').textContent = '用光照亮他们。点余烬，走进他的一夜。';
-  audio.ambient.play(ambientFor(act, day));
+  audio.scene({ act, label: scene.label });     // 场景声明表决定环境床与 BGM（不再自己拼 kind）
   audio.sfx('day');
   renderStats(S);
   renderAp(S);
@@ -1119,14 +1119,6 @@ async function fireSceneGen(act) {
       appendCampLog(S, '场景', r.whisper || r.atmosphere.slice(0, 40));
     }
   } catch { /* 静默 */ }
-}
-
-/** 环境床按幕/按天选：ogg 存在就播文件，否则合成（见 audio.js 的 AMBIENT_FILE） */
-function ambientFor(act, day) {
-  const scene = dayScene(act, day);
-  if (scene.label === '雪山') return 'snow';
-  if (scene.label === '草地') return 'camp';
-  return { act0: 'depart', act1: 'xiangjiang', act2: 'zunyi', act3: 'river', act5: 'huining' }[act.id] || 'wind';
 }
 
 function updateDusk() {
@@ -1934,7 +1926,7 @@ async function doLuding(act) {
   step('luding', 'minigame');
   showScreen('screen-stage');
   setStageBanner('飞夺泸定桥', sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg'));
-  audio.ambient.play('luding');
+  audio.scene('luding');                       // 泸定桥：急流 + 该章的 BGM
   showNpc('突击队长', { role: '红四团', mood: '决绝' });
   setStagePanel('');
   await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
@@ -2330,6 +2322,7 @@ async function finishAct(act) {
 
 async function runEnding() {
   step('end', 'end');
+  audio.scene('ending');
   showScreen('screen-end');
   $('end-title').textContent = '结算中…';
   $('end-paras').innerHTML = '';

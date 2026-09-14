@@ -126,8 +126,10 @@ export class VoiceChannel {
       const el = new Audio(file);
       el.volume = MIX.voice.level;
       this.el = el;
+      this.core.duck(true);                 // 台词期间压低背景（BGM 重、环境床轻）
       const done = () => {
         if (this.el === el) this.el = null;
+        this.core.duck(false);
         resolve();
       };
       el.onended = done;

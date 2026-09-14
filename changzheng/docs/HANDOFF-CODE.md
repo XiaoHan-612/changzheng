@@ -128,13 +128,19 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 
 28. **音频只有一个门面：`public/js/audio/`（批 1 重写，见 docs/AUDIO-SYSTEM.md）**
    - **结构**：`mix.js`（值：音量/淡入淡出/闪避，唯一允许写这些数字的地方）→ `core.js`（框架：
-     ctx + 四条总线 + `desired`/`actual` + `reconcile()`）→ `channels/{ambient,sfx,voice}.js`（通道）
-     → `index.js`（门面，唯一 import 入口）。批 2 补 `scene-table.js` + BGM 通道，批 3 补音效注册表与试听页。
+     ctx + 四条总线 + `desired`/`actual` + `reconcile()`）→ `channels/{ambient,bgm,sfx,voice}.js`（通道）
+     → `index.js`（门面，唯一 import 入口）。批 1 落地；**批 2 已补 `scene-table.js`（场景声明表）+ BGM 通道 +
+     闪避 + `fade.js`**；批 3 补音效注册表与试听页。
    - **心脏**：分清楚「该响什么」`desired` 与「现在在响什么」`actual`，所有入口（进屏/换幕、静音、
      用户手势、标签页可见性、元素被外部暂停）只改 desired 或调 `reconcile()`。
      老实现"静音后环境床再也不回来"就是因为没有这一层（`2026-09-14` 玩家反馈，当天重写收口）。
    - **三层静音**：游戏内 `setMuted`（保留意图、取消即恢复，`qa:smoke` 有断言）· 浏览器/标签页静音
      （不可直接探测，由 reconcile 的手势/可见性/元素 pause 事件自愈）· 系统静音（应用层不该处理）。
+   - **切场景只走声明表**：`audio.scene({ act, label })`（幕轴）或 `audio.scene('sandbox'|'title'|'luding'|'ending')`；
+     新增场景 = `scene-table.js` 加一行。守卫会核对「场景表写的 kind ↔ 文件映射 ↔ 磁盘文件」三层，
+     **写错 kind 会当场报错**（不然就是静默无声）；`qa:audio` 还会拦住 app 代码直调 `audio.ambient/bgm.play`。
+   - **BGM 现状**：通道与混音已就位，但**没有文件**（`public/audio/bgm/` 空）——所以现在每幕只有环境床，
+     `state().actual.bgm.missing` 会列出缺的曲名；音频模型把 `.ogg` 落盘即生效，代码不用动。
    - **规矩由 `npm run qa:audio` 的「框架一致性」段强制**：`public/js/` 里除 `audio/` 外不许出现
      `new Audio(` / `new AudioContext` / `.volume =` / `.gain.value =`，不许残留旧 API 名
      （`playAmbient`/`stopAmbient`/`playSfx`/`setEnabled`），并且只能从 `./audio/index.js` 进门。

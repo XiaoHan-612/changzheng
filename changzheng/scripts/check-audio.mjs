@@ -28,7 +28,7 @@ const TTS_HASH = (voice, text) => crypto.createHash('sha1').update(`${voice}|${t
 /** 收集所有音频文件（按目录分类） */
 function listAudio() {
   const out = [];
-  for (const dir of ['ambient', 'cache', 'voices', 'reactions']) {
+  for (const dir of ['ambient', 'bgm', 'cache', 'voices', 'reactions']) {
     const abs = path.join(AUDIO, dir);
     if (!fs.existsSync(abs)) continue;
     for (const f of fs.readdirSync(abs).filter((x) => /\.(wav|ogg|mp3)$/i.test(x)).sort()) {
@@ -52,6 +52,7 @@ function references() {
   const src = audioSources();
   const ambient = new Set([...src.matchAll(/'(?:'|\/audio\/ambient\/)([a-z_]+\.ogg)'/g)].map((m) => m[1]));
   const ambientAlt = new Set([...src.matchAll(/\/audio\/ambient\/([a-z_]+\.ogg)/g)].map((m) => m[1]));
+  const bgm = new Set([...src.matchAll(/\/audio\/bgm\/([a-z_]+)_bgm\.ogg/g)].map((m) => m[1]));
   const voices = new Set();
   const voiceLines = JSON.parse(read('public/audio/voice-lines.json')).lines || [];
   for (const l of voiceLines) voices.add(path.basename(l.file));
@@ -61,7 +62,7 @@ function references() {
   const cache = new Set();
   const ttsLines = JSON.parse(read('data/tts-lines.json')).lines || [];
   for (const l of ttsLines) cache.add(`${TTS_HASH(l.voiceId || 'narr', l.text)}_${l.voiceId || 'narr'}.wav`);
-  return { ambient: new Set([...ambient, ...ambientAlt]), voices, reactions, cache, voiceLines, ttsLines };
+  return { ambient: new Set([...ambient, ...ambientAlt]), bgm, voices, reactions, cache, voiceLines, ttsLines };
 }
 
 async function main() {
@@ -155,12 +156,17 @@ async function main() {
   }
   for (const name of refs.reactions) if (!have.has(name)) problems.push(`sim-visuals.json 指向不存在的反应音：${name}`);
   for (const name of refs.cache) if (!have.has(name)) problems.push(`data/tts-lines.json 对应的缓存缺失：${name}（重跑 npm run tts:manifest 对照）`);
+  for (const r of byDir('bgm')) {
+    if (!Object.values(mapOf(read('public/js/audio/channels/bgm.js'), BGM_ENTRY)).some((u) => path.basename(u) === r.file)) {
+      problems.push(`${r.url} 没有任何 BGM_FILE 映射指向它 → 永远播不到`);
+    }
+  }
 
   // 报告
   const lines = [
     '# 音频体检报告',
     '',
-    `> 由 \`npm run qa:audio\` 生成 · 共 ${rows.length} 个文件（ambient ${byDir('ambient').length} · cache ${byDir('cache').length} · voices ${byDir('voices').length} · reactions ${byDir('reactions').length}）`,
+    `> 由 \`npm run qa:audio\` 生成 · 共 ${rows.length} 个文件（ambient ${byDir('ambient').length} · bgm ${byDir('bgm').length} · cache ${byDir('cache').length} · voices ${byDir('voices').length} · reactions ${byDir('reactions').length}）`,
     '',
     '| 文件 | 容器 | 采样 | 声道 | 时长 | 体积 | HTTP | MIME | 可解码 |',
     '|---|---|---|---|---|---|---|---|---|',
@@ -174,6 +180,43 @@ async function main() {
     notes.length ? `## 提示\n\n${notes.map((n) => `- ${n}`).join('\n')}\n` : '',
   ].filter((l) => l !== '').join('\n');
   fs.writeFileSync(OUT, lines, 'utf8');
+
+  // ───────── 声明表 ↔ 磁盘文件（scene-table.js 是唯一场景真相；缺文件必须看得见）─────────
+  // 全部用正则**字面量**：模板字符串里的 `\s` 会被 JS 当成字符 s，正则静默失效（这里踩过一次）。
+  const AMBIENT_ENTRY = /^\s*([a-z_]+):\s*'(\/audio\/ambient\/[^']+)'/gm;
+  const BGM_ENTRY = /^\s*([a-z_]+):\s*'(\/audio\/bgm\/[^']+)'/gm;
+  const AMBIENT_KIND = /ambient:\s*'([a-z_]+)'/g;
+  const BGM_KIND = /bgm:\s*'([a-z_]+)'/g;
+  const mapOf = (src, re) => Object.fromEntries([...src.matchAll(re)].map((m) => [m[1], m[2]]));
+  const tableSrc = read('public/js/audio/scene-table.js');
+  const ambientMap = mapOf(read('public/js/audio/channels/ambient.js'), AMBIENT_ENTRY);
+  const bgmMap = mapOf(read('public/js/audio/channels/bgm.js'), BGM_ENTRY);
+  const declaredAmbient = [...new Set([...tableSrc.matchAll(AMBIENT_KIND)].map((m) => m[1]))];
+  const declaredBgm = [...new Set([...tableSrc.matchAll(BGM_KIND)].map((m) => m[1]))];
+  const onDisk = (url) => fs.existsSync(path.join(ROOT, 'public', url.replace(/^\//, '')));
+  if (!declaredAmbient.length || !declaredBgm.length) {
+    problems.push('场景表解析不出 kind —— check-audio 的正则与 scene-table.js 的写法对不上了（守卫不能静默失效）');
+  }
+  if (!Object.keys(ambientMap).length || !Object.keys(bgmMap).length) {
+    problems.push('文件映射解析不出条目 —— check-audio 的正则与 channels/*.js 的写法对不上了');
+  }
+  // ① 场景表写的 kind，映射表里必须有（写错 kind = 该场景静默无声）
+  for (const k of declaredAmbient) {
+    if (!ambientMap[k]) problems.push(`场景表声明了环境床「${k}」，但 channels/ambient.js 的 AMBIENT_FILE 里没有它（写错会静默无声）`);
+  }
+  for (const k of declaredBgm) {
+    if (!bgmMap[k]) problems.push(`场景表声明了 BGM「${k}」，但 channels/bgm.js 的 BGM_FILE 里没有它`);
+  }
+  // ② 映射表指向的文件，磁盘上有没有：缺 BGM 不算错（"有文件就放，落盘即生效"）；缺环境床会走合成兜底
+  const noAmbientFile = declaredAmbient.filter((k) => ambientMap[k] && !onDisk(ambientMap[k]));
+  const noBgmFile = declaredBgm.filter((k) => bgmMap[k] && !onDisk(bgmMap[k]));
+  notes.push(`场景表：环境床 ${declaredAmbient.length} 种 / BGM ${declaredBgm.length} 种，kind 与文件映射一致`);
+  notes.push(noBgmFile.length
+    ? `还没有 BGM 文件（${noBgmFile.length} 首）：${noBgmFile.map((k) => `${k}_bgm.ogg`).join('、')} —— 放进 public/audio/bgm/ 即生效，代码无需改动`
+    : `BGM 文件齐全（${declaredBgm.length} 首）`);
+  if (noAmbientFile.length) {
+    notes.push(`环境床缺文件、正在走合成兜底：${noAmbientFile.join('、')}`);
+  }
 
   // ───────── 框架一致性（docs/AUDIO-SYSTEM.md）：音频只能从门面走 ─────────
   const JS_DIR = path.join(ROOT, 'public/js');
@@ -196,6 +239,9 @@ async function main() {
       ]) {
         if (re.test(src)) problems.push(`${where} 绕开音频框架直接用了 ${what} —— 改走 audio/index.js 门面（见 docs/AUDIO-SYSTEM.md）`);
       }
+      // ②b 切场景不许绕过声明表（换场景 = scene-table.js 加一行 + audio.scene(...)）
+      const direct = src.match(/audio\.(ambient|bgm)\.(play|stop)\(/);
+      if (direct) problems.push(`${where} 直接调了 ${direct[0]}… —— 切场景请走 audio.scene(...)（场景写进 scene-table.js）`);
       // ② 旧 API 名残留
       for (const name of ['playAmbient', 'stopAmbient', 'playSfx', 'setEnabled']) {
         if (new RegExp(`audio\\.${name}\\b`).test(src)) problems.push(`${where} 还在用旧音频 API \`audio.${name}\` —— 现已收进门面（ambient.play / ambient.stop / sfx / setMuted）`);
@@ -205,10 +251,10 @@ async function main() {
       if (deep) problems.push(`${where} 直接 import 了音频深模块 ${deep[0]} —— 一律从 './audio/index.js' 进`);
     }
   }
-  for (const [name, f] of [['环境床', 'AMBIENT_FILE'], ['音效', 'SFX_NAMES'], ['音色', 'ACTOR_VOICE']]) {
+  for (const [name, f] of [['环境床', 'AMBIENT_FILE'], ['BGM', 'BGM_FILE'], ['音效', 'SFX_NAMES'], ['音色', 'ACTOR_VOICE']]) {
     if (!read('public/js/audio/index.js').includes(f)) problems.push(`音频门面没有再导出 ${name} 表（${f}）—— 别的模块要用它时不该各自抄一份`);
   }
-  notes.push('框架一致性：门面唯一、无旧 API 残留（批 2/3 还会补：场景声明表覆盖率、音效注册表、BGM 目录扫描）');
+  notes.push('框架一致性：门面唯一、无旧 API 残留、场景切换只走声明表');
 
   console.log(`音频文件 ${rows.length} 个 · 可解码 ${rows.filter((r) => r.decoded).length} · 问题 ${problems.length}`);
   for (const p of problems) console.log('  ✗ ' + p);

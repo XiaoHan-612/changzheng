@@ -36,9 +36,19 @@ function checkSceneDropin() {
   if (!onlyDoc.length && !onlyCode.length) ok.push('图片落盘即生效清单一致（' + code.length + ' 张）');
 }
 
-// 音频环境床：audio.js 的 AMBIENT_FILE vs HANDOFF-AUDIO 表格
+// 音频环境床：audio/**/*.js 里的 AMBIENT_FILE vs HANDOFF-AUDIO 表格
+// （2026-09-14：音频重写成 public/js/audio/ 目录后，这里原先还指着已删除的 public/js/audio.js，
+//   守卫直接 ENOENT 抛错——批 1 漏跑了这条，批 2 补上）
+function audioSources() {
+  const dir = path.join(ROOT, 'public/js/audio');
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (
+    e.isDirectory() ? walk(path.join(d, e.name)) : (e.name.endsWith('.js') ? [path.join(d, e.name)] : [])
+  ));
+  return walk(dir).map((f) => fs.readFileSync(f, 'utf8')).join(String.fromCharCode(10));
+}
+
 function checkAmbient() {
-  const code = pick(read('public/js/audio.js'), /'\/audio\/ambient\/([a-z_]+\.ogg)'/g);
+  const code = pick(audioSources(), /'\/audio\/ambient\/([a-z_]+\.ogg)'/g);
   const doc = pick(read('docs/HANDOFF-AUDIO.md'), /`public\/audio\/ambient\/([a-z_]+\.ogg)`/g);
   const onlyDoc = doc.filter((x) => !code.includes(x));
   const onlyCode = code.filter((x) => !doc.includes(x));
