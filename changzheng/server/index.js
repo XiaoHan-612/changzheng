@@ -40,13 +40,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// 静态资源：图片/音频给长缓存，页面与脚本给短缓存
+// 静态资源缓存：**默认每次都回源校验（304），只有字体给长缓存**。
+//
+// 为什么不给 max-age：这个项目没有构建步骤，承诺是"改文件/换素材，刷新即生效"。
+// 一旦给了 1h / 7d，浏览器就会拿着旧脚本旧图跑——实测踩过：改了 audio.js 刷新页面，
+// 跑的还是缓存里的旧代码，排查半天以为修复没生效。ETag/Last-Modified 本来就会发 304，
+// 本地演示的开销可以忽略；要提速再按内容哈希改名（那时才可以放心长缓存）。
 const PUB = path.join(__dirname, '..', 'public');
-app.use('/assets', express.static(path.join(PUB, 'assets'), { maxAge: '7d' }));
-app.use('/audio', express.static(path.join(PUB, 'audio'), { maxAge: '7d' }));
-// 自托管字体：改动极少，给长缓存（woff2 本身已压缩，gzip 中间件只处理文本类型，不会重复压）
+app.use('/assets', express.static(path.join(PUB, 'assets')));
+app.use('/audio', express.static(path.join(PUB, 'audio')));
+// 自托管字体：改动极少（只有重跑 fonts:build 才会变），7 天缓存是有意为之，文档里也这么写
 app.use('/fonts', express.static(path.join(PUB, 'fonts'), { maxAge: '7d' }));
-app.use(express.static(PUB, { maxAge: '1h' }));
+app.use(express.static(PUB));
 
 app.post('/api/decide', async (req, res) => {
   try {

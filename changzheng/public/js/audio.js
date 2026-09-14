@@ -54,6 +54,9 @@ class GameAudio {
     this.voiceGain = null;
     this.ambientNodes = [];
     this.currentAmbient = null;
+    // 「本来该在响的环境床」。与 currentAmbient 的区别：静音/挂起只是把声音停掉，
+    // 这个字段留着，取消静音时才能把它接回来（踩过：静音后再点回来，背景声永远不回来）。
+    this.wantedAmbient = null;
     this.voiceEl = null;
     this.catalog = null;
     this.catalogPromise = null;
@@ -83,11 +86,39 @@ class GameAudio {
   }
 
   setEnabled(on) {
+    const was = this.enabled;
     this.enabled = !!on;
     if (!on) {
-      this.stopAmbient();
-      this.stopVoice();
+      this.silence();                 // 停声，但记住该放什么
+    } else if (!was) {
+      this.restore();                 // 取消静音：把环境床接回来
     }
+  }
+
+  /** 停掉正在响的声音，但**保留** wantedAmbient（静音、切后台时用） */
+  silence() {
+    this._stopAmbientSound();
+    this.stopVoice();
+  }
+
+  /**
+   * 自愈：把"本该在响的东西"接回来。
+   *
+   * 三个触发点：取消静音、任意用户手势、标签页重新可见。要治的是同一类现象——
+   * 声音被外部因素停掉了（我们的静音键、浏览器把 AudioContext 挂起、系统休眠、
+   * 标签页被静音/后台），而应用不知道：AudioContext 恢复、环境床若不在响就重起一条。
+   * 一切正常时它只做几次布尔判断，随便调。
+   */
+  restore() {
+    if (!this.enabled) return;
+    this.ensure();                                   // 顺带把 suspended 的 AudioContext 恢复
+    const kind = this.wantedAmbient;
+    if (!kind || kind === 'none') return;
+    const fileAlive = this.ambientEl && !this.ambientEl.paused && !this.ambientEl.ended;
+    const synthAlive = !this.ambientEl && this.ambientNodes.length > 0 && this.currentAmbient === kind;
+    if (fileAlive || synthAlive) return;             // 正响着，别叠一条
+    this.currentAmbient = null;                      // 清掉去重标记，强制重起
+    this.playAmbient(kind);
   }
 
   async loadCatalog() {
@@ -198,7 +229,13 @@ class GameAudio {
     }
   }
 
+  /** 场景切换用：连"该响什么"一起忘掉（静音请用 silence()） */
   stopAmbient() {
+    this.wantedAmbient = null;
+    this._stopAmbientSound();
+  }
+
+  _stopAmbientSound() {
     if (this.ambientEl) {
       try {
         this.ambientEl.pause();
@@ -214,9 +251,10 @@ class GameAudio {
   }
 
   playAmbient(kind) {
+    this.wantedAmbient = kind;            // 先记下来：静音期间也要知道"恢复时该放什么"
     if (!this.enabled) return;
     if (this.currentAmbient === kind) return;
-    this.stopAmbient();
+    this._stopAmbientSound();
     this.currentAmbient = kind;
     if (!kind || kind === 'none') return;
     // 优先用 public/audio/ambient/<file>.ogg（音频模型产出的真实环境床）；
@@ -240,6 +278,8 @@ class GameAudio {
         if (fell) return;          // 只回落一次，避免合成链生成两份
         fell = true;
         if (this.currentAmbient !== kind) return;
+        // 换源前先把上一条停掉：否则它成了孤儿元素、还在响，于是两条环境床叠在一起
+        try { el.pause(); } catch { /* ignore */ }
         this.ambientEl = null;
         // 模型可能只产出 wav（体积大但能用）：先试同名 .wav，再回落合成
         if (!isAlt && /\.ogg$/.test(file)) {
@@ -253,6 +293,11 @@ class GameAudio {
       el.volume = 0.32;
       this.ambientEl = el;
       el.onerror = fallback;
+      // 被外部因素暂停（浏览器切后台、系统休眠）→ 稍后自愈重起；
+      // 我们自己按静音停的不算（enabled=false 时不触发）
+      el.addEventListener('pause', () => {
+        if (this.enabled && this.wantedAmbient === kind) setTimeout(() => this.restore(), 300);
+      });
       el.play().catch(fallback);
       // 文件 404 时部分浏览器不触发 error，用 fetch 兜一次
       fetch(file, { method: 'HEAD' })
@@ -472,10 +517,18 @@ class GameAudio {
 
 export const audio = new GameAudio();
 
+// 调试句柄：声音出问题时，控制台里 `__czAudio` 能直接看到内部状态
+// （enabled / wantedAmbient 本该在响什么 / currentAmbient 现在在响什么 / ambientEl 是否在播）。
+// 玩家看不见它；玩家反馈"没声音/声音怪"时，这一眼就能分清是"没恢复"还是"被静音了"。
+window.__czAudio = audio;
+
 function unlock() {
-  audio.ensure();
-  window.removeEventListener('pointerdown', unlock);
-  window.removeEventListener('keydown', unlock);
+  audio.restore();
 }
+// 手势与"回到前台"都做一次自愈（首次手势也用它解锁 AudioContext）：
+// 浏览器可能因为标签页静音/后台/休眠把声音停掉，下一次交互或回到页面时接回来。
 window.addEventListener('pointerdown', unlock);
 window.addEventListener('keydown', unlock);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') audio.restore();
+});

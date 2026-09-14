@@ -101,6 +101,25 @@ async function run() {
   assert(await used.isDisabled(), `用过的热点「${hotspotLabel}」应立刻置为已看过`);
   assert((await used.getAttribute('data-hotspot-state')) === 'done', `用过的热点「${hotspotLabel}」状态应为 done`);
 
+  // 静音开关：点回去必须把环境床接回来
+  // （2026-09-14 修的 bug：取消静音只置了标志位，背景声再也不恢复，只有切场景才回来）
+  const muteCycle = await page.evaluate(async () => {
+    const a = window.__czAudio;
+    if (!a) return { ok: false, why: '没有 __czAudio 调试句柄' };
+    const wait = (ms) => new Promise((s) => setTimeout(s, ms));
+    const clickMute = () => document.getElementById('btn-mute').dispatchEvent(new MouseEvent('click', { bubbles: true, view: window }));
+    const playing = () => !!(a.ambientEl && !a.ambientEl.paused);
+    const wasPlaying = playing();
+    clickMute(); await wait(300);
+    const afterMute = playing();
+    clickMute(); await wait(900);
+    return { ok: true, wasPlaying, afterMute, afterUnmute: playing(), wanted: a.wantedAmbient };
+  });
+  assert(muteCycle.ok, `静音体检：${muteCycle.why || ''}`);
+  assert(muteCycle.wasPlaying, '进营地后环境床应在播（拼错了素材名或回退链断了）');
+  assert(!muteCycle.afterMute, '点静音后环境床应停播');
+  assert(muteCycle.afterUnmute, '取消静音后环境床应自动恢复（静音恢复回归）');
+
   // 设置面板 = 模型控制台：模型（下拉+自定义）/ 推理档位 / Key / 接口 / 测试键
   await page.click('#btn-settings').catch(async () => { await page.click('#btn-settings2').catch(() => {}); });
   await page.waitForTimeout(400);

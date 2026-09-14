@@ -30,7 +30,8 @@ npm start                   # http://localhost:3001
 5. **坏了先看哪儿**：
    - 界面弹「模型调用失败」→ 点「重试」；连续失败看「设置 → 测试连通」和「记录」里那条 `source=ERROR` 的原因；
    - 一次真调 1.2–6 秒属正常（若换回赛制指定的 `glm-5.1` 约 11 秒/次）；**没有离线能力**，断网即报错（备选方案见 `OFFLINE-REPLAY.md`）；
-   - 没声音 → 顶栏喇叭是否静音、浏览器是否拦了自动播放；
+   - 没声音 → 顶栏喇叭是否静音、浏览器是否拦了自动播放；控制台敲 `__czAudio` 看
+     `wantedAmbient`（本该在响什么）/ `currentAmbient`（现在在响什么）/ `ambientEl.paused`，一眼分清是没恢复还是被静音；
    - 想单独复现某一屏 → 打开「设置 → 展示」后用 `window.__czScreens`（`show / mini / quiz / night / end / logs / defense`，见 `HANDOFF-CODE.md` 第 27 条）；顶栏的「记录 / 答辩」也要打开这个开关才显示。
 6. **交接前实测过的形态**：干净克隆 + 复制 `.env` + `npm install --omit=dev` + `node server/index.js` 就能玩
    （首页与静态资源/字体/音频/acts 全 200，连通测试真调成功）——这也是便携包的最小形态（见 `DELIVERY.md`）。
