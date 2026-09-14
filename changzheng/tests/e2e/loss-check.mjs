@@ -17,6 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const KEY = 'czjc_demo_state_v1';
 
 const RUNTIME = path.join(ROOT, 'runtime-config.json');
+let pageErrs = [];
 const snapshotRuntime = () => { try { return fs.readFileSync(RUNTIME, 'utf8'); } catch { return null; } };
 function restoreRuntime(snap) {
   try {
@@ -34,6 +35,7 @@ async function run() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
+  pageErrs = errs;                  // 抛错时（卡住/超时）也把页面报错带出来，否则只看到一句"卡住 40s"
   page.on('dialog', (d) => d.accept().catch(() => {}));
 
   await page.goto(`${BASE}/?loss=${Date.now()}`, { waitUntil: 'networkidle' });
@@ -102,6 +104,12 @@ async function main() {
 }
 
 main().catch((e) => {
+  // 失败时把页面报错一并带出来：只报一句"卡住 40s"看不到真正的原因，
+  // 而卡住往往就是因为页面里抛了异常（这一步的第一次定位就是靠它）。
   console.error('LOSS CHECK FAIL', e.message);
+  if (pageErrs.length) {
+    console.error('页面报错：');
+    for (const m of pageErrs.slice(0, 5)) console.error('  - ' + m);
+  }
   process.exit(1);
 });

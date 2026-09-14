@@ -13,6 +13,10 @@
 三档都能挑单项跑：`node scripts/verify.mjs motion board`、`npm run verify:full -- av`。
 **顺手改坏没被抓到**这件事本身就是 bug：快检的两个故意破坏用例（模块间 import、页面里塞语法错）都会红，见 `HANDOFF-CODE.md` 坑位 36。
 
+改了**状态 / 抉择 / 失败线**之后，别只跑快检：`npm run qa:loss`（行军高风险抉择必须减员）与
+`npm run qa:failure`（失败结算）必跑——e2e / smoke / board 走的都是研学模式，**行军专属分支它们碰不到**
+（2026-09-14 那条"行军一进高风险抉择就卡死"的 bug 就是这么躲过全量验收的，见坑位 39）。
+
 ## 自动化
 
 | 命令 | 覆盖 | 通过标准 |

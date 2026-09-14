@@ -1,10 +1,12 @@
 // 总线架构守卫（静态那半）：把"模块化"变成机器可查的规则，而不是靠自觉。
 //
-// 四条规则（对应 docs/BUS.md §规矩）：
+// 六条规则（对应 docs/BUS.md §规矩）：
 //   ① 模块之间不许 import：modules/x 只能 import kernel/ 与自己的文件（要协作走事件或 kernel.api）
 //   ② 订阅只写在描述符里：模块内不许出现 `bus.on(` / `kernel.bus.on(`
 //   ③ 事件名必须登记：源码里出现的 emit/on 名字要在 kernel/contracts.js 里
 //   ④ 模块必须在清单里：有描述符的模块目录要在 kernel/wiring.js 的 MODULES 里（防"注册了没人知道"）
+//   ⑤ 状态写入只能在 state 模块（别处只读）
+//   ⑥ state.js 的纯函数必须先 import（或走 st() 动作）——批 4 漏改一处就卡死过行军模式
 //
 // 用法：npm run qa:bus（静态这半 + 运行时那半 tests/e2e/bus-boot.mjs）
 import fs from 'node:fs';
@@ -26,8 +28,17 @@ const walkJs = (dir) => (fs.existsSync(dir)
   ))
   : []);
 
-/** 剥注释：注释里提到的类名/事件名不该算违规（守卫只量代码） */
-const stripComments = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+/**
+ * 剥注释：注释里提到的类名/事件名不该算违规（守卫只量代码）。
+ * **关键：注释换成等长空格、换行保留**——这样剥离后的下标与原文一一对应，
+ * 所有规则报的行号才是真行号（早先直接删注释，报出来的行号会偏十几行，白白浪费排查时间）。
+ */
+const stripComments = (t) => t
+  .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+  .replace(/^[ \t]*\/\/.*$/gm, (m) => ' '.repeat(m.length));
+
+/** 报行号：剥离源码里的下标 → 真源码里的行号（两者等长，所以直接数换行即可） */
+const lineAt = (strippedSrc, index) => strippedSrc.slice(0, index).split('\n').length;
 
 // ── 读契约表与实际模块 ──
 const contractsSrc = fs.readFileSync(path.join(KERNEL, 'contracts.js'), 'utf8');
@@ -112,31 +123,75 @@ const manifestNames = [...stripComments(wiringSrc).matchAll(/\{\s*name:\s*'([^']
 }
 
 // ── ⑤ 状态写入只能发生在 state 模块（或它的纯函数层 state.js）──
+//
+// 踩过的坑：这条规则里的 \b 曾被写成字面退格符，四条正则一条也匹配不上——
+// 守卫照样报 ✓（假绿），于是"状态只有一条写路"实际上没人守。判断守卫死没死的办法只有一条：
+// 故意写一行违规，看它红不红（本轮就是这么发现的）。
+const MUTATORS = ['applyEffects', 'applyStarvation', 'addLoss', 'unlockFact', 'markLineDone', 'saveState'];
 {
   const offenders = [];
+  // 字段名**不能用 \w**：本项目的状态字段大多是中文（体力/粮食/士气…），\w 一个也匹配不到，
+  // 守卫又会变成"看着在守、其实漏光"（这一版的第一个负向用例就是这么发现的）。
+  const FIELD = '[^\\s=(),;\\[\\]]+';
+  const patterns = [
+    [new RegExp('\\bS\\.' + FIELD + '\\s*(=(?!=)|[+\\-*]=|[|&]=|\\?\\?=|\\u002F=)'), '对 S 的字段赋值'],
+    [new RegExp('\\bS\\.' + FIELD + '\\.(push|pop|shift|unshift|splice|sort|fill|reverse)\\s*\\('), '改 S 的数组'],
+    [new RegExp('\\bS\\.' + FIELD + '\\[[^\\]]*\\]\\s*=(?!=)'), '往 S 的键值里写'],
+    [new RegExp('\\bS\\.' + FIELD + '(\\+\\+|--)'), '自增/自减 S 的字段'],
+    [new RegExp('\\b(' + MUTATORS.join('|') + ')\\s*\\(\\s*S\\b'), '把 S 交给写函数直接改（要走 st() 的动作）'],
+  ];
   for (const f of walkJs(JS)) {
     const where = rel(f);
-    const isStore = /^public\/js\/modules\/state\//.test(where);
-    const isPureLayer = /^public\/js\/state\.js$/.test(where);      // 纯函数层：可以改它收到的 state 参数
-    if (isStore || isPureLayer) continue;
-    const src = stripComments(fs.readFileSync(f, 'utf8'));
-    const patterns = [
-      [/S\.[^\s=]+\s*=(?!=)/, '对 S 赋值'],
-      [/S\.\w+\.push\(/, '往 S 的数组里 push'],
-      [/S\.\w+\[[^\]]+\]\s*=/, '往 S 的键值里写'],
-      [/applyEffects\(\s*S/, '直接调 applyEffects(S, …)'],
-    ];
+    if (/^public\/js\/modules\/state\//.test(where)) continue;   // store 本体
+    if (/^public\/js\/state\.js$/.test(where)) continue;         // 纯函数层：它收到的 state 参数就是要改的
+    const orig = fs.readFileSync(f, 'utf8');
+    // 只查"手里真的握着状态别名"的文件：`S` 在别处可能只是个小局部变量
+    // （minigames.js 里 `let S = {}` 是元素表，早先被这条规则误报过）。
+    const holdsAlias = /\bst\(\)\./.test(orig)
+      || /kernel\.api\('state'\)/.test(orig)
+      || /modules\/state/.test(orig);
+    if (!holdsAlias) continue;
+    const stripped = stripComments(orig);
     for (const [re, what] of patterns) {
-      const m = src.match(re);
-      if (m) {
-        const line = src.slice(0, m.index).split(String.fromCharCode(10)).length;
-        offenders.push(`${where}:${line} ${what}（${m[0].trim()}）`);
-      }
+      const m = stripped.match(re);
+      if (!m) continue;
+      offenders.push(`${where}:${lineAt(stripped, m.index)} ${what}（${m[0].trim()}）`);
     }
   }
   if (offenders.length) {
-    problems.push(`写状态只有一条路：state 模块的语义动作 / apply()（见 docs/BUS.md）：${String.fromCharCode(10)}      ${offenders.join(String.fromCharCode(10) + '      ')}`);
+    problems.push(`写状态只有一条路：state 模块的语义动作 / apply()（见 docs/BUS.md）：\n      ${offenders.join('\n      ')}`);
   } else ok.push('状态的写入只发生在 modules/state（其它地方只读）');
+}
+
+// ── ⑥ 调用 state.js 的纯函数必须先 import（或走 st() 动作）──
+//
+// 为什么单列一条：批 4 把状态收归模块时，`addLoss(S, …)` 这种老写法被漏改了一处，
+// 而它只在**行军模式的高风险抉择**上会被执行——e2e 走的是研学模式，谁都没碰它，
+// 于是"玩到湘江护送就原地卡死"活到了全量验收才被 qa:loss 抓到（页面报 addLoss is not defined）。
+// 静态上认得出这一类：state.js 导出的名字，在别的文件里既没 import、也没定义，却出现了调用。
+{
+  const offenders = [];
+  const pureNames = [...fs.readFileSync(path.join(JS, 'state.js'), 'utf8')
+    .matchAll(/export function ([\w$]+)/g)].map((m) => m[1]);
+  for (const f of walkJs(JS)) {
+    const where = rel(f);
+    // 模块内部有自己的写法（走 kernel.api 拿到 state 动作），这里只管"非模块的页面脚本"
+    if (where.startsWith('public/js/modules/') || where === 'public/js/state.js') continue;
+    const src = stripComments(fs.readFileSync(f, 'utf8'));
+    const imported = new Set([...src.matchAll(/import\s*\{([^}]+)\}\s*from/g)]
+      .flatMap((m) => m[1].split(',').map((s) => s.trim().split(/\s+as\s+/).pop())));
+    const defined = new Set([...src.matchAll(/(?:function|class)\s+([\w$]+)|(?:const|let|var)\s+([\w$]+)\s*=/g)]
+      .flatMap((m) => [m[1], m[2]]).filter(Boolean));
+    for (const n of pureNames) {
+      if (imported.has(n) || defined.has(n)) continue;
+      const m = src.match(new RegExp('(^|[^.\\w$])' + n + '\\s*\\('));
+      if (m) {
+        offenders.push(`${where}:${lineAt(src, m.index)} 调了没导入的 ${n}()（批次重构后漏改？要走 st().${n}() 或先 import）`);
+      }
+    }
+  }
+  if (offenders.length) problems.push(`state.js 的纯函数必须先 import 再用：\n      ${offenders.join('\n      ')}`);
+  else ok.push('state.js 的纯函数没有裸调用（要么 import，要么走 st() 动作）');
 }
 
 // ── 报告 ──

@@ -1858,7 +1858,9 @@ async function doChoice(act, actionId) {
   // 行军模式：减员由「作者标注的风险 + 当前资源」决定（见 state.js 的 resolveLoss），不可逆
   if (S.mode === 'march') {
     const loss = st().lossFor(cs, cs.options.findIndex((o) => o.label === choice));
-    if (loss && addLoss(S, loss.who, loss.reason)) {
+    // 写状态一律走 state 模块的动作：批 4 之后 `S` 只是只读别名，这里曾漏改成裸调 addLoss，
+    // 结果一进行军模式的高风险抉择就抛 ReferenceError、流程原地卡死（qa:loss 抓到的）
+    if (loss && st().addLoss(loss.who, loss.reason)) {
       showLossToast(loss.who, loss.reason);
       st().pushCampLog('损失', `${loss.who} 没能跟上`);
     }
