@@ -34,6 +34,7 @@
     "qa:inspect": "node scripts/inspect-assets.mjs",
     "qa:tts": "node scripts/check-tts.mjs",
     "qa:look": "node tests/manual/asset-look.mjs",
+    "qa:bus": "node scripts/lint-bus.mjs && node tests/e2e/bus-boot.mjs",
     "qa:handoff": "node scripts/check-handoff.mjs",
     "tts:manifest": "node scripts/tts-manifest.mjs",
     "check:glm": "node scripts/check-glm.mjs",

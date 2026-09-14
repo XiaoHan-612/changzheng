@@ -54,6 +54,7 @@ npm run qa:sandbox    # 自由行军沙盘：两回合 + 存档恢复
 npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫
+npm run qa:bus        # 总线守卫：模块化规则（四条）+ 内核运行时体检
 ```
 
 ## 重新生成策划文档
@@ -74,7 +75,8 @@ node make-docx.js     # 输出 ../长征-抉择-设计方案.docx
 | `changzheng/docs/HANDOFF.md` | 已完成 / 已知缺口 / **每轮收尾清单** / 接力建议 |
 | `changzheng/docs/HANDOFF-CODE.md` | **代码接手主文档**：模块地图 / 状态机 / 契约 / 29 条踩过的坑 |
 | `changzheng/docs/DESIGN-SYSTEM.md` | 视觉体系（模板 / 区块 / 动效）与逐批打磨进度 |
-| `changzheng/docs/AUDIO-SYSTEM.md` | **音频系统框架**（混音表 / 通道 / 场景声明表 / 三层静音）——重写设计稿 |
+| `changzheng/docs/AUDIO-SYSTEM.md` | 音频系统框架（混音表 / 通道 / 场景声明表 / 三层静音） |
+| `changzheng/docs/BUS.md` | **前端架构**：内核 + 事件总线 + IP 模块；**加模块 / 加交互玩法的唯一入口** |
 | `changzheng/docs/SCORING.md` | 评分对照与路演讲法 |
 | `changzheng/docs/QA.md` | 测试清单（每条命令的通过标准） |
 | `_archive/README.md` | 归档内容与新旧路径对照 |

@@ -294,6 +294,10 @@ git blame 路径/文件名              # 看某一行是谁什么时候改的
   这台机器上的 local 身份会被前后几个 agent 互相覆盖（§一），不核对就把提交算到别人头上了；
   不对就按 §一 改回来，再 `git commit --amend --reset-author`（只改最近一条）。
 - **工作区不干净时先问清楚**（`git status`）再动手 —— 可能是上一个人留下的在途改动。
+- **前端改动请遵守总线架构**（[`changzheng/docs/BUS.md`](changzheng/docs/BUS.md)）：模块之间不直接调用，走事件或 `kernel.api()`；
+  跨模块读数据走 `kernel.snapshot`；订阅写在模块自己的描述符里，**不要**写 `bus.on`；
+  发/听的事件名先在 `kernel/contracts.js` 登记。改完跑 `npm run qa:bus`（四条静态规则 + 运行时体检）。
+  写新的交互玩法看 [`modules/games/README.md`](changzheng/public/js/modules/games/README.md)（复制 `_template.js` 即可）。
 - **改完跑对应层级的验收**（HANDOFF §二），服务端改动后必须确认测试输出里出现 `restarted`，否则跑的是旧进程、绿灯是假的。
 
 ---

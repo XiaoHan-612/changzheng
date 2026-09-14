@@ -94,7 +94,7 @@ npm run test:unit    # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值
 npm run qa:smoke     # 标题→营地→一次互动→回设置
 npm run qa:board     # 玩法板体检 57 项（8 个玩法的板屏壳 / 数值签 / 契约标记 / 离开清空）
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫：字面量 / 模板 / 纸面 / 动效
-npm run qa:handoff   # 交接文档与代码契约是否一致
+npm run qa:bus       # 总线守卫（模块化规则 + 内核运行时体检）· qa:handoff 交接文档一致性
 ```
 
 当前结果：unit 49/49 · smoke PASS · board 57/57 · motion 16/16 · e2e FULL PASS ·
@@ -124,6 +124,10 @@ sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 
 
 ## 五、关键文件
 
+> **架构**：前端正在按「内核 + 事件总线 + IP 模块」渐进重写（[`BUS.md`](BUS.md) 是接新模块/新玩法的唯一入口）：
+> 批 1（内核地基）已完成，批 2–7 逐个把 audio / state / screens / games / ai / flow 挂上总线。
+> 迁移期**游戏始终可运行**，每批一个提交、守卫全绿。
+>
 > 音频相关（环境床 / BGM / 音效 / 语音）**正在按 [`AUDIO-SYSTEM.md`](AUDIO-SYSTEM.md) 重写成统一框架**：
 > 设计稿已定、分批实施（骨架+静音模型 → 场景声明表+BGM → 注册表+试听页）。动手前先读那份。
 
@@ -136,6 +140,8 @@ server/
   logger.js     JSONL 落库（按日文件 + 会话镜像 + 契约戳记）
   config.js     .env / runtime-config.json 双层配置
 public/js/
+  kernel/       内核（bus/contracts/plugins/kernel/wiring/resources/snapshot/diag）——见 docs/BUS.md
+  modules/      IP 模块（当前只有 README 与 games 模板；批 2 起逐个迁入）
   main.js       主线状态机（幕、营地、强制链、失败结算、玩法宿主 openBoard/mountMini）
   step.js       交互契约（step/askChoice/choiceButton/waitContinue/markMini）
   minigames.js  8 个玩法（本地只判手感，结算走 /api/decide）

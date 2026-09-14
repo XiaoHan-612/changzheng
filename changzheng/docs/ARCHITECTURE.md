@@ -23,7 +23,11 @@ changzheng/
     index.html          # 18 个屏；每屏一个 tpl-* 模板（由 qa:frames 强制）
     css/                # fonts → tokens（唯一值源）→ base → framework（模板+区块+动效）→ components
     js/
-      main.js           # 流程状态机（幕、营地、强制链、锁、篝火夜、玩法宿主 openBoard/mountMini）
+      kernel/           # 【新】内核：bus / contracts(事件契约) / plugins / kernel / wiring(模块清单)
+                        #        / resources(显式锁) / snapshot(只读快照) / diag(事件流黑匣子)
+                        #        架构与新模块怎么加见 docs/BUS.md
+      modules/          # 【新】IP 模块：README + games/（交互游戏插件契约与模板）
+      main.js           # 流程状态机（批 7 会拆成 modules/flow/*）（幕、营地、强制链、锁、篝火夜、玩法宿主 openBoard/mountMini）
       step.js           # 交互契约（setStep / askChoice / choiceButton / waitContinue / markMini）
       minigames.js      # 8 个玩法（本地判手感，结算走 /api/decide）
       sandbox.js        # 沙盘循环 v2（事件图卡、语音、存档、目标/记忆、模型收尾）
@@ -58,10 +62,23 @@ changzheng/
 
 ## 运行时数据流
 
+现状（分批迁移中，见 [`BUS.md`](BUS.md)）：
+
 ```
 UI 事件 → main.js(withLock) → ai-client → POST /api/decide
        → server/ai.js(GLM|ERROR) → logger JSONL
        → applyEffects(state) → 史实回响(echo) → 下一屏
+```
+
+目标形态（每批往前挪一步）：
+
+```
+        ┌─────────────── kernel（bus / contracts / resources / snapshot / diag）───────────────┐
+UI 事件 ─┤ kernel.emit('ai:request', …)                                                       │
+        │        ↓ 谁订阅谁处理（模块在描述符里声明；订阅只在 wiring 清单里登记）                 │
+        │   modules/ai ──→ POST /api/decide ──→ 契约校验 ──→ logs JSONL ──→ emit('ai:done')     │
+        │   modules/state（唯一快照提供者）── emit('state:change') ──→ 订阅者按需读 snapshot    │
+        └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 交互契约（`public/js/step.js`）—— 全项目唯一"当前在做什么"的真相

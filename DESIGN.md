@@ -91,6 +91,10 @@
 
 **前端无构建**：原生 ES Module + DOM 叙事 + Canvas 小游戏（`public/`，`npm start` 直接托管）· Node Express 代理 GLM / 日志 / 静态 · `.env` 与 `runtime-config.json` 双层配置（密钥永不进前端）。
 
+前端内部按**「内核 + 事件总线 + IP 模块」**组织（SoC 思路）：模块之间不直接调用，只通过事件与只读快照协作；
+模块集合不写死——新增模块/交互玩法只需加一个描述符并在清单里登记一行，内核与其它模块都不用改。
+规矩由 `npm run qa:bus` 强制；架构与「怎么加」见 `changzheng/docs/BUS.md`。
+
 ## 11. 里程碑
 
 | 阶段 | 交付 | 状态 |

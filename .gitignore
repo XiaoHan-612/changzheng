@@ -23,3 +23,6 @@ _archive/**/*.png
 _archive/**/*.jpg
 _archive/**/*.jpeg
 _archive/**/*.wav
+
+# ZCode 客户端的过程文件（计划稿等）：是工具产物，不是源码
+.zcode/

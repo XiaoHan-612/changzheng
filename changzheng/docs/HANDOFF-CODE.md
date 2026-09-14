@@ -26,6 +26,8 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 | 文件 | 职责 | 改动注意 |
 |---|---|---|
 | `public/js/main.js` | 主线状态机：五幕、营地日、强制链、对决、失败/终局、篝火夜；**玩法宿主** `openBoard()` + `mountMini()` | 最大的文件；热点用 `HOTSPOT_HANDLERS` 映射表分发，**加玩法只加一行**；玩法一律挂板屏（见第 27 条） |
+| `public/js/kernel/` | **内核**（新）：`bus`（事件总线）/ `contracts`（事件契约唯一真源）/ `plugins`（模块描述符）/ `kernel`（注册·接线·ready·诊断）/ `wiring`（模块清单）/ `resources`（显式锁）/ `snapshot`（只读快照）/ `diag`（事件流黑匣子） | 架构与规矩见 [`BUS.md`](BUS.md)；**模块集合不写死**——加模块只动 `wiring.js` 清单与模块自己的文件 |
+| `public/js/modules/` | **IP 模块**（新）：现在只有 `README.md` 与 `games/`（交互游戏插件契约 + 模板） | 批 2 起逐个迁入；别人写玩法看 `modules/games/README.md` |
 | `public/js/step.js` | **交互契约**：`step()` / `askChoice()` / **`choiceButton()`（选项唯一构建处）** / `waitContinue()` / `markMini()` | 新增玩法只要声明契约，测试与自动化无需改动；详见 ARCHITECTURE 的「交互契约」 |
 | `public/js/minigames.js` | **8 个玩法**：钓鱼/弯针/夜校识字/分糖/夜岗/五子棋/泸定桥/陡坡 | 统一返回 `{score, detail, summary?}`，本地只判手感，结算走 `/api/decide`；状态经 `stats(host, [...])` 写进板头数值签 |
 | `public/js/state.js` | 资源/好感/附身线/行动点/每日场景/失败判定 | 纯函数、可单测；新增资源维度要同时改 `applyEffects` 的钳制表 |
@@ -169,7 +171,16 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
    处理：**已经缓存过旧头的浏览器要硬刷新一次（`Ctrl+Shift+R`）**才认新头；急用可换个 origin
    （如 `http://127.0.0.1:3001/`，缓存键不同）。判定口诀：页面在、点了没反应 → 先硬刷新，再怀疑代码。
 
-31. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
+32. **前端架构：内核 + 总线 + IP 模块（批 1 落地，见 BUS.md）** —— 模块之间不直接调用，只走事件与只读快照；
+   新增模块/玩法**不改内核、也不改别人的文件**。四条规矩由 `npm run qa:bus` 强制：
+   ① 模块间不许 import（只许 `kernel/`）② 订阅只写在模块描述符里（模块内不许 `bus.on`）
+   ③ 事件名先登记在 `kernel/contracts.js` ④ 模块必须在 `kernel/wiring.js` 的 MODULES 清单里。
+   排错入口：`__czKernel.state()`（模块/订阅/锁/契约违规）与 `__czKernel.diag.toJsonl()`（事件流黑匣子）。
+   两个**守卫自己的坑**（都踩过）：① 清单提取要先剥注释——`wiring.js` 里那行"怎么加一行"的示例会被当成真清单；
+   ② 模板字符串里的 `\s` 会被 JS 当成字符 s（`check-audio` 的对账正则曾因此静默失效）——守卫必须用正则字面量，
+   且"解析不出东西"时要**直接报错**，不许静默通过。
+
+33. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
 
 ## 六、下一步建议（按价值排序）
 

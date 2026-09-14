@@ -120,6 +120,9 @@ import { audio } from './audio/index.js';
 import { bindSandbox } from './sandbox.js';
 import * as UI from './ui.js';
 import { setStep, setStepState, waitContinue, askChoice, markAction, markMini, choiceButton } from './step.js';
+// 内核：模块注册 / 事件总线 / 契约 / 只读快照 / 诊断（架构见 docs/BUS.md）。
+// 批 1 只把地基启动起来，业务模块从批 2 起逐个挂上来（见 wiring.js 的 MODULES 清单）。
+import { kernel, loadModules } from './kernel/index.js';
 
 const { $, showScreen, setTopbar, renderStats, renderAp, renderCompanions,
   appendCampLog, toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
@@ -352,6 +355,10 @@ const CHOICE_SETS = {
 // ─── boot ───
 async function boot() {
   applyFeatures();               // 先按本机开关决定"纯游戏界面"还是含调试/答辩入口
+  // 内核先启动：模块（IP）注册 → init → 按描述符接线 → ready。
+  // 幂等，且模块加载失败不影响启动（分批迁移期清单里可能列着还没写的模块）。
+  await loadModules();
+  kernel.boot();
   config = await fetchConfig();
   setAiMode(config);
   $('title-model').textContent = config.model;
@@ -413,7 +420,9 @@ function currentActDef() {
  */
 function exposeSheetHooks() {
   if (!isDevToolsOn()) return;
-  window.__czScreens = {
+  // 摆屏入口的唯一真相在内核（kernel.screens），__czScreens 只是它的窗口镜像。
+  // 这样批 7 把 main.js 拆成 flow/* 之后，qa:screens / qa:board / layout-audit 仍然照旧可用。
+  const api = {
     show: showScreen,
     overlay: showOverlay,
     journal: () => openJournal(),
@@ -457,6 +466,9 @@ function exposeSheetHooks() {
       return true;
     },
   };
+  // 登记进内核的统一入口（唯一真相），再挂到 window 供脚本使用
+  kernel.screens.register(() => api);
+  window.__czScreens = api;
 }
 
 function bindChrome() {
