@@ -9,11 +9,18 @@
 
 ## 快速开始
 
+> **团队协作（拉取 / 提交 / 推送 / 配置提交身份）见 → [`CONTRIBUTING.md`](CONTRIBUTING.md)。**
+> 本仓库是**私有**的，新人需先被加为 collaborator 才能克隆。
+
 ```powershell
-cd changzheng
+git clone https://github.com/XiaoHan-612/changzheng.git   # 首次
+cd changzheng/changzheng                                  # 仓库根 → 可运行工程
+
 npm install
 npm start          # http://localhost:3001
 ```
+
+已经克隆过的，这里等价于在仓库根执行 `cd changzheng`。每轮开工先 `git pull --rebase`，收工 `git push`。
 
 - 未配置 Key 时自动进入 **MOCK 演示模式**，全流程仍可完整跑通（日志标明 `source=MOCK_AI`）
 - 真实调用：把密钥写进 `changzheng/.env`（`GLM_API_KEY=...`），或在游戏内「设置」里填
@@ -60,6 +67,7 @@ node make-docx.js     # 输出 ../长征-抉择-设计方案.docx
 
 | 文档 | 内容 |
 |------|------|
+| `CONTRIBUTING.md` | **团队协作规范：git 工作流 / 提交身份 / 冲突处理 / 给 AI agent 的规矩** |
 | `changzheng/README.md` | 玩法与交互要点 |
 | `changzheng/docs/ARCHITECTURE.md` | 架构、运行时数据流、设计约束 |
 | `changzheng/docs/HANDOFF.md` | 已完成 / 已知缺口 / **每轮收尾清单** / 接力建议 |

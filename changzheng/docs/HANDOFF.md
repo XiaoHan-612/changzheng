@@ -8,6 +8,8 @@
 
 ## 零、接手第一步（5 分钟跑起来）
 
+> 前提：先按 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) **克隆仓库并配好提交身份**；每轮开工先 `git pull --rebase`。
+
 ```powershell
 cd changzheng
 npm install                 # 生产只要 express；playwright 只在跑测试时需要（--omit=dev 可省掉）
@@ -153,7 +155,9 @@ tests/          unit / e2e（Playwright）/ manual（一次性排查与体检脚
    - 本文件 §二 的结果行与 §三 缺口表同步（缺口解决了就划掉）。
 3. **刷新生成物**：`qa:audit`（LOG-AUDIT）、`tts:manifest`（TTS-MANIFEST）、涉及素材时 `qa:assets`。
 4. **交付图**：涉及页面的批次，出 1280 与 820 联系表（`qa:screens`）。
-5. **提交**：一个批次一个提交，信息里写清"做了什么 + 验收结果 + 遗留"。
+5. **提交并推送**：一个批次一个提交，信息里写清"做了什么 + 验收结果 + 遗留"
+   （格式与推送流程见 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) §二 / §四）。
+   **改完必须 `git push`** —— 留在工作区的改动对其他人和下一个接手的 agent 等于不存在。
 
 ## 七、注意事项
 
