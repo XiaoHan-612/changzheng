@@ -35,6 +35,22 @@ git -c credential.helper= ls-remote https://github.com/XiaoHan-612/changzheng.gi
 3. **URL 写错**：漏 `.git`、用户名拼错（`git remote -v` 核对）。
 4. **网络/代理**：公司网/校园网拦 `github.com`（`curl -I https://github.com` 试）；走 SSH 的话先 `ssh -T git@github.com` 看返回的是哪个账号——不是自己的就换 key。
 
+**已经确认"公开仓库 + 已接受邀请"，他还是克隆和推送都失败时**——问题一定在他那台机器的*连接方式*，不是仓库设置。
+让他把下面两条的输出原样发出来，一次就能定性：
+
+```powershell
+git --version
+git ls-remote https://github.com/XiaoHan-612/changzheng.git    # 不带任何凭据
+```
+
+| 结果 | 说明 | 修法 |
+|---|---|---|
+| 列得出 `refs/heads/main` | 网络与证书没问题 → 故障在**凭据或 SSH** | ① HTTPS：清掉凭据管理器里的 `git:https://github.com`，重新克隆时登录（或用**有权限的 PAT 当密码**；GitHub 早就不收账号密码了）；② SSH：`ssh -T git@github.com` 看返回的是不是自己的账号，不是就换 key——图省事直接改用 HTTPS 地址克隆 |
+| 报连接/证书错误 | **网络层**问题 | 换手机热点试一次（一次就能定性）；公司/学校要代理就 `git config --global http.proxy http://<代理>:<端口>` |
+
+> 本机（开发机）的基线：`http.sslBackend=schannel`（走 Windows 证书栈）+ 凭据管理器，**不配代理**，
+> `git ls-remote` 正常。对方环境只要对齐这三条即可。
+
 ---
 
 ## 一、一次性准备（每人只做一次）
