@@ -31,7 +31,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 | `public/js/state.js` | 资源/好感/附身线/行动点/每日场景/失败判定 | 纯函数、可单测；新增资源维度要同时改 `applyEffects` 的钳制表 |
 | `public/js/origin.js` | 开场设定：出身三选一 + 出发前一问（纯数据 + 纯函数） | 三条出身的收益刻意对称（各 +5/−2），别加出唯一最优解；问答必须留在本地题库，开局第一屏不能依赖网络 |
 | `public/js/sandbox.js` | 自由行军沙盘（世界裁判 + 存档） | 表单监听只绑一次（`bindSandboxFormOnce`），别改回 `addEventListener` |
-| `public/js/audio.js` | 环境床/SFX 合成 + 预录 wav + TTS 缓存 | `speak()` 命中顺序：预录 → TTS 缓存 → 静默 |
+| `public/js/audio/` | **音频框架**（批 1 重写）：`index`（门面）/ `mix`（混音表）/ `core`（desired-actual + reconcile）/ `channels/*` | 见坑 28；调用一律从 `index.js` 进，`qa:audio` 的框架一致性段强制 |
 | `public/js/ui.js` | DOM 渲染与浮层 | 模型返回的文本一律走 `escapeHtml`；`showScreen()` 负责按模板选入场动效、并在离开舞台/板屏时清空内容 |
 | `server/ai.js` | VN 侧提示词 + 真调 + 重试 | 每个 callType 的返回 schema 必须与前端读取字段一致 |
 | `server/sim.js` | 沙盘世界裁判 | 同上（2026-09-13 起也过契约表：数组响应按「整体不是对象」判失败） |
@@ -107,7 +107,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 12. **静态资源找不到必须 404** —— SPA 兜底只对页面路由生效（`server/index.js` 里排除了 `/assets`、`/audio`、`/css`、`/js`）。如果让缺图回 index.html（200），前端的素材探测和 `qa:assets` 都会被骗过。
 13. **契约标记要随状态撤销** —— 过场按钮是静态 DOM，结束后必须 `delete dataset.action`；已用掉的糖/已落子的格必须移除 `data-mini-action` 或置 `aria-disabled`，否则"当前可交互项"会撒谎（这几条都是踩过的坑）。
 14. **自动化只认契约** —— `tests/e2e/full-run.mjs` 的驱动按 `body[data-step]` + `data-action`/`data-choice-index`/`data-mini-*` 操作，不认识任何中文标签或屏内元素 id。新增玩法时先声明契约，别再改驱动。
-15. **TTS 缓存靠"逐字一致"命中** —— 哈希是 `sha1(voiceId|text)`，所以：① 代码里 `say()` 的文本改了，就要同步改 `data/tts-lines.json` 并重跑 `npm run tts:manifest`，否则文件白做（曾 21/24 条不可达）；② `speak()` 的 voiceId 必须走 `audio.js` 的 `ACTOR_VOICE` 映射（中文角色名会被清洗成 `default`，哈希对不上）；③ 史实回响会念 `facts.json` 的标题，标题即 TTS 文本。验收：`npm run qa:tts` + 跑一局看 `ttsHits`（E2E 已断言 ≥5）。
+15. **TTS 缓存靠"逐字一致"命中** —— 哈希是 `sha1(voiceId|text)`，所以：① 代码里 `say()` 的文本改了，就要同步改 `data/tts-lines.json` 并重跑 `npm run tts:manifest`，否则文件白做（曾 21/24 条不可达）；② `speak()` 的 voiceId 必须走语音通道的 `ACTOR_VOICE` 映射（`public/js/audio/channels/voice.js`）（中文角色名会被清洗成 `default`，哈希对不上）；③ 史实回响会念 `facts.json` 的标题，标题即 TTS 文本。验收：`npm run qa:tts` + 跑一局看 `ttsHits`（E2E 已断言 ≥5）。
 16. **立绘兜底不能反过来写** —— 旧代码 `comp.img || portraitImage(npc)` 里的 `comp` 是 `COMPANIONS.find(...) || COMPANIONS[0]`，于是任何**非同伴 NPC**（母亲、船工、宣传员、向导、新兵）都长出老班长的脸，10 张新立绘里 5 张永远不会出现（2026-09-13 修）。现在统一走 `showNpc(npc, { role, mood })`：专属立绘 → 同伴立绘 → 文字头像。热点/抉择集想立谁，就写 `npc` 字段（`acts.json` 的 `wounded`、`CHOICE_SETS.snow_help` 是样例）。回归用例在 `tests/e2e/asset-drop.mjs`（点开「母亲」热点，断言立绘必须是 `mother.png`）。
 17. **响应契约只有一张表** —— `server/schema.js` 的 `REQUIRED` 是唯一真源：`server/ai.js` 每次解析完就校验（缺必需字段 = 当次失败 → 走既有重试），`scripts/audit-logs.mjs` 用同一张表审计。别在别处再抄一份。起因是 2026-09-13 事故：模型把 `answer_index` 的键名写坏成 `",answer_index"`，由于只解析不校验，界面拿到"没有正确答案的题"照样往下跑 —— 只有日志审计能看出来，事后很难查。判定规则与回归用例见 `tests/unit/schema.test.js`。
    同一天还有第二起：`server/sim.js`（沙盘）**漏接了这张表** —— 模型把整个响应包成 JSON 数组（`[{...}]`）时，`typeof === 'object'` 与非空数组的键数都过得了原来的"空 JSON"检查，于是被当合规响应落库、界面渲染出一个没有叙事的空白回合（只有审计能发现）。现已补上校验，数组一律按"整体不是对象"判失败重试。**新增任何调模型的路径，都要接同一张表**。
@@ -116,7 +116,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 19. **交谈屏的"快捷问句"也带 `data-choice-index`** —— 它们是可选话题，不是必答选项。驱动/自动化如果按"先看通用选项、再看交谈"的顺序写，就会在同一屏反复提问：实测把 API 额度烧掉 400+ 次调用且永远走不出去。正确优先级是 **`talkEnd` 先于 `choices`**（`tests/e2e/lib/driver.mjs` 的快照里单列了 `talkQuick` 就是为这个）。
 20. **营地热点是一次性的（已生效）** —— `hotspotSpent()` 判定：`kind` 在 `REPEATABLE_HOTSPOTS`（只有 `fire`/`rest`）里的可反复做，其余按 `doneKeys[actId:action||id]` 用过即废；作废的热点 `disabled` + `data-hotspot-state="done"`，并把副文案换成「已看过」，行动点照旧每次 −1。两个连带教训：① **`markDone()` 之后必须重画一次 `renderHotspots()`**——否则刚用过那颗停在"看着还能点"的样子，点下去只弹「这里已经看过了」，界面与状态对不上（玩家只是困惑，自动化会在它上面反复点直到 40s 超时，2026-09-13 影音审计实锤）；② 自动化要"优先点没做过的热点"（`pickHotspot(..., { visited })`），一旦全部点过就会回退到点第一个，正好撞上那颗假可点的。
 21. **回归脚本曾经"空跑营地"** —— 旧版 full-run 在营地里优先点「启程」，行动点从没花过，因此 `npc_chat` 调用为 0、夜校/分糖之外的营地内容完全没覆盖。现在营地改为「`apOn > 0` 就先点热点、花完再启程」。判断剩余行动点用 HUD 的 `#ap-dots .ap-dot.on`。
-22. **图和声音坏了，流程测试是不会发现的** —— `sceneImage()` 找不到图会静默退回占位图，`playAmbient()` 找不到文件会静默退回合成音，`speak()` 找不到缓存就静默不响。于是路径拼错、文件缺失、映射写反都能"通关"。所以有独立的影音审计 `npm run qa:av`：整局监听 `/assets`、`/audio` 的 4xx/5xx，核对营地全景/舞台图/立绘是否就是期望的那一张，统计环境床与语音是否**真的 play() 成功**，并逐个验证 `/api/tts` 返回的音频能解码出时长。
+22. **图和声音坏了，流程测试是不会发现的** —— `sceneImage()` 找不到图会静默退回占位图，`audio.ambient.play()` 找不到文件会静默退回合成音，`speak()` 找不到缓存就静默不响。于是路径拼错、文件缺失、映射写反都能"通关"。所以有独立的影音审计 `npm run qa:av`：整局监听 `/assets`、`/audio` 的 4xx/5xx，核对营地全景/舞台图/立绘是否就是期望的那一张，统计环境床与语音是否**真的 play() 成功**，并逐个验证 `/api/tts` 返回的音频能解码出时长。
 23. **`text-avatar` 是设计的一部分，不是缺陷** —— 没有专属立绘的 NPC（目前是「湘江老兵」）会退回文字头像，影音审计按 `PORTRAIT_FILE` 的键判断"本该有立绘"，因此不会误报；要给他补立绘时，往 `PORTRAIT_FILE` 加一行即可自动生效。
 24. **测试会复用旧服务，让服务端改动"假绿"** —— 早先每个 e2e 脚本各写一份 `ensureServer()`，只判断端口上有没有服务。于是一个几小时前启动的进程会被一直复用：**服务端代码改了，测试却还在跑旧代码**，绿灯是假的（本人在数值护栏上踩过：日志里单次 +15，钳制明明写了却"没生效"）。现在统一走 `tests/e2e/lib/server.mjs`：服务端在 `/api/config` 暴露 `pid` 与 `codeStamp`（`server/*.js` 最新 mtime），测试启动前比对，代码比进程新就杀掉重启；迁移期旧服务不暴露 pid 时按端口反查监听进程。改服务端代码后跑测试，看到 `restarted` 才算真跑。
 25. **数值改动要同时改三处** —— ①`server/balance.js` 的钳制表（单维单次上限 + 单次最多 3 维 + 信念只允许在 `branch_judge`/`night_resolve` 正向增长）；②`server/ai.js` 提示词里的【数值】段落；③`tests/unit/balance.test.js`。只改其一会出现"提示词说 ±8、实际还能 +15"这类不一致。实测口径：一局 AI 净变化应为体力 −20～−30、信念 +5 左右，终局落在体力 20–45 / 信念 50–85。
@@ -150,7 +150,17 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
    - **点按区 ≥32px**：五子棋格子 28×28 会被 `layout-audit --width 820` 判"手指点不准"（现 32，9×32+间隙=320 放得进 620 的板身）。
    - 另两条小的：`stats()` 返回句柄（标签 → `<b>`），倒计时这类每帧变的数值**只改文本**、别重写 HTML；`stats()` 的初始化要放在那几个状态变量声明**之后**（写在前面会踩 TDZ，抓过一次）。
 
-30. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
+30. **静态资源不发长缓存：浏览器缓存旧脚本的症状是"点哪儿都没反应"** —— 这个项目没有构建步骤、
+   承诺是"改文件/换素材，刷新即生效"，所以 `server/index.js` 里页面/脚本/图片/音频一律**回源校验**
+   （ETag → 304），只有 `/fonts` 保留 7 天（有意为之）。踩过的两件事：
+   ① 排查音频修复时被 `max-age=1h` 骗过——改完 `audio.js` 刷新页面跑的还是缓存里的旧代码，
+      一度以为修复没生效；
+   ② 删掉 `public/js/audio.js` 改写框架后，`localhost:3001` 的缓存里留着旧 `main.js`（它 import 的
+      `./audio.js` 已不存在）→ 模块 404 → **整个 app 的 JS 不执行**，页面显示正常、点哪儿都没反应。
+   处理：**已经缓存过旧头的浏览器要硬刷新一次（`Ctrl+Shift+R`）**才认新头；急用可换个 origin
+   （如 `http://127.0.0.1:3001/`，缓存键不同）。判定口诀：页面在、点了没反应 → 先硬刷新，再怀疑代码。
+
+31. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
 
 ## 六、下一步建议（按价值排序）
 
