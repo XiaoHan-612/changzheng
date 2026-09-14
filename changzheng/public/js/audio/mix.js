@@ -10,7 +10,7 @@
  */
 export const MIX = {
   /** 总音量。要整体压低就只动这一个数 */
-  master: 0.75,
+  master: 1.0,
 
   /** 四条通道的电平（相对 master）。sfx 那一档直接引用下面 sfx.level，避免两处各写一个数 */
   bus: {
@@ -21,8 +21,9 @@ export const MIX = {
   },
 
   ambient: {
-    /** 环境床文件元素的音量（<audio> 元素走元素级音量：ctx 被挂起时它照样响） */
-    level: 0.32,
+    /** 环境床文件元素的音量（<audio> 元素走元素级音量：ctx 被挂起时它照样响）。
+     *  0.32 时实测只有 −37 dBFS（素材本身偏轻），抬到 0.7 ≈ −28 dBFS 才是"听得见但不吵"的一档 */
+    level: 0.7,
     fadeInMs: 1800,
     fadeOutMs: 600,
     /** 合成兜底的起播淡入（与 fadeInMs 独立：合成是节点级的） */
