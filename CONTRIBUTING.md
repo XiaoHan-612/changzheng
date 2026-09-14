@@ -159,7 +159,8 @@ npm install
 # 1. 开工前先同步
 git pull --rebase
 
-# 2. 干活……（按 HANDOFF.md §六 跑验收、更新文档）
+# 2. 干活……（改一处就跑 npm run dev:check：约 6 秒、0 次真调，先知道有没有把东西碰坏）
+#    收尾按 HANDOFF.md §六 分级验收：提交前 npm run verify:fast，推送与交付前 npm run verify:full
 
 # 3. 看看自己动了什么
 git status

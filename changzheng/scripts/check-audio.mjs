@@ -12,11 +12,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { ensureServer, BASE as SERVER_BASE } from '../tests/e2e/lib/server.mjs';
 import { audioInfo, bytesLabel } from './lib/audio-info.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const AUDIO = path.join(ROOT, 'public/audio');
-const BASE = `http://localhost:${process.env.PORT || 3001}`;
+// 端口/服务交给共用件（它会在没服务时自己起、并尊重 PORT）——与其它体检脚本一致，
+// 不再要求"先 npm start"（这条老毛病让 qa:audio 在并行验收里必挂）
+const BASE = SERVER_BASE;
 const OUT = path.join(ROOT, 'docs/AUDIO-REPORT.md');
 
 const problems = [];
@@ -70,10 +73,10 @@ async function main() {
   const refs = references();
 
   // 服务端可达性 + MIME
-  let serverUp = false;
-  try { serverUp = (await fetch(`${BASE}/api/config`)).ok; } catch { /* 未启动 */ }
+  await ensureServer();                     // 没起就自己起（尊重 PORT 环境变量）
+  const serverUp = await fetch(`${BASE}/api/config`).then((r) => r.ok).catch(() => false);
   if (!serverUp) {
-    console.error(`服务未启动：先 npm start（或让本脚本自己起，见 README）`);
+    console.error(`服务起不来：${BASE}/api/config 不可达`);
     process.exit(1);
   }
 

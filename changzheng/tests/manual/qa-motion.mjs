@@ -22,6 +22,9 @@ await page.evaluate(() => {
 });
 await page.reload({ waitUntil: 'networkidle' });
 
+const pageErrors = [];
+page.on('pageerror', (e) => pageErrors.push(e.message));
+
 const rows = [];
 const check = (name, got, want) => rows.push({ 检查: name, 实测: got, 期望: want, 结果: String(got) === String(want) ? '✓' : '✗' });
 
@@ -32,6 +35,21 @@ const animOf = (sel) => page.evaluate((s) => {
   const cs = getComputedStyle(el);
   return `${cs.animationName} ${cs.animationDelay}`;
 }, sel);
+
+/**
+ * 等到某元素的动画**真的挂上**（而不是固定等 400ms）。
+ * 并行验收时几个浏览器抢 CPU，固定 sleep 会不够——"等具体状态"是这个项目已经学过的教训。
+ * 超时就把最后一次读到的东西返回，让断言如实报出来。
+ */
+const waitForAnim = async (sel, want, timeout = 8000) => {
+  const t0 = Date.now();
+  for (;;) {
+    const got = await animOf(sel);
+    if (got === want) return got;
+    if (Date.now() - t0 > timeout) return got;
+    await page.waitForTimeout(120);
+  }
+};
 
 // ① 封面入场（tpl-title → anim-fade）
 check('封面入场', await animOf('#screen-title .title-card'), 'fade-in 0s');
@@ -66,8 +84,9 @@ for (let i = 0; i < 30; i++) {
   if (await page.locator('#ch-opts .blk-choice').count()) break;
   await page.waitForTimeout(400);
 }
-check('舞台入场（纸卷上滑）', await animOf('#screen-stage .sheet'), 'sheet-rise 0s');
-check('正文墨显', await animOf('#stage-panel'), 'ink-in 0s');
+check('舞台入场（纸卷上滑）', await waitForAnim('#screen-stage .sheet', 'sheet-rise 0s'), 'sheet-rise 0s');
+check('正文墨显', await waitForAnim('#stage-panel', 'ink-in 0s'), 'ink-in 0s');
+await waitForAnim('#ch-opts .blk-choice', 'ink-in 0s');
 check('选项第 1 条延迟', await page.evaluate(() => {
   const c = document.querySelector('#ch-opts > *');
   return c ? getComputedStyle(c).animationDelay : '(缺选项)';
@@ -89,8 +108,8 @@ for (let i = 0; i < 40; i++) {                        // 回响层打开前可�
   await page.waitForTimeout(300);
 }
 await page.waitForTimeout(400);
-check('回响印章钤印', await animOf('#screen-echo .echo-seal'), 'seal-stamp 0.12s');
-check('回响两栏逐条', await animOf('#screen-echo .echo-grid > *:nth-child(2)'), 'ink-in 0.06s');
+check('回响印章钤印', await waitForAnim('#screen-echo .echo-seal', 'seal-stamp 0.12s'), 'seal-stamp 0.12s');
+check('回响两栏逐条', await waitForAnim('#screen-echo .echo-grid > *:nth-child(2)', 'ink-in 0.06s'), 'ink-in 0.06s');
 
 // ⑤b 玩法板：tpl-board 的入场（这一屏批四才真接上，之前没有任何页面用它）
 await page.evaluate(() => window.__czScreens?.mini?.('needle'));
@@ -136,10 +155,35 @@ console.log('动效体检（量的是计算样式）：');
 console.table(rows);
 console.log(`减动效偏好：--motion-scale=${calm.scale}　（位移关、只留淡入，符合文档口径）`);
 
+/**
+ * 失败时把现场打出来：只报一个"实测 none"是查不出问题的——
+ * 要看清是哪一屏、走到哪一步、元素在不在、是不是弹了模型重试。
+ * （并行验收时出现"稳定失败、单跑却通过"，就是靠这个 dump 定的性。）
+ */
+const dumpScene = async (why) => {
+  const facts = await page.evaluate(() => {
+    const grid = document.querySelector('#screen-echo .echo-grid');
+    return {
+      screens: [...document.querySelectorAll('.screen')].filter((s) => !s.classList.contains('hidden')).map((s) => s.id),
+      step: document.body.dataset.step,
+      stepState: document.body.dataset.stepState,
+      echoGrid: grid ? { cls: grid.className, kids: grid.children.length } : null,
+      echoKid1: grid?.children?.[1] ? grid.children[1].className : null,
+      aiRetry: !!document.querySelector('[data-action="ai-retry"]'),
+      continueBtn: !!document.getElementById('btn-continue'),
+    };
+  });
+  console.log('[现场] ' + why);
+  console.log('  ' + JSON.stringify(facts));
+  if (pageErrors.length) console.log('  pageErrors: ' + pageErrors.slice(-3).join(' | '));
+};
+
 const failed = rows.filter((r) => r.结果 === '✗');
 if (failed.length) {
   console.log(`\n✗ 动效体检未通过：${failed.length} 项`);
   for (const f of failed) console.log(`  ✗ ${f.检查}：实测 ${f.实测}，期望 ${f.期望}`);
+  await dumpScene('未通过 ' + failed.length + ' 项');
+  await browser.close();
   process.exit(1);
 }
 console.log('\n✓ 动效体检通过：五个标准效果都挂在实际页面上');

@@ -44,8 +44,13 @@ npm start          # http://localhost:3001
 
 ## 测试
 
+三层尺子：改一处先跑 `dev:check`（约 6 秒、0 次真调），提交前 `verify:fast`，推送与交付前 `verify:full`。
+
 ```powershell
 cd changzheng
+npm run dev:check     # 开发快检：总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板（约 6 秒）
+npm run verify:fast   # 提交前那一档：上面这些 + 动效 / 音频 / 素材 / 影音守卫，并行约 30 秒
+npm run verify:full   # 推送与交付前：真调那一档（e2e / av / sandbox / …），分钟级
 npm run test:unit     # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏
 npm run qa:smoke      # 标题 → 营地 → 一次互动（顺带断言用过的热点当场作废）
 npm run qa:board      # 玩法板体检：8 个玩法逐屏摆上板（板屏壳 / 数值签 / 契约标记）

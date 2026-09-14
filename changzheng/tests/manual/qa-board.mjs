@@ -33,9 +33,24 @@ await passOrigin(page);
 await page.click('#btn-cut-skip').catch(() => {});
 await page.waitForTimeout(800);
 
-const board = async (name) => {
+/**
+ * 摆一个玩法到板屏上，**等到它真的摆好**再断言。
+ *
+ * 这里踩过一次坑：原来是 `mini(n)` + 固定等 400ms。而 `__czScreens.mini()` 是异步的
+ * （它内部要先 await 场景对话才 openBoard），偶尔 400ms 还没轮到本玩法——于是
+ * `#board-stats` 里读到的还是**上一个玩法的数值签**（sentry 读到 candy 的「还剩」），
+ * 断言随机变红，单跑却常常通过。教训与 qa:motion 同一条：等具体状态，别等固定 sleep。
+ */
+const board = async (name, spec) => {
   await page.evaluate((n) => window.__czScreens.mini(n), name);
-  await page.waitForTimeout(400);
+  const t0 = Date.now();
+  for (;;) {
+    const title = ((await page.locator('#board-title').textContent()) || '').trim();
+    const statText = (await page.locator('#board-stats').textContent()) || '';
+    if (title === spec.title && statText.includes(spec.stat)) return;
+    if (Date.now() - t0 > 8000) return;               // 超时就如实断言，别假装成功
+    await page.waitForTimeout(120);
+  }
 };
 const count = (sel) => page.locator(sel).count();
 const visible = (sel) => page.locator(sel).first().isVisible().catch(() => false);
@@ -53,7 +68,7 @@ const specs = {
 };
 
 for (const [name, spec] of Object.entries(specs)) {
-  await board(name);
+  await board(name, spec);
   check(`${name}：板屏打开`, await page.locator('#screen-board').isVisible(), true);
   check(`${name}：题名`, (await page.locator('#board-title').textContent())?.trim(), spec.title);
   check(`${name}：数值签`, await page.locator('#board-stats .blk-stat').first().isVisible(), true);
@@ -61,9 +76,12 @@ for (const [name, spec] of Object.entries(specs)) {
   check(`${name}：数值签含「${spec.stat}」`, statText.includes(spec.stat), true);
   check(`${name}：玩法区在板身里`, await visible(`#board-body ${spec.kick}`), true);
   check(`${name}：契约标记`, await count(`#board-body [data-mini-action]`) > 0, true);
-  // 点第一步，看有没有反应（契约元素仍然在、状态推进）
+  // 点第一步，看有没有反应（契约元素仍然在、状态推进）；同样等状态，不等固定 sleep
   await page.locator(`#board-body ${spec.kick}`).first().click({ force: true }).catch(() => {});
-  await page.waitForTimeout(500);
+  const t1 = Date.now();
+  while ((await count(`#board-body ${spec.after}`)) === 0 && Date.now() - t1 < 4000) {
+    await page.waitForTimeout(120);
+  }
   check(`${name}：点一下有反应`, await count(`#board-body ${spec.after}`) > 0, true);
 }
 

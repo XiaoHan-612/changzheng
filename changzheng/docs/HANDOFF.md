@@ -83,13 +83,25 @@ npm start                   # http://localhost:3001
 - `npm run qa:audit` → `docs/LOG-AUDIT.md`：本版本字段缺失 0、FALLBACK 0
 
 ### 测试（当前全绿）
+
+三层尺子（什么时候跑哪一档，见 [`QA.md`](QA.md) 开头）：
+
 ```powershell
-# 全流程（真调，需配好 Key）
+# ① 改一处就扫一眼：6 秒、0 真调（总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板）
+npm run dev:check
+# ② 提交前：上面那一套加动效、音频、素材、影音守卫，并行约 30 秒
+npm run verify:fast
+# ③ 推送与交付前：真调那一档（分钟级，需配好 Key）
+npm run verify:full
+```
+
+单跑某一项时也仍然可以直接用原来的命令：
+
+```powershell
 npm run test:e2e     # 五幕真调通关：unit 之外的总验收（~76 次调用），含不重复结算等回归断言
 npm run qa:sandbox   # 沙盘两回合 + 建议行动      · npm run qa:regress  沙盘监听泄漏/存档错位
 npm run qa:failure   # 行军模式失败线（failure_review 真调）
 npm run qa:av        # 影音运行时审计：资源 404 / 立绘 / 环境床 / TTS 解码
-# 局部（多数不烧 AI，随时可跑）
 npm run test:unit    # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏
 npm run qa:smoke     # 标题→营地→一次互动→回设置
 npm run qa:board     # 玩法板体检 57 项（8 个玩法的板屏壳 / 数值签 / 契约标记 / 离开清空）
@@ -99,7 +111,7 @@ npm run qa:bus       # 总线守卫（模块化规则 + 内核运行时体检）
 
 当前结果：unit 49/49 · smoke PASS · board 57/57 · motion 16/16 · e2e FULL PASS ·
 sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 全绿 ·
-`layout-audit --width 820` 与 1280 均零布局缺陷
+`dev:check` 7/7（≈6s）· `layout-audit --width 820` 与 1280 均零布局缺陷
 
 ## 三、还没做 / 已知缺口（按优先级）
 
@@ -159,8 +171,9 @@ tests/          unit / e2e（Playwright）/ manual（一次性排查与体检脚
 
 ## 六、每轮收尾清单（**每轮结束都做，做到随时能移交**）
 
-1. **跑验收**：改动涉及的层级按 §二 的命令跑一遍；服务端改动后必须看到测试输出 `restarted`
-   （否则跑的是旧进程，绿灯是假的）。
+1. **跑验收**：开工到收尾都跑 `npm run dev:check`（约 6 秒、0 真调——改一处就看一眼它绿不绿）；
+   收尾时按改动涉及的层级跑 `npm run verify:fast`（提交前）与 `npm run verify:full`（推送/交付前，
+   真调那一档）；服务端改动后必须看到测试输出 `restarted`（否则跑的是旧进程，绿灯是假的）。
 2. **更新文档**（缺一项都算没做完）：
    - 本轮改动 → `HANDOFF-CODE.md`（坑与规矩，编号往后加）与 `README.md` / `QA.md` 的命令表；
    - 界面改动 → `DESIGN-SYSTEM.md` §五 批次表 + §三 组件表 + 模板表；

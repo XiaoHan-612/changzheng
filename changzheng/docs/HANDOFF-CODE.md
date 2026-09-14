@@ -217,6 +217,21 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 
 35. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
 
+36. **自动化里"等固定 sleep"就是随机变红（本轮两次实锤）** —— 2026-09-14 排验收时 `qa:motion` 与 `qa:board` 都出现"单跑通过、跑一轮随机失败"，成因同一条：
+
+   - `qa:board` 的 `board(name)` 原来是 `mini(n)` + 等 400ms；而 `__czScreens.mini()` **是异步的**（内部先 await 场景对话再 `openBoard`），偶尔 400ms 还没轮到本玩法 —— 于是 `#board-stats` 里读到的是**上一个玩法的数值签**（sentry 读到 candy 的「还剩」），断言随机变红。
+   - 修法一律是**等具体状态**：`qa-board` 轮询到"题名对上 **且** 数值签含本玩法的字"才断言，点第一步改成等"契约标记重新出现"；`qa-motion` 用 `waitForAnim(sel, want)` 等计算样式到位，并在失败时用 `dumpScene()` 打出场景现场（可见的屏、`body[data-step]`、元素在不在、有没有弹模型重试）。
+
+   **三条教训**：① 断言前要等"只有成功才会出现"的那个状态，不要等时间；② 失败输出必须带现场，只报一句"实测 none"会让人查半天——`verify.mjs` 现在会把带 ✗ 的行从整张表里捞出来，因为尾部 24 行往往正好截不到它；③ 新守卫要**自己证明抓得到坏东西**：本轮对 `dev:check` 做了两个故意破坏用例（模块里加一行跨模块 `import`、往 `ui.js` 尾巴塞语法错），两次都如实变红、改回即恢复绿色。只会变绿的守卫等于没有。
+
+37. **端口上蹲着的旧服务会给出"假绿"，dev:check 因此开工前先清场** —— 第 24 条讲的是"代码指纹比对"，但它只解决"复用旧代码"那一半：如果端口上还留着**上一轮验收**的进程，它带的是自己的 `LOG_DIR`（临时目录，多半已删）和环境变量，测试连上去看到的是别人的现场。本轮排查就撞见三个这样的残留进程，正好占着编排器要用的 `3200/3201/3202`。所以：
+
+   - `npm run dev:check` 用**专用端口 3399**，并在起服务前按端口清掉监听进程；
+   - 排查怪现象时先看一眼端口：`netstat -ano | findstr :3200`，有没有"别人的服务"；
+   - 验收档仍按 `3200 + slot` 分端口；换号段时 `--port=` 与 `--jobs=` 要一起改。
+
+38. **测试分层：三层，别拿真调档当日常** —— `dev:check`（~6s，0 真调，改一处就扫）→ `verify:fast`（~30s，提交前）→ `verify:full`（分钟级、真调，推送与交付前）。改代码的节奏快过验收的节奏，混在一起的结果就是"懒得跑"；但**快档不能替代真调档**：动效/流程类检查可以绕开模型，`source=GLM`、16 类 callType 覆盖、断网报错这些证据只有真调才拿得到。
+
 ## 六、下一步建议（按价值排序）
 
 1. **真调验证已全覆盖**（2026-09-13）：标准模式一局 76 次调用全 `source=GLM`、无 ERROR；`failure_review` 由 `npm run qa:failure` 单独覆盖（注入"断粮+体力见底"走失败线，断言真调 1 次且渲染出标题/段落/史实要点）。16 类 callType 全部有真调记录。
@@ -230,21 +245,25 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 
 ## 七、验收清单（每轮收尾跑这一套）
 
+三层尺子（详见 [`QA.md`](QA.md) 开头）：改完一处先 `npm run dev:check`（6 秒、0 真调），提交前 `npm run verify:fast`，推送与交付前 `npm run verify:full`。
+
 ```powershell
-# 全流程（真调；服务端改动后要看到测试输出 restarted，否则跑的是旧进程）
-npm run test:e2e && npm run qa:sandbox && npm run qa:regress && npm run qa:failure && npm run qa:av
-# 局部与守卫（多数不烧 AI）
-npm run test:unit && npm run qa:smoke && npm run qa:board
-npm run qa:tokens && npm run qa:frames && npm run qa:tone && npm run qa:motion && npm run qa:handoff
+# 批次中间：改一处就扫一眼（0 真调，约 6 秒）
+npm run dev:check
+# 提交前：一套不烧 AI 的守卫并行跑（约 30 秒）
+npm run verify:fast
+# 推送/交付前：真调那一档（分钟级；服务端改动后要看到测试输出 restarted，否则跑的是旧进程）
+npm run verify:full
 # 改台词后
 npm run tts:manifest
 ```
 
+- [ ] `dev:check` 7 步全 ✓（总线静态规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 无报错）
 - [ ] unit 49/49
 - [ ] 标准模式与 `--quick` 均 E2E FULL PASS，无 pageerror
 - [ ] 日志里 candy/sentry/gomoku/luding 各恰好 1 次，夜间 `night_options`+`night_resolve` 各 1 次
       （gomoku 只靠可选营地热点触发，偶尔落空——失败信息会带「营地历次热点 apN:[…]」）
-- [ ] 玩法板体检 36 项全 ✓（板屏壳 / 数值签 / 契约标记 / 离开清空）
+- [ ] 玩法板体检全 ✓（板屏壳 / 数值签 / 契约标记 / 离开清空）
 - [ ] 视觉守卫全绿；改了页面则出 1280/820 联系表
 - [ ] 页面上没有"用了但 CSS 里没定义"的类（`.choice-btn` 那类事故，见第 27 条）
 - [ ] 无 Key 时给出明确错误提示（不再静默、不编造内容）

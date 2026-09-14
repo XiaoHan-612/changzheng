@@ -54,6 +54,8 @@ export default {
 - `[data-mini="<id>"]` 容器 + `[data-mini-state="..."]`（`idle|awaiting|window|player|ai|done` …）
 - `[data-mini-action="<动作名>"]` 可操作项（写进描述符的 `actions` 里，体检会核对）
 - 玩法板体检：`npm run qa:board`（会逐个把玩法摆到板上，验板屏壳、数值签、契约标记、第一步可点、离开清空）
+- **写完先跑 `npm run dev:check`**：约 6 秒、0 次真调，它会把两个代表玩法（needle / sentry）摆到板屏上点一下。
+  想让它查自己那个：`npm run dev:check -- --mins=你的id,grab`；八个玩法全量体检仍是 `qa:board`
 - 回归驱动：`tests/e2e/lib/driver.mjs` 的 `applyMiniAction()` —— 新动作名要在那里加一条策略
 
 ## 四、迁移状态
