@@ -58,9 +58,11 @@ file:.git/config        你的名字
 file:.git/config        你的邮箱
 ```
 
-**两条注意**：
+**三条注意**：
 
 - **别改成 `--global` 就以为万事大吉。** 本仓库 `.git/config` 里有一份 local 身份，而 **local 优先级高于 global** —— 设了 global 也不会对本仓库生效。要交给 global 管，得先 `git config --local --unset user.name` 删掉 local 那份。
+- **多人 / 多 agent 共用一台机器时**：local 身份只有一份，谁最后配的算谁的。提交前用 §二 第 5 步
+  核对作者，别把别人的活儿算到自己头上（或反过来）。
 - **邮箱要填你在 GitHub 上验证过的那个**（GitHub → `Settings` → `Emails`）。填错不报错，只是提交不算你头上、贡献图没头像。不想暴露真实邮箱就用 GitHub 的匿名转发地址：`<账号ID>+<用户名>@users.noreply.github.com`，同样能正确归因。
 
 > 历史备注：本仓库最早的 62 个提交全部署名 `长征·抉择 开发组 <dev@changzheng.local>` —— 那是个**全组共用的假邮箱**，GitHub 认不出是谁提交的。新提交请用各自的真实身份。
@@ -92,12 +94,20 @@ git diff
 git add -A
 git commit -m "docs(qa): 测试清单对齐最终代码；unit 47→49 全绿"
 
-# 5. 推之前再同步一次
+# 5. 推之前核对这批提交的作者身份（多 agent / 多人共用一台机器时最容易串）
+git log origin/main..main --format='%h %an <%ae> %s'
+#    作者不对 → 先按 §一 把身份改对，再 git commit --amend --reset-author 改正最近一条
+
+# 6. 再同步一次，然后推
 git pull --rebase
 git push
 ```
 
-**第 5 步为什么还要 pull 一次**：这段时间别人（或另一个 agent）可能刚推过，此时 `push` 会被拒。先 `pull --rebase` 把自己的提交挪到最新之上，再 push 就顺了。
+**第 5 步为什么必须做**：仓库的 local 身份只有一份，谁最后配置的就算谁的。这台机器上前后
+可能换过多个 agent（或多人共用），不核对就会把提交算到别人头上——`--reset-author` 只改最近一条，
+多条要 `git rebase --root --exec 'git commit --amend --reset-author --no-edit'`（慎用，要先备份分支）。
+
+**第 6 步为什么还要 pull 一次**：这段时间别人（或另一个 agent）可能刚推过，此时 `push` 会被拒。先 `pull --rebase` 把自己的提交挪到最新之上，再 push 就顺了。
 
 **为什么用 `--rebase` 而不是默认的 merge**：rebase 不会产生 `Merge branch 'main'` 这种合并提交，这 62 条干净的直线历史能一直保持下去。
 
@@ -205,6 +215,9 @@ git blame 路径/文件名              # 看某一行是谁什么时候改的
 - **永远不要把 `.env` / `runtime-config.json` 的内容读进产物**（文档、报告、日志、提交信息），也不要提交它们。密钥只在 `.env` 与 `runtime-config.json` 里。
 - **不要 `git push --force`**，不要改写已推送的历史。要撤回就用 `git revert`。
 - **`node_modules` 已经在 `.gitignore` 里**，不要为了「让队友能跑」而把它提交上去。
+- **push 前核对作者身份**：`git log origin/main..main --format='%h %an <%ae> %s'`。
+  这台机器上的 local 身份会被前后几个 agent 互相覆盖（§一），不核对就把提交算到别人头上了；
+  不对就按 §一 改回来，再 `git commit --amend --reset-author`（只改最近一条）。
 - **工作区不干净时先问清楚**（`git status`）再动手 —— 可能是上一个人留下的在途改动。
 - **改完跑对应层级的验收**（HANDOFF §二），服务端改动后必须确认测试输出里出现 `restarted`，否则跑的是旧进程、绿灯是假的。
 
