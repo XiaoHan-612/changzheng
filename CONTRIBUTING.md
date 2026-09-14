@@ -35,6 +35,28 @@ git -c credential.helper= ls-remote https://github.com/XiaoHan-612/changzheng.gi
 3. **URL 写错**：漏 `.git`、用户名拼错（`git remote -v` 核对）。
 4. **网络/代理**：公司网/校园网拦 `github.com`（`curl -I https://github.com` 试）；走 SSH 的话先 `ssh -T git@github.com` 看返回的是哪个账号——不是自己的就换 key。
 
+**新同学第一次加入时，用这个"权限自测"把权限和环境分开**（不碰 `main`，测完删分支）：
+
+```powershell
+git clone https://github.com/XiaoHan-612/changzheng.git
+cd changzheng
+git config user.name  "你的名字"
+git config user.email "你 GitHub 验证过的邮箱"          # §一：必须是自己的身份
+
+git switch -c perm-check
+git commit --allow-empty -m "chore: 权限自测（可删）"
+git push -u origin perm-check        # 成功 = Write 权限到位；403 = 没权限；Authentication failed = 本机凭据问题
+```
+
+- `remote: Permission to ... denied` → 权限没到位（邀请没接受 / 加成了 Read）→ 让管理员核对
+  `Settings → Collaborators and roles` 里你的权限是不是 **Write**；
+- `Authentication failed` / `could not read Username` → 本机凭据问题（清掉凭据管理器里的 `git:https://github.com` 重登；
+  GitHub 早就不收账号密码，密码栏要填 **PAT**）；
+- **能克隆但推不了**：克隆只要"读"（公开仓库人人可读），推送才要 Write——所以这两件事的报错要分开看。
+
+> 注意区分**你自己的电脑**与**agent 的执行沙箱**：沙箱是另一台机器，没有你的凭据、网络也可能被限，
+> 平台侧的 `setup refresh had errors` 与仓库权限无关。权限自测请在**你自己确定能上网的电脑**上做。
+
 **执行环境连 git 都用不了时（只读用途）**，两条不依赖任何凭据的路：
 
 ```powershell
