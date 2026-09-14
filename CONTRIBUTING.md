@@ -35,6 +35,17 @@ git -c credential.helper= ls-remote https://github.com/XiaoHan-612/changzheng.gi
 3. **URL 写错**：漏 `.git`、用户名拼错（`git remote -v` 核对）。
 4. **网络/代理**：公司网/校园网拦 `github.com`（`curl -I https://github.com` 试）；走 SSH 的话先 `ssh -T git@github.com` 看返回的是哪个账号——不是自己的就换 key。
 
+**执行环境连 git 都用不了时（只读用途）**，两条不依赖任何凭据的路：
+
+```powershell
+git clone --depth 1 https://github.com/XiaoHan-612/changzheng.git cz   # 只要最新一次提交，仓库 pack 才 16MB，快
+# 或者干脆不用 git：公开仓库直接下 zip（浏览器能开就行）
+#   https://github.com/XiaoHan-612/changzheng/archive/refs/heads/main.zip
+```
+
+两条都不需要登录、不需要邀请——**公开仓库的读取对全世界开放**。所以"拉不下来"只可能是他那边的网络或工具链问题，
+与仓库设置无关；把原始报错发出来即可定位（是 `setup refresh had errors` 这类平台侧报错，就找他那个执行环境的管理员/文档）。
+
 **已经确认"公开仓库 + 已接受邀请"，他还是克隆和推送都失败时**——问题一定在他那台机器的*连接方式*，不是仓库设置。
 让他把下面两条的输出原样发出来，一次就能定性：
 
@@ -100,7 +111,14 @@ file:.git/config        你的邮箱
   核对作者，别把别人的活儿算到自己头上（或反过来）。
 - **邮箱要填你在 GitHub 上验证过的那个**（GitHub → `Settings` → `Emails`）。填错不报错，只是提交不算你头上、贡献图没头像。不想暴露真实邮箱就用 GitHub 的匿名转发地址：`<账号ID>+<用户名>@users.noreply.github.com`，同样能正确归因。
 
-> 历史备注：本仓库最早的 62 个提交全部署名 `长征·抉择 开发组 <dev@changzheng.local>` —— 那是个**全组共用的假邮箱**，GitHub 认不出是谁提交的。新提交请用各自的真实身份。
+> 历史备注：本仓库最早的 62 个提交全部署名 `长征·抉择 开发组 <dev@changzheng.local>` —— 那是个**全组共用的假邮箱**，GitHub 认不出是谁提交的。
+> 中间还有一段：开发机的 local 身份被设成了 `XiaoHan <300475724+XiaoHan-612@users.noreply.github.com>`，
+> **在那台机器上提交的人（包括几个 agent）全被记到 XiaoHan 名下**（`git shortlog -sne HEAD` 一看就明白：
+> 62 条旧假邮箱 + 15 条 XiaoHan，没有第三个作者）。
+>
+> **结论：Contributors 页不显示你 ≠ 你没干活，而是这台机器的身份不是你的。**
+> 想让自己的贡献归到自己名下：在**你自己的机器**上克隆后先按上面设好身份，再提交 —— 之后的 commit 就归你；
+> 已经产生的错归属不要用 `rebase`/`force-push` 去改（见 §八 禁令），历史留着就好。
 
 ### 3. 装依赖
 
