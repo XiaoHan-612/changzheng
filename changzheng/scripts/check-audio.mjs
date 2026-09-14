@@ -246,9 +246,24 @@ async function main() {
       for (const name of ['playAmbient', 'stopAmbient', 'playSfx', 'setEnabled']) {
         if (new RegExp(`audio\\.${name}\\b`).test(src)) problems.push(`${where} 还在用旧音频 API \`audio.${name}\` —— 现已收进门面（ambient.play / ambient.stop / sfx / setMuted）`);
       }
-      // ③ 不许绕过门面直接 import 深模块
-      const deep = src.match(/from\s+'(\.\/)?audio\/(?!index\.js)[^']+'/);
-      if (deep) problems.push(`${where} 直接 import 了音频深模块 ${deep[0]} —— 一律从 './audio/index.js' 进`);
+      // ③ 不许绕过门面直接 import 深模块（把相对路径解析成绝对路径再判断，别只匹配写法）
+      for (const m of src.matchAll(/from\s+'([^']+)'/g)) {
+        const spec = m[1];
+        if (!spec.startsWith('.')) continue;
+        const target = path.resolve(path.dirname(f), spec).split(path.sep).join('/');
+        const isInsideAudio = target.startsWith(AUDIO_DIR.split(path.sep).join('/'));
+        const isAudioIndex = /\/audio\/index\.js$/.test(target);
+        // ④ 声音只能从 audio 模块出：除 modules/audio/ 自身外，业务代码不许 import 音频门面
+        //   （批 2 起业务只发事件：kernel.emit('sfx:play'|'voice:say'|'scene:enter'|'flow:act-enter')）
+        // "谁在 import"而不是"目标是谁"：允许的唯一例外是音频模块自己
+        const isAudioModule = /^public\/js\/modules\/audio\//.test(where);
+        if (isInsideAudio && !isAudioIndex) {
+          problems.push(`${where} 直接 import 了音频深模块 ${spec} —— 一律从 audio/index.js 进`);
+        }
+        if (isAudioIndex && !isAudioModule) {
+          problems.push(`${where} 绕开总线直接 import 了音频门面 ${spec} —— 业务只发事件（见 docs/BUS.md），只有 modules/audio 可以调门面`);
+        }
+      }
     }
   }
   for (const [name, f] of [['环境床', 'AMBIENT_FILE'], ['BGM', 'BGM_FILE'], ['音效', 'SFX_NAMES'], ['音色', 'ACTOR_VOICE']]) {

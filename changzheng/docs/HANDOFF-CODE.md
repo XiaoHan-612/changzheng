@@ -27,7 +27,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 |---|---|---|
 | `public/js/main.js` | 主线状态机：五幕、营地日、强制链、对决、失败/终局、篝火夜；**玩法宿主** `openBoard()` + `mountMini()` | 最大的文件；热点用 `HOTSPOT_HANDLERS` 映射表分发，**加玩法只加一行**；玩法一律挂板屏（见第 27 条） |
 | `public/js/kernel/` | **内核**（新）：`bus`（事件总线）/ `contracts`（事件契约唯一真源）/ `plugins`（模块描述符）/ `kernel`（注册·接线·ready·诊断）/ `wiring`（模块清单）/ `resources`（显式锁）/ `snapshot`（只读快照）/ `diag`（事件流黑匣子） | 架构与规矩见 [`BUS.md`](BUS.md)；**模块集合不写死**——加模块只动 `wiring.js` 清单与模块自己的文件 |
-| `public/js/modules/` | **IP 模块**（新）：现在只有 `README.md` 与 `games/`（交互游戏插件契约 + 模板） | 批 2 起逐个迁入；别人写玩法看 `modules/games/README.md` |
+| `public/js/modules/` | **IP 模块**（新）：已挂 `audio`（声音总入口，订阅事件后调 `audio/` 框架）与 `chrome`（外壳对事件的反应：静音图标、ctx 挂起提示）；`games/` 是交互游戏插件契约 + 模板 | 批 2 起逐个迁入；**业务发声音只发事件**（`sfx:play`/`voice:say`/`scene:enter`/`flow:act-enter`），`qa:audio` 会拦直接 import 音频门面的写法 |
 | `public/js/step.js` | **交互契约**：`step()` / `askChoice()` / **`choiceButton()`（选项唯一构建处）** / `waitContinue()` / `markMini()` | 新增玩法只要声明契约，测试与自动化无需改动；详见 ARCHITECTURE 的「交互契约」 |
 | `public/js/minigames.js` | **8 个玩法**：钓鱼/弯针/夜校识字/分糖/夜岗/五子棋/泸定桥/陡坡 | 统一返回 `{score, detail, summary?}`，本地只判手感，结算走 `/api/decide`；状态经 `stats(host, [...])` 写进板头数值签 |
 | `public/js/state.js` | 资源/好感/附身线/行动点/每日场景/失败判定 | 纯函数、可单测；新增资源维度要同时改 `applyEffects` 的钳制表 |
@@ -148,7 +148,13 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
      `new Audio(` / `new AudioContext` / `.volume =` / `.gain.value =`，不许残留旧 API 名
      （`playAmbient`/`stopAmbient`/`playSfx`/`setEnabled`），只能从 `./audio/index.js` 进门。
      落地当天就靠这条抓出沙盘里自己 `new Audio` 的同伴反应音（现走 `audio.speak({ file })`）。
-   - **不变量（`qa:av` 断言）**：同一通道最多一个句柄在播（**同时播放峰值 ≤1**，防叠音/孤儿）。
+   - **不变量（`qa:av` 断言）**：**同一通道**最多一个句柄在播（按通道统计峰值：ambient ≤1 / bgm ≤1 / voice ≤1）。
+     注意判据要按通道——语音叠在环境床/音乐上是正常的（2 条），全局阈值会误报。
+   - **异步探测的竞态**（2026-09-14 修）：环境床的"先 HEAD 再放"是异步的，飞行期间若又切回同一场景，
+     `current === kind && playing()` 拦不住（那时还没声音）→ 又发一次探测 → 两个探测各建一个 `<audio>`，
+     前一个成孤儿、永远不停。现在用一个 `probing` 集合保证同一 kind 只有一次探测在飞，
+     外加 `_playFile` 的幂等护栏（同一条已在播就返回）。**这就是 `qa:av` 的叠音断言存在的意义**：
+     整局攒出 12 条同时播放时，只有它会喊（实测抓到）。
    - **听感这件事机器验不了**：无头浏览器没有音频输出，"元素在播"≠"你听得见"。两个入口——
      `public/dev/audio.html`（浏览器里逐个点播，标出每个声音现在用文件还是合成兜底）与
      `node tests/manual/audio-listen.mjs --measure`（可见 Chrome 里按顺序放一遍并量 RMS）。
@@ -176,9 +182,12 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
    ① 模块间不许 import（只许 `kernel/`）② 订阅只写在模块描述符里（模块内不许 `bus.on`）
    ③ 事件名先登记在 `kernel/contracts.js` ④ 模块必须在 `kernel/wiring.js` 的 MODULES 清单里。
    排错入口：`__czKernel.state()`（模块/订阅/锁/契约违规）与 `__czKernel.diag.toJsonl()`（事件流黑匣子）。
-   两个**守卫自己的坑**（都踩过）：① 清单提取要先剥注释——`wiring.js` 里那行"怎么加一行"的示例会被当成真清单；
+   三个**守卫/加载自己的坑**（都踩过）：① 清单提取要先剥注释——`wiring.js` 里那行"怎么加一行"的示例会被当成真清单；
    ② 模板字符串里的 `\s` 会被 JS 当成字符 s（`check-audio` 的对账正则曾因此静默失效）——守卫必须用正则字面量，
-   且"解析不出东西"时要**直接报错**，不许静默通过。
+   且"解析不出东西"时要**直接报错**，不许静默通过；③ **清单里的 path 必须按模块根解析**：
+   `import(item.path)` 的相对说明符是相对 `kernel/index.js` 的，写 `./modules/x/index.js` 会去找
+   `kernel/modules/…` → 模块静默加载失败（只有冒烟测试才发现）。现在 `loadModules()` 显式
+   `new URL('../' + path, import.meta.url)`，且 `qa:bus` 运行时断言"清单里的模块都真的注册了、无加载失败"。
 
 33. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
 

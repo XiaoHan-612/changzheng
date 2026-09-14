@@ -125,7 +125,7 @@ sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 
 ## 五、关键文件
 
 > **架构**：前端正在按「内核 + 事件总线 + IP 模块」渐进重写（[`BUS.md`](BUS.md) 是接新模块/新玩法的唯一入口）：
-> 批 1（内核地基）已完成，批 2–7 逐个把 audio / state / screens / games / ai / flow 挂上总线。
+> 批 1（内核地基）、批 2（audio + chrome 挂上总线）已完成；批 3–7 继续把 state / screens / games / ai / flow 挂上来。
 > 迁移期**游戏始终可运行**，每批一个提交、守卫全绿。
 >
 > 音频相关（环境床 / BGM / 音效 / 语音）**正在按 [`AUDIO-SYSTEM.md`](AUDIO-SYSTEM.md) 重写成统一框架**：
@@ -141,7 +141,7 @@ server/
   config.js     .env / runtime-config.json 双层配置
 public/js/
   kernel/       内核（bus/contracts/plugins/kernel/wiring/resources/snapshot/diag）——见 docs/BUS.md
-  modules/      IP 模块（当前只有 README 与 games 模板；批 2 起逐个迁入）
+  modules/      IP 模块（已挂 audio = 声音总入口、chrome = 外壳反应；games/ 是交互游戏插件契约）
   main.js       主线状态机（幕、营地、强制链、失败结算、玩法宿主 openBoard/mountMini）
   step.js       交互契约（step/askChoice/choiceButton/waitContinue/markMini）
   minigames.js  8 个玩法（本地只判手感，结算走 /api/decide）

@@ -23,7 +23,11 @@ export async function loadModules(list = MODULES) {
   const loaded = [];
   for (const item of list) {
     try {
-      const mod = await import(item.path);
+      // 清单里的 path 写成"相对 public/js/"（如 './modules/audio/index.js'，可读），
+      // 但 import() 的相对说明符是相对**本文件**解析的——所以这里显式拼成模块根再 load。
+      // （踩过：直接 import(item.path) 会去找 kernel/modules/…，模块静默加载失败。）
+      const url = new URL(`../${String(item.path).replace(/^\.\//, '')}`, import.meta.url).href;
+      const mod = await import(url);
       const descriptor = mod.default || mod.descriptor;
       if (!descriptor) throw new Error('模块没有 export default 描述符');
       if (descriptor.name !== item.name) {
@@ -41,7 +45,10 @@ export async function loadModules(list = MODULES) {
 
 // 调试句柄：和 __czAudio 同级。事件流、已注册模块、契约违规、锁的持有者，一眼看清。
 // 排错入口：`__czKernel.state()` / `__czKernel.diag.dump()` / `__czKernel.diag.toJsonl()`
-if (typeof window !== 'undefined') window.__czKernel = kernel;
+if (typeof window !== 'undefined') {
+  window.__czKernel = kernel;
+  window.__czModules = MODULES;   // 体检用：核对「清单里的模块都真的注册上了」
+}
 
 export { EVENTS, isEvent, checkPayload } from './contracts.js';
 export { MODULES } from './wiring.js';

@@ -58,6 +58,17 @@ check('取接口失败 0 次', flow?.apiMiss ?? -1, 0);
 check('事件流可导出 JSONL', flow?.jsonlLines >= 1 ? 'yes' : 'no', 'yes');
 check('统一摆屏入口可用', flow?.screensHook, 'function');
 
+// 清单里的模块必须真的注册上（踩过：path 解析错 → 模块静默加载失败，只有冒烟才发现）
+const loaded = await page.evaluate(() => {
+  const k = window.__czKernel;
+  if (!k) return null;
+  const names = k.state().modules.map((m) => m.name);
+  const expect = (window.__czModules || []).map((m) => m.name);
+  return { names, expect, loadErrors: k.diag.problems().filter((p) => p.kind === 'module-load-error').map((p) => p.module) };
+});
+check('清单模块全部注册', (loaded?.expect || []).every((n) => loaded?.names?.includes(n)) ? 'yes' : `no(${(loaded?.expect || []).filter((n) => !loaded?.names?.includes(n)).join(',')})`, 'yes');
+check('模块加载无失败', (loaded?.loadErrors || []).length, 0);
+
 console.log('总线体检（运行时）：');
 console.table(rows);
 console.log(`契约表 ${flow?.eventsDeclared ?? 0} 条事件；事件流 ${flow?.total ?? 0} 笔（其中 boot:ready ${flow?.ready ?? 0}）`);

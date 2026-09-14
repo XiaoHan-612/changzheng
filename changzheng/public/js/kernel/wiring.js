@@ -15,8 +15,9 @@
  *   - path 相对本文件；模块用 `export default { ...描述符 }` 导出。
  */
 export const MODULES = [
-  // 批 1：地基先立，模块从批 2 起逐个挂上来（迁移顺序见 docs/BUS.md）。
-  // 例：{ name: 'audio', path: './modules/audio/index.js', note: '环境床 / BGM / 音效 / 语音' },
+  // 批 2 起逐个挂上来（迁移顺序见 docs/BUS.md）。
+  { name: 'audio', path: './modules/audio/index.js', note: '声音总入口：环境床 / BGM / 音效 / 语音' },
+  { name: 'shell', path: './modules/shell/index.js', note: '外壳对事件的反应：顶栏静音图标、ctx 挂起提示' },
 ];
 
 /** 内核启动阶段（boot 编排）：需要插在某个阶段之间的模块，用 stage 字段声明 */

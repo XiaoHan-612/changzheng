@@ -1,5 +1,5 @@
 import { COMPANIONS } from './data.js';
-import { audio } from './audio/index.js';
+import { kernel } from './kernel/index.js';
 
 export function $(id) {
   return document.getElementById(id);
@@ -304,7 +304,7 @@ export async function say(speaker, text, voiceId) {
   $('dlg-speaker').textContent = speaker || '';
   replayAnim($('dlg-body'), 'anim-ink');
   // 预置语音后台播，不阻塞打字与流程
-  audio.speak({ text: text, actorId: speaker || '叙事', voiceId: voiceId }).catch(() => {});
+  kernel.emit('voice:say', { text, actorId: speaker || '叙事', voiceId });
   await typeText($('dlg-body'), text);
 }
 

@@ -70,7 +70,7 @@ UI 事件 → main.js(withLock) → ai-client → POST /api/decide
        → applyEffects(state) → 史实回响(echo) → 下一屏
 ```
 
-目标形态（每批往前挪一步）：
+目标形态（每批往前挪一步；**批 2 已落地 audio 与 chrome 两个模块**）：
 
 ```
         ┌─────────────── kernel（bus / contracts / resources / snapshot / diag）───────────────┐

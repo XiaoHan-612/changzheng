@@ -45,7 +45,21 @@ export class AmbientChannel {
     this.nodes = [];         // 合成版：current 节点
     this.current = null;     // 现在在响的 kind（actual）
     this.timers = [];        // 合成版的循环定时器（stop 时清）
-    this._fell = false;      // 本次起播是否已回落过（只回落一次）
+    this.missing = new Set(); // 已知没有文件的 kind（负缓存：别再探）
+    /**
+     * 文件可用的 kind（正缓存）。`undefined` = 还没探过。
+     *
+     * 这一层修的是老做法的浪费：原来每切一次场景都拿 `new Audio()` 去试，缺文件时等于**每次**
+     * 制造一个必然 404 的元素、再走一次 HEAD 兜底——白花两次请求，还可能在换源时留下孤儿元素。
+     * 现在与 BGM 通道同一套做法：**先 HEAD 问有没有，再决定放文件还是合成**，结果只探一次。
+     */
+    this.present = new Map();
+    /**
+     * 正在探测中的 kind。**这个集合是必需的**：探测是异步的，飞行期间如果又切回同一个场景，
+     * `current===kind && playing()` 拦不住（那时还没声音），于是会再发一次 HEAD —— 两个探测各自建元素，
+     * 前一个就成了永远不停的孤儿（2026-09-14 实测：整局攒出 12 条同时播放，被 qa:av 的叠音断言抓住）。
+     */
+    this.probing = new Set();
   }
 
   /* ── 门面用的三个入口 ── */
@@ -67,6 +81,7 @@ export class AmbientChannel {
       playing: this.playing(),
       volume: this.el ? +this.el.volume.toFixed(3) : null,
       ducked: this.ducked,
+      missing: [...this.missing],
     };
   }
 
@@ -82,24 +97,47 @@ export class AmbientChannel {
     if (this.current === kind && this.playing()) return;   // 已经在响同一条，别重起
     this._stopSound();
     this.current = kind;
-    this._fell = false;
     const file = AMBIENT_FILE[kind];
-    if (file) this._playFile(kind, file, false);
-    else this._playSynth(kind);
+    if (!file) { this._playSynth(kind); return; }          // 场景表写了 kind、映射表没有：直接合成
+    if (this.present.get(kind) === true) { this._playFile(kind, file); return; }
+    if (this.present.get(kind) === false) {                // 已知没文件：不再探测
+      if (MIX.ambient.allowSynthFallback) this._playSynth(kind);
+      return;
+    }
+    if (this.probing.has(kind)) return;                    // 这个 kind 的探测已在飞：等它，别再发起（防孤儿）
+    // 第一次遇到这个 kind：HEAD 探一次（本地 <100ms）。探测期间先不出声——比先放一个注定失败的元素干净
+    this.probing.add(kind);
+    fetch(file, { method: 'HEAD' })
+      .then((r) => {
+        this.present.set(kind, r.ok);
+        if (this.core.desired.ambient !== kind) return;    // 期间切走了：探明白了也不放
+        if (r.ok) this._playFile(kind, file);
+        else {
+          this.missing.add(kind);
+          if (MIX.ambient.allowSynthFallback) this._playSynth(kind);
+        }
+      })
+      .catch(() => {
+        this.present.set(kind, false);
+        if (MIX.ambient.allowSynthFallback && this.core.desired.ambient === kind) this._playSynth(kind);
+      })
+      .finally(() => this.probing.delete(kind));
   }
 
-  /* ── 文件版 ── */
-  _playFile(kind, file, isAlt) {
+  /* ── 文件版（有没有文件已在 reconcile 里问过，这里只管放） ── */
+  _playFile(kind, file) {
+    const base = file.split('/').pop();
+    // 幂等护栏：同一条已经在播就什么都不做（异步探测竞态的最后一道保险，防孤儿元素）
+    if (this.el && !this.el.paused && (this.el.src || '').endsWith(base)) return;
+    const fallback = () => {
+      if (this.core.desired.ambient !== kind) return;     // 期间已经切走了
+      this._stopSound();                                  // 换源前停旧的：否则旧元素成孤儿、两条床叠着响
+      this.current = kind;
+      this.present.set(kind, false);                      // 播不出来就当它没有：下一轮直接合成
+      this.missing.add(kind);
+      if (MIX.ambient.allowSynthFallback) this._playSynth(kind);
+    };
     try {
-      const fallback = () => {
-        if (this._fell) return;                       // 只回落一次，避免合成链生成两份
-        this._fell = true;
-        if (this.core.desired.ambient !== kind) return;   // 期间已经切走了
-        this._stopSound();                            // 换源前停旧的：否则旧元素成孤儿、两条床叠着响
-        this.current = kind;
-        if (!isAlt && /\.ogg$/.test(file)) { this._playFile(kind, file.replace(/\.ogg$/, '.wav'), true); return; }
-        if (MIX.ambient.allowSynthFallback) this._playSynth(kind);
-      };
       const el = new Audio(file);
       el.loop = true;
       el.volume = 0;                                  // 起播淡入（切场景不会"啪"地一声）
@@ -112,12 +150,8 @@ export class AmbientChannel {
       el.play()
         .then(() => fadeElement(el, MIX.ambient.level * (this.ducked ? MIX.voice.duckAmbient : 1), MIX.ambient.fadeInMs))
         .catch(fallback);
-      // 文件 404 时部分浏览器不触发 error，用 fetch 兜一次
-      fetch(file, { method: 'HEAD' })
-        .then((r) => { if (!r.ok) fallback(); })
-        .catch(fallback);
     } catch {
-      if (MIX.ambient.allowSynthFallback) this._playSynth(kind);
+      fallback();
     }
   }
 

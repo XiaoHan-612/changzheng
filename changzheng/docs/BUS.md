@@ -3,8 +3,8 @@
 > **一句话**：模块之间不直接调用，全部挂在一条事件总线上；谁听什么写在模块自己的描述符里，
 > 内核负责接线；跨模块读数据走只读快照。加模块/加玩法**不需要改内核，也不需要改别人的文件**。
 >
-> 状态：**批 1 已落地**（内核地基 + 契约表 + 诊断 + 守卫 + 体检）。业务模块从批 2 起逐个挂上来，
-> 顺序见本文 §六。**迁移期间游戏始终可运行**（这是硬要求）。
+> 状态：**批 1、批 2 已落地**（内核地基；audio 与 shell 两个模块已挂上总线）。
+> 后续批次把 state / screens / games / ai / flow 逐个迁进来，顺序见 §六。**迁移期间游戏始终可运行**。
 
 ---
 
@@ -54,8 +54,24 @@ const s = kernel.snapshot.get(); if (s.体力 <= 20) // ② 只读取数
 kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调用，慎用）
 ```
 
-事件清单见 `kernel/contracts.js`（那张表本身就是文档）；当前 17 条，分四组：
-`boot:*` · `screen:*`/`flow:*` · `state:*`/`hotspot:*`/`choice:*`/`line:*` · `ai:*` · `sfx:*`/`voice:*` · `resource:*`。
+事件清单见 `kernel/contracts.js`（那张表本身就是文档）；当前 21 条，分五组：
+`boot:*` · `screen:*`/`scene:*`/`flow:*` · `state:*`/`hotspot:*`/`choice:*`/`line:*` · `ai:*` · `sfx:*`/`voice:*`/`audio:*` · `resource:*`。
+
+### 已挂上总线的模块（批 2）
+
+| 模块 | 订阅 | 说明 |
+|---|---|---|
+| `modules/audio` | `flow:act-enter` · `scene:enter` · `sfx:play` · `voice:say` · `audio:toggle-mute` | **声音的唯一入口**：把事件翻译成 `public/js/audio/` 框架的调用（场景表/通道/静音模型都在框架里）。业务代码从此不认识音频 API |
+| `modules/shell` | `audio:muted` · `audio:suspended` | 外壳对事件的反应：顶栏静音图标、ctx 挂起的提示（过去是 main.js 手工注入回调 + 直接读 `audio.muted`） |
+
+**发声音就发事件**（别再调音频门面——`qa:audio` 会拦）：
+
+```js
+kernel.emit('sfx:play', { name: 'click' });                       // 音效（名字见 audio/sfx-table.js）
+kernel.emit('voice:say', { text, actorId: '老班长' });             // 台词（预置 → TTS 缓存 → 静默）
+kernel.emit('scene:enter', { name: 'sandbox' });                  // 独立场景：title/sandbox/luding/ending
+kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // 幕轴上的场景（含第四幕分日）
+```
 
 ## 五、诊断与体检
 
@@ -70,7 +86,7 @@ kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调�
 | 批 | 内容 | 状态 |
 |---|---|---|
 | 1 | 内核地基（本文档 + 内核七件套 + 契约 + 模块/玩法契约 + 四条 lint + `qa:bus`） | ✅ 已完成 |
-| 2 | audio 挂总线（第一个 IP，最干净） | ⏳ |
+| 2 | **audio 挂总线**（声音总入口）+ shell（外壳对事件的反应） | ✅ 已完成 |
 | 3 | 去越界（`screen:hide` 各屏自清）+ 锁显式化（`resources` 收编 `S.busy` 与 `data-step-state`） | ⏳ |
 | 4 | state 挂总线 + 只读快照（消掉"绕纯函数直改字段"） | ⏳ |
 | 5 | screens / games / sandbox 挂总线（玩法宿主变服务，现有 8 个玩法改成插件形状） | ⏳ |
@@ -80,6 +96,11 @@ kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调�
 ## 七、怎么加东西（两个最常见）
 
 **加一个模块**：读 [`modules/README.md`](../modules/README.md) —— 写一个描述符 + 在 `wiring.js` 清单加一行，完事。
+（清单里的 `path` 写成"相对 `public/js/`"，内核加载时按 `import.meta.url` 解析——**踩过**：直接 `import(item.path)`
+会去找 `kernel/modules/…`，模块静默加载失败，只有冒烟测试才发现它。`qa:bus` 现在会断言"清单里的模块都真的注册了"。）
+
+写描述符时的两条：**订阅处理器写在描述符上没问题**（那是方法），但**不许往描述符里塞数据**——
+那会变成"模块偷偷带状态"，正是老代码里 `S` 满天飞的翻版（守卫会报"既不是规定字段也不是方法"）。
 
 **加一个交互游戏**：读 [`modules/games/README.md`](../modules/games/README.md) —— 复制 `_template.js`，填 `id/title/stats/actions/mount`，
 在 `games/index.js` 的 GAMES 里加一行。宿主（玩法板）会替你开屏、写题名、写数值签、声明自动化契约。

@@ -128,14 +128,18 @@ async function main() {
       const live = window.__av.live.filter((e) => !e.paused && !e.ended);
       window.__av.live = live;
       const count = (pre) => live.filter((e) => (e.currentSrc || e.src || '').includes(pre)).length;
-      window.__av.maxLive = Math.max(
-        window.__av.maxLive,
-        count('/audio/ambient/'), count('/audio/bgm/'), count('/audio/voices/'), count('/audio/cache/'),
-      );
-      window.__av.liveBreakdown = {
-        ambient: count('/audio/ambient/'), bgm: count('/audio/bgm/'),
+      const now = {
+        ambient: count('/audio/ambient/'),
+        bgm: count('/audio/bgm/'),
         voice: count('/audio/voices/') + count('/audio/cache/'),
       };
+      // 设计不变量是"**同一通道**最多一个句柄在播"：语音叠在环境床/音乐上是正常的，
+      // 要抓的是同一通道多条（孤儿元素、重复播放）。
+      window.__av.maxLiveByChannel = window.__av.maxLiveByChannel || { ambient: 0, bgm: 0, voice: 0 };
+      for (const k of Object.keys(now)) {
+        window.__av.maxLiveByChannel[k] = Math.max(window.__av.maxLiveByChannel[k], now[k]);
+      }
+      window.__av.liveBreakdown = now;
     };
     const origPlay = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function patchedPlay() {
@@ -286,7 +290,11 @@ async function main() {
   const liveCheck = await page.evaluate(() => {
     const a = window.__av;
     const playing = a.live.filter((e) => !e.paused && !e.ended).map((e) => (e.currentSrc || e.src || '').split('/').pop());
-    return { maxLive: a.maxLive, breakdown: a.liveBreakdown || null, playingNow: playing };
+    return {
+      byChannel: a.maxLiveByChannel || { ambient: 0, bgm: 0, voice: 0 },
+      breakdown: a.liveBreakdown || null,
+      playingNow: playing,
+    };
   });
   await page.screenshot({ path: path.join(ART, 'av-end.png') });
   await browser.close();
@@ -303,9 +311,10 @@ async function main() {
   if (!ambientOk.length) problems.push('整局没有一次成功的环境床播放（说明全在走合成兜底）');
   if (voicePlays.length === 0) problems.push('整局没有播放过任何语音（预录与 TTS 都没响）');
   if (av.sfx < 10) problems.push(`音效链路可疑：整局只创建了 ${av.sfx} 个音源`);
-  // 不变量①（AUDIO-SYSTEM §五）：同一通道最多一个句柄在播 —— 叠音/孤儿会在这里露头
-  if (liveCheck.maxLive > 1) {
-    problems.push(`出现过叠音：同一时刻有 ${liveCheck.maxLive} 条音频元素在播（正常 ≤1）；结束时仍在播：${liveCheck.playingNow.join('、') || '无'}`);
+  // 不变量①（AUDIO-SYSTEM §五）：**同一通道**最多一个句柄在播 —— 孤儿元素/重复播放会在这里露头
+  const over = Object.entries(liveCheck.byChannel).filter(([, n]) => n > 1);
+  if (over.length) {
+    problems.push(`出现过叠音（同通道多条）：${over.map(([k, n]) => `${k} 峰值 ${n}`).join('、')}；结束时仍在播：${liveCheck.playingNow.join('、') || '无'}`);
   }
 
   const report = {
@@ -324,7 +333,7 @@ async function main() {
     未命中_AI自由文本: uniqDynamic.length,
     音效音源数: av.sfx,
     资源请求失败数: badStatus.length,
-    同时播放峰值: liveCheck.maxLive,
+    同通道峰值: `ambient ${liveCheck.byChannel.ambient} / bgm ${liveCheck.byChannel.bgm} / voice ${liveCheck.byChannel.voice}`,
     待产出素材数: [...new Set(pendingAssets)].length,
     pageErrors: errs,
     问题: problems,

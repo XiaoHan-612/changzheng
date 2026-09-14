@@ -3,7 +3,7 @@
  * 规则：本地只做手感判定，结算一律交 /api/decide。
  * 统一返回 { score: 0..1, detail: {...}, summary?: string }
  */
-import { audio } from './audio/index.js';
+import { kernel } from './kernel/index.js';
 import { choiceButton } from './step.js';
 
 function h(tag, attrs = {}, children = []) {
@@ -231,7 +231,7 @@ export function runFishing(container, opts = {}) {
 
     function hook() {
       if (phase !== 'window' || resolved) return;
-      audio.sfx('hook');
+      kernel.emit('sfx:play', { name: 'hook' });
       const elapsed = performance.now() - biteStart;
       phase = 'hooked';
       btnHook.disabled = true;
@@ -271,7 +271,7 @@ export function runFishing(container, opts = {}) {
 
     btnCast.addEventListener('click', () => {
       if (phase !== 'idle' || castIndex >= TOTAL || resolved) return;
-      audio.sfx('cast');
+      kernel.emit('sfx:play', { name: 'cast' });
       phase = 'waiting';
       btnCast.disabled = true;
       status.textContent = '抛竿…盯住漂';
@@ -397,7 +397,7 @@ export function runCandy(container, opts = {}) {
         candies.forEach((x) => (x.style.outline = ''));
         pickIdx = Number(c.dataset.idx);
         c.style.outline = '2px solid var(--gold)';
-        audio.sfx('click');
+        kernel.emit('sfx:play', { name: 'click' });
       };
       c.addEventListener('click', pick);
       c.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
@@ -429,7 +429,7 @@ export function runCandy(container, opts = {}) {
         refreshStats();
         pickIdx = null;
         confirmBtn.disabled = false;
-        audio.sfx('click');
+        kernel.emit('sfx:play', { name: 'click' });
       };
       card.addEventListener('click', give);
       card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); give(); } });
@@ -584,7 +584,7 @@ export function runSentry(knownPassword, container, opts = {}) {
           const ok = i === ev.correct;
           if (ok) hits += 1;
           log.push({ type: ev.type, choice: label, ok });
-          audio.sfx(ok ? 'correct' : 'wrong');
+          kernel.emit('sfx:play', { name: ok ? 'correct' : 'wrong' });
           idx += 1;
           showEvent();
         };
@@ -618,7 +618,7 @@ export function runBendNeedle(container, opts = {}) {
     refresh();
     btn.onclick = () => {
       i += 1;
-      audio.sfx('hook');
+      kernel.emit('sfx:play', { name: 'hook' });
       refresh();
       if (i >= 3) {
         btn.disabled = true;
@@ -705,7 +705,7 @@ export function runGomoku(container, opts = {}) {
       over = true;
       setNote(finalNote);
       container.dataset.miniState = 'done';
-      audio.sfx(result === 'win' ? 'correct' : result === 'draw' ? 'echo' : 'wrong');
+      kernel.emit('sfx:play', { name: result === 'win' ? 'correct' : result === 'draw' ? 'echo' : 'wrong' });
       const score = result === 'win' ? 1 : result === 'draw' ? 0.55 : 0.25;
       setTimeout(() => {
         resolve({ score, detail: { result, moves }, summary: `五子棋：${finalNote}` });
@@ -901,7 +901,7 @@ export function runLuding(container, opts = {}) {
         if (py >= GROUND - 1 && onGround && inGap(px)) {
           falls += 1;
           if (S.跌落) S.跌落.textContent = falls;
-          audio.sfx('wrong');
+          kernel.emit('sfx:play', { name: 'wrong' });
           if (falls >= 2) {
             finish(false, '第二次跌落，队伍付出代价才过桥');
           } else {
@@ -918,7 +918,7 @@ export function runLuding(container, opts = {}) {
         if (fireHot(now) && hitCooldown <= 0 && fires.some((f) => px > f.x - 10 && px < f.x + f.w + 10)) {
           hits += 1;
           hitCooldown = 0.8;
-          audio.sfx('wrong');
+          kernel.emit('sfx:play', { name: 'wrong' });
           if (S.中弹) S.中弹.textContent = hits;
         }
         if (px >= GOAL) finish(true, hits === 0 && falls === 0 ? '干净利落过桥' : '过桥了');
@@ -998,7 +998,7 @@ export function runLuding(container, opts = {}) {
       if (over || !onGround) return;
       vy = -340;
       onGround = false;
-      audio.sfx('click');
+      kernel.emit('sfx:play', { name: 'click' });
     }
     function press(dir) {
       keys.add(dir);
@@ -1097,7 +1097,7 @@ export function runGrab(container, opts = {}) {
       sum += v;
       if (inZone) hits += 1;
       tries += 1;
-      audio.sfx(inZone ? 'hook' : 'wrong');
+      kernel.emit('sfx:play', { name: inZone ? 'hook' : 'wrong' });
       note = inZone
         ? `抓住了！（第 ${tries}/${TRIES} 次）`
         : `手空了……（第 ${tries}/${TRIES} 次）`;

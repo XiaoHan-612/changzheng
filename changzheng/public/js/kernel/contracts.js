@@ -16,7 +16,7 @@ export const EVENTS = {
   // ── 屏与流程 ──
   'screen:show': { note: '切到某屏。各屏自己订阅 screen:hide 清理自己的 DOM（不许越界清别人）', fields: ['id'] },
   'screen:hide': { note: '离开某屏（由 showScreen 广播）', fields: ['id'] },
-  'flow:act-enter': { note: '进入某一幕（营地日会带 day）', fields: ['actId'], optional: ['day', 'title'] },
+  'flow:act-enter': { note: '进入某一幕（营地日带 day 与分日标签 label，如第四幕的「雪山/草地」）', fields: ['actId'], optional: ['day', 'label', 'title'] },
   'flow:act-finish': { note: '一幕收尾（幕间总评之后）', fields: ['actId'] },
 
   // ── 游戏状态 ──
@@ -31,9 +31,13 @@ export const EVENTS = {
   'ai:done': { note: '调用成功返回', fields: ['callType', 'ms'], optional: ['source', 'usage'] },
   'ai:fail': { note: '调用失败（重试用尽）', fields: ['callType', 'error'] },
 
-  // ── 声音 ──
+  // ── 声音（audio 模块订阅：业务只发事件，不直接调音频门面）──
+  'scene:enter': { note: '进入一个独立场景（title / sandbox / luding / ending —— 幕轴上的场景走 flow:act-enter）', fields: ['name'] },
   'sfx:play': { note: '播一个音效（名字见 audio/sfx-table.js）', fields: ['name'] },
-  'voice:say': { note: '播一句台词', fields: ['text'], optional: ['actorId', 'voiceId', 'file'] },
+  'voice:say': { note: '播一句台词；text 与 file 至少给一个（file 直给时跳过目录与 TTS 解析，沙盘同伴反应音就是这种）', fields: [], optional: ['text', 'actorId', 'voiceId', 'file'] },
+  'audio:toggle-mute': { note: '请求切换静音（状态由 audio 模块持有，UI 不自己记）', fields: [] },
+  'audio:muted': { note: '静音状态变了（audio 模块回执；UI 据此更新图标与提示）', fields: ['on'] },
+  'audio:suspended': { note: 'AudioContext 被浏览器策略挂起、需要用户点一下（UI 提示一次）', fields: ['message'] },
 
   // ── 内核资源（把 S.busy 这类"独占"提成可观测的东西）──
   'resource:claim': { note: '申请独占资源；已被占则失败（调用方自行决定等还是提示）', fields: ['name', 'who'] },

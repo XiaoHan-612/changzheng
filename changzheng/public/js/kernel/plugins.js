@@ -41,8 +41,12 @@ export function validateDescriptor(d, { knownEvents } = {}) {
       errs.push(`订阅「${evt}」的处理器必须是方法名或函数`);
     }
   }
-  for (const k of Object.keys(d)) {
-    if (!DESCRIPTOR_KEYS.includes(k)) errs.push(`描述符里有不认识的字段「${k}」（避免随手塞状态进去）`);
+  // 描述符上允许出现"方法"（订阅处理器、内部小工具）——订阅就是按方法名找的。
+  // 但**不许塞数据**：那会变成"模块偷偷带状态"，正是老代码里 S 满天飞的翻版。
+  for (const [k, v] of Object.entries(d)) {
+    if (DESCRIPTOR_KEYS.includes(k)) continue;
+    if (typeof v === 'function') continue;
+    errs.push(`描述符里的「${k}」既不是规定字段也不是方法（别把状态塞进描述符，用模块自己的模块级变量）`);
   }
   if (d.requires && !Array.isArray(d.requires)) errs.push('requires 必须是数组');
   return errs;

@@ -3,7 +3,7 @@
  * 一句话行动 → 模型裁判 + 世界推进 + NPC 反应 → 事件图卡 + 语音
  */
 import { runSimTurn, decide } from './ai-client.js';
-import { audio } from './audio/index.js';
+import { kernel } from './kernel/index.js';
 
 const START_PEOPLE = [
   { name: '老班长', status: '正常', goal: '把队伍完整带出去', memory: [] },
@@ -175,7 +175,7 @@ function playReactionVoice(npc) {
   const file = REACTION_FILE[id];
   if (!file) return;
   // 走语音通道（门面）：与台词同一套打断/静音语义，音量也归混音表管
-  audio.speak({ file }).catch(() => {});
+  kernel.emit('voice:say', { text: '', file });
 }
 
 function pushFeed(html) {
@@ -349,7 +349,7 @@ export async function bindSandbox({ onExit }) {
   const saved = loadWorld();
   const state = { world: saved || createSandboxWorld(), busy: false, restored: !!saved };
 
-  audio.scene('sandbox');       // 自由行军：只铺环境床，不配乐（见 scene-table.js）
+  kernel.emit('scene:enter', { name: 'sandbox' });   // 自由行军：只铺环境床，不配乐（见 scene-table.js）
   renderWorld(state.world);
   if (state.restored) {
     pushFeed(`<div class="turn">
@@ -369,7 +369,7 @@ export async function bindSandbox({ onExit }) {
     const action = String(text || '').trim();
     if (!action) return;
     state.busy = true;
-  audio.sfx('click');
+  kernel.emit('sfx:play', { name: 'click' });
   $('sb-input').value = '';
   $('sb-suggest').innerHTML = '';
   pushFeed('<div class="turn thinking">模型在推演这一手…</div>');
@@ -378,7 +378,7 @@ export async function bindSandbox({ onExit }) {
   const t0 = Date.now();
     try {
       result = await runSimTurn({ world: state.world, action });
-      audio.sfx('echo');
+      kernel.emit('sfx:play', { name: 'echo' });
       window.__pushAiFeed?.({
         callType: 'sim_turn',
         scene: `沙盘·${state.world.place}`,
@@ -406,7 +406,7 @@ export async function bindSandbox({ onExit }) {
 
     const collapse = checkCollapse(state.world);
     if (collapse) {
-      audio.sfx('wrong');
+      kernel.emit('sfx:play', { name: 'wrong' });
       pushFeed(`<div class="turn"><div class="act-line">行军中断</div><div class="narr">${esc(collapse)}</div></div>`);
       await runSimEnding(state.world, collapse);
       clearWorld();
@@ -425,7 +425,7 @@ export async function bindSandbox({ onExit }) {
   if (reset) {
     reset.onclick = () => {
       clearWorld();
-      audio.scene('title');
+      kernel.emit('scene:enter', { name: 'title' });
       exit();
     };
   }
