@@ -2,7 +2,9 @@
 
 > **方向一句话**：一次重写，之后**所有**音频都从一个门面走；加环境床 / BGM / 音效 / 台词都只在**声明表**里加一行。
 > 结构刻意与视觉那套一一对应：**值 → 框架 → 通道 → 声明表 → 守卫/体检**（见 §二）。
-> 状态：**设计稿，未实现**。分批计划见 §九，待拍板的四件事见 §十。
+> 状态：**批 1 已落地**（骨架 + 静音模型 + 调用点全部收进门面）；批 2（场景声明表 + BGM）、
+> 批 3（音效注册表 + 语音收口 + 试听页）待做。分批计划见 §九。
+> 已拍板：BGM 有文件就放 · 播放走 `<audio>` 元素（抗 ctx 挂起）· 保留合成兜底但审计显式列出 · 操作音效继续合成。
 
 ---
 
@@ -37,17 +39,16 @@
 **目录**（`public/js/audio/`，旧的 `public/js/audio.js` 删除）
 
 ```
-audio/
-  index.js        # 门面：唯一 import 入口（audio.scene/sfx/speak/setMuted/boot/state）
-  mix.js          # 【值】混音表
-  core.js         # 【框架】ctx + 总线 + desired/actual + reconcile + 三层静音与自愈触发点
+audio/                     ← 已落地（批 1）：旧 public/js/audio.js 已删除
+  index.js                 # 门面：唯一 import 入口（boot / ambient.play·stop / sfx / speak / setMuted / isPlaying / state）
+  mix.js                   # 【值】混音表（唯一允许写音量与淡入淡出的地方）
+  core.js                  # 【框架】ctx + 四条总线 + desired/actual + reconcile + 三层静音与自愈触发点
   channels/
-    ambient.js    # 环境床：文件(.ogg→.wav) → 合成兜底；循环；切场景淡入淡出
-    bgm.js        # BGM：文件循环；闪避；起停淡入淡出
-    sfx.js        # 音效：注册表（合成配方 / 同名文件覆盖）；节流
-    voice.js      # 语音：目录 → /api/tts 缓存 → 静默；打断与 ducking
-  scene-table.js  # 【声明】屏 → { ambient, bgm }
-  sfx-table.js    # 【声明】音效名 → 配方或文件
+    ambient.js             # 环境床：AMBIENT_FILE 映射 + 文件(.ogg→.wav) → 合成兜底；循环
+    sfx.js                 # 音效：SFX_NAMES + 合成配方 + 同名节流（批 3 换成注册表 + 文件覆盖）
+    voice.js               # 语音：ACTOR_VOICE + voice-lines.json 目录 → /api/tts 缓存 → 静默；支持 { file } 直给
+  scene-table.js           # 【声明·批 2】屏 → { ambient, bgm }
+  bgm.js                   # 【批 2】BGM 通道
 ```
 
 ---
@@ -65,8 +66,10 @@ audio.setMuted(true);                  // 关键时机④：静音开关（取�
 audio.state();                         // 调试快照（= window.__czAudio）
 ```
 
-**硬规矩（lint 卡住）**：`public/js/` 里除 `audio/` 之外，**不许出现** `new Audio` / `new AudioContext` / `playAmbient` / `volume =` / `gain.value =`。
-——这条是"统一"的保证：只要有人绕开框架，守卫立刻报。
+**硬规矩（`npm run qa:audio` 的「框架一致性」段已强制）**：`public/js/` 里除 `audio/` 之外，
+**不许出现** `new Audio(` / `new AudioContext` / `.volume =` / `.gain.value =`，也不许再出现旧 API 名
+（`playAmbient` / `stopAmbient` / `playSfx` / `setEnabled`），并且**只允许从 `./audio/index.js` 进门**（深模块不外露）。
+——这条是"统一"的机械保证：谁绕开框架，守卫立刻报。批 1 落地时就靠它抓出了沙盘里自己 `new Audio` 的反应语音。
 
 ---
 

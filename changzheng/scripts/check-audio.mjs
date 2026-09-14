@@ -39,9 +39,19 @@ function listAudio() {
 }
 
 /** 引用集合：哪些文件真的会被代码请求到 */
+/** 音频框架的全部源码拼一起（环境床映射现在在 public/js/audio/channels/ambient.js 里） */
+function audioSources() {
+  const dir = path.join(ROOT, 'public/js/audio');
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (
+    e.isDirectory() ? walk(path.join(d, e.name)) : (e.name.endsWith('.js') ? [path.join(d, e.name)] : [])
+  ));
+  return walk(dir).map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+}
+
 function references() {
-  const ambient = new Set([...read('public/js/audio.js').matchAll(/'(?:'|\/audio\/ambient\/)([a-z_]+\.ogg)'/g)].map((m) => m[1]));
-  const ambientAlt = new Set([...read('public/js/audio.js').matchAll(/\/audio\/ambient\/([a-z_]+\.ogg)/g)].map((m) => m[1]));
+  const src = audioSources();
+  const ambient = new Set([...src.matchAll(/'(?:'|\/audio\/ambient\/)([a-z_]+\.ogg)'/g)].map((m) => m[1]));
+  const ambientAlt = new Set([...src.matchAll(/\/audio\/ambient\/([a-z_]+\.ogg)/g)].map((m) => m[1]));
   const voices = new Set();
   const voiceLines = JSON.parse(read('public/audio/voice-lines.json')).lines || [];
   for (const l of voiceLines) voices.add(path.basename(l.file));
@@ -164,6 +174,41 @@ async function main() {
     notes.length ? `## 提示\n\n${notes.map((n) => `- ${n}`).join('\n')}\n` : '',
   ].filter((l) => l !== '').join('\n');
   fs.writeFileSync(OUT, lines, 'utf8');
+
+  // ───────── 框架一致性（docs/AUDIO-SYSTEM.md）：音频只能从门面走 ─────────
+  const JS_DIR = path.join(ROOT, 'public/js');
+  const walkJs = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (
+    d.isDirectory() ? walkJs(path.join(dir, d.name)) : (d.name.endsWith('.js') ? [path.join(dir, d.name)] : [])
+  ));
+  const AUDIO_DIR = path.join(JS_DIR, 'audio');
+  const rel = (f) => path.relative(ROOT, f).split(path.sep).join('/');
+  for (const f of walkJs(JS_DIR)) {
+    const src = fs.readFileSync(f, 'utf8');
+    const isAudioModule = f.startsWith(AUDIO_DIR + path.sep);
+    const where = rel(f);
+    if (!isAudioModule) {
+      // ① 绕开框架直接碰音频 API
+      for (const [re, what] of [
+        [/new\s+Audio\s*\(/, '`new Audio(`'],
+        [/new\s+(window\.)?(webkit)?AudioContext/, '`new AudioContext`'],
+        [/\.volume\s*=/, '`.volume =`'],
+        [/\.gain\.value\s*=/, '`.gain.value =`'],
+      ]) {
+        if (re.test(src)) problems.push(`${where} 绕开音频框架直接用了 ${what} —— 改走 audio/index.js 门面（见 docs/AUDIO-SYSTEM.md）`);
+      }
+      // ② 旧 API 名残留
+      for (const name of ['playAmbient', 'stopAmbient', 'playSfx', 'setEnabled']) {
+        if (new RegExp(`audio\\.${name}\\b`).test(src)) problems.push(`${where} 还在用旧音频 API \`audio.${name}\` —— 现已收进门面（ambient.play / ambient.stop / sfx / setMuted）`);
+      }
+      // ③ 不许绕过门面直接 import 深模块
+      const deep = src.match(/from\s+'(\.\/)?audio\/(?!index\.js)[^']+'/);
+      if (deep) problems.push(`${where} 直接 import 了音频深模块 ${deep[0]} —— 一律从 './audio/index.js' 进`);
+    }
+  }
+  for (const [name, f] of [['环境床', 'AMBIENT_FILE'], ['音效', 'SFX_NAMES'], ['音色', 'ACTOR_VOICE']]) {
+    if (!read('public/js/audio/index.js').includes(f)) problems.push(`音频门面没有再导出 ${name} 表（${f}）—— 别的模块要用它时不该各自抄一份`);
+  }
+  notes.push('框架一致性：门面唯一、无旧 API 残留（批 2/3 还会补：场景声明表覆盖率、音效注册表、BGM 目录扫描）');
 
   console.log(`音频文件 ${rows.length} 个 · 可解码 ${rows.filter((r) => r.decoded).length} · 问题 ${problems.length}`);
   for (const p of problems) console.log('  ✗ ' + p);

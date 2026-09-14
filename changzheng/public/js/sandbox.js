@@ -3,7 +3,7 @@
  * 一句话行动 → 模型裁判 + 世界推进 + NPC 反应 → 事件图卡 + 语音
  */
 import { runSimTurn, decide } from './ai-client.js';
-import { audio } from './audio.js';
+import { audio } from './audio/index.js';
 
 const START_PEOPLE = [
   { name: '老班长', status: '正常', goal: '把队伍完整带出去', memory: [] },
@@ -174,11 +174,8 @@ function playReactionVoice(npc) {
   if (!id) return;
   const file = REACTION_FILE[id];
   if (!file) return;
-  try {
-    const el = new Audio(file);
-    el.volume = 0.9;
-    el.play().catch(() => {});
-  } catch { /* ignore */ }
+  // 走语音通道（门面）：与台词同一套打断/静音语义，音量也归混音表管
+  audio.speak({ file }).catch(() => {});
 }
 
 function pushFeed(html) {
@@ -352,7 +349,7 @@ export async function bindSandbox({ onExit }) {
   const saved = loadWorld();
   const state = { world: saved || createSandboxWorld(), busy: false, restored: !!saved };
 
-  audio.playAmbient('camp');
+  audio.ambient.play('camp');
   renderWorld(state.world);
   if (state.restored) {
     pushFeed(`<div class="turn">
@@ -372,7 +369,7 @@ export async function bindSandbox({ onExit }) {
     const action = String(text || '').trim();
     if (!action) return;
     state.busy = true;
-  audio.playSfx('click');
+  audio.sfx('click');
   $('sb-input').value = '';
   $('sb-suggest').innerHTML = '';
   pushFeed('<div class="turn thinking">模型在推演这一手…</div>');
@@ -381,7 +378,7 @@ export async function bindSandbox({ onExit }) {
   const t0 = Date.now();
     try {
       result = await runSimTurn({ world: state.world, action });
-      audio.playSfx('echo');
+      audio.sfx('echo');
       window.__pushAiFeed?.({
         callType: 'sim_turn',
         scene: `沙盘·${state.world.place}`,
@@ -409,7 +406,7 @@ export async function bindSandbox({ onExit }) {
 
     const collapse = checkCollapse(state.world);
     if (collapse) {
-      audio.playSfx('wrong');
+      audio.sfx('wrong');
       pushFeed(`<div class="turn"><div class="act-line">行军中断</div><div class="narr">${esc(collapse)}</div></div>`);
       await runSimEnding(state.world, collapse);
       clearWorld();
@@ -428,7 +425,7 @@ export async function bindSandbox({ onExit }) {
   if (reset) {
     reset.onclick = () => {
       clearWorld();
-      audio.stopAmbient();
+      audio.ambient.stop();
       exit();
     };
   }

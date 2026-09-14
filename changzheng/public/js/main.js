@@ -116,7 +116,7 @@ function setJudgeMode(on) {
   }
 }
 import { runFishing, runNightSchool, runCandy, runSentry, runGomoku, runBendNeedle, runLuding, runGrab } from './minigames.js';
-import { audio } from './audio.js';
+import { audio } from './audio/index.js';
 import { bindSandbox } from './sandbox.js';
 import * as UI from './ui.js';
 import { setStep, setStepState, waitContinue, askChoice, markAction, markMini, choiceButton } from './step.js';
@@ -485,12 +485,14 @@ function bindChrome() {
   };
   $('btn-settings').onclick = () => openSettings();
   $('btn-settings2').onclick = () => openSettings();
+  // 音频核心在 ctx 被自动播放策略挂起时提示一次（回调注入，音频层不依赖 UI）
+  audio.onSuspended((msg) => toast(msg, 4000));
   const muteBtn = $('btn-mute');
   if (muteBtn) {
     muteBtn.onclick = () => {
-      audio.setEnabled(!audio.enabled);
-      muteBtn.textContent = audio.enabled ? '🔊' : '🔇';
-      toast(audio.enabled ? '声音已开' : '声音已关');
+      audio.setMuted(!audio.muted);
+      muteBtn.textContent = audio.muted ? '🔇' : '🔊';
+      toast(audio.muted ? '声音已关' : '声音已开');
     };
   }
   const defBtn = $('btn-defense');
@@ -514,7 +516,7 @@ function bindChrome() {
       const rows = [...document.querySelectorAll('.choice-row:not(.hidden) .blk-choice:not([disabled]), #stage-panel .blk-choice:not([disabled]), #fire-opts .blk-choice:not([disabled]), #quiz-body .blk-choice:not([disabled]), .path-zone')]
         .filter((el) => el.offsetParent !== null);
       if (rows[n - 1]) {
-        audio.playSfx('click');
+        audio.sfx('click');
         rows[n - 1].click();
       }
     }
@@ -585,7 +587,7 @@ function showLossToast(who, reason) {
   el.className = 'loss-toast';
   el.innerHTML = `<div class="lw">${escapeHtml(who)} · 掉队</div><div class="lr">${escapeHtml(reason || '')}</div>`;
   document.body.appendChild(el);
-  audio.playSfx('wrong');
+  audio.sfx('wrong');
   setTimeout(() => el.remove(), 3400);
 }
 
@@ -656,7 +658,7 @@ async function startSandbox() {
   if (sbLogs) sbLogs.onclick = () => $('btn-logs')?.click();
   await bindSandbox({
     onExit: () => {
-      audio.stopAmbient();
+      audio.ambient.stop();
       showScreen('screen-title');
       setTopbar(false);
     },
@@ -786,7 +788,7 @@ function bindSettings() {
 function showEcho({ title, play, real, fic }) {
   markAction($('btn-echo-ok'), 'echo-ok');
   return new Promise((resolve) => {
-    audio.playSfx('echo');
+    audio.sfx('echo');
     // 史实回响底纹：有 echo_paper 就用它（压一层深色渐变，保证文字可读）
     const paper = sceneImage('/assets/scenes/echo_paper.jpg', '');
     const cinema = document.querySelector('#screen-echo .echo-cinema');
@@ -797,8 +799,8 @@ function showEcho({ title, play, real, fic }) {
         : '';
     }
     // 史实回响的播报点：有史实卡就念卡名（命中 14 张标题的 TTS 缓存），没有才念固定旁白
-    if (title) audio.speak(title, '旁白', 'narr').catch(() => {});
-    else audio.speak('你刚经历的，和真实发生过的，往往只隔着一层时间。', '叙事', 'narr_echo');
+    if (title) audio.speak({ text: title, actorId: '旁白', voiceId: 'narr' }).catch(() => {});
+    else audio.speak({ text: '你刚经历的，和真实发生过的，往往只隔着一层时间。', actorId: '叙事', voiceId: 'narr_echo' });
     $('echo-title').textContent = title || '刚刚发生的事';
     $('echo-play').textContent = play || '';
     $('echo-real').textContent = real || '';
@@ -1045,7 +1047,7 @@ async function runPrelude(act) {
   setStageBanner(pre.title, sceneImage('/assets/scenes/snow_let_clothes.jpg', pre.pano));
   setPortrait('你', '年轻战士', '你', '风雪');
   setStagePanel('<p class="hint">雪线之上，有人发抖。你怎么选？</p><div class="choices" id="pre-opts"></div>');
-  audio.speak('他接过外衣，没说谢。后来在你走不动时，递了水壶。', '叙事', 'narr_snow');
+  audio.speak({ text: '他接过外衣，没说谢。后来在你走不动时，递了水壶。', actorId: '叙事', voiceId: 'narr_snow' });
   const cs = CHOICE_SETS[pre.choice];
   const choice = (await askChoice($('pre-opts'), cs.options)).label;
   showThinking(true);
@@ -1087,8 +1089,8 @@ function enterCampDay(act, day) {
   $('day-num').textContent = String(day);
   $('day-max').textContent = String(act.apDays || 1);
   $('camp-hint').textContent = '用光照亮他们。点余烬，走进他的一夜。';
-  audio.playAmbient(ambientFor(act, day));
-  audio.playSfx('day');
+  audio.ambient.play(ambientFor(act, day));
+  audio.sfx('day');
   renderStats(S);
   renderAp(S);
   renderCompanions(S);
@@ -1192,7 +1194,7 @@ function updateMarchButton() {
 }
 
 async function marchTransition(label) {
-  audio.playSfx('march');
+  audio.sfx('march');
   const flash = document.createElement('div');
   flash.className = 'march-flash';
   flash.innerHTML = `<span>${label || '启程'}</span>`;
@@ -1288,7 +1290,7 @@ async function onHotspot(act, h) {
     toast('这里已经看过了', 1600);
     return;
   }
-  audio.playSfx('click');
+  audio.sfx('click');
   if (h.kind === 'march') {
     return withLock(async () => {
       if (S.ap > 0 && S.day < (act.apDays || 1)) {
@@ -1932,7 +1934,7 @@ async function doLuding(act) {
   step('luding', 'minigame');
   showScreen('screen-stage');
   setStageBanner('飞夺泸定桥', sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg'));
-  audio.playAmbient('luding');
+  audio.ambient.play('luding');
   showNpc('突击队长', { role: '红四团', mood: '决绝' });
   setStagePanel('');
   await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
@@ -2033,7 +2035,7 @@ function renderPathZones(host, onPick) {
 async function runPathOnImage() {
   step('path', 'choice');
   showScreen('screen-path');
-  audio.speak('前面岔开了三条路。你定。', '指导员', 'zhiyuan_grass');
+  audio.speak({ text: '前面岔开了三条路。你定。', actorId: '指导员', voiceId: 'zhiyuan_grass' });
   const choice = await new Promise((resolve) => renderPathZones($('path-zones'), resolve));
   showScreen('screen-stage');
   setStageBanner('过草地', '/assets/scenes/marsh.jpg');
@@ -2067,7 +2069,7 @@ async function runQuiz(act) {
   $('quiz-score').textContent = `${S.quiz.human} : ${S.quiz.ai}`;
   const body = $('quiz-body');
   body.innerHTML = '<p class="muted">正在出题…</p>';
-  audio.speak('停一停。刚才走过的路，你还记得多少。', '叙事', 'narr_quiz');
+  audio.speak({ text: '停一停。刚才走过的路，你还记得多少。', actorId: '叙事', voiceId: 'narr_quiz' });
   showThinking(true);
   let q;
   try {
@@ -2161,7 +2163,7 @@ async function runQuiz(act) {
         });
         bumpAiCount(S);
         applyEffects(S, judge.effects || { 士气: humanRight ? 3 : -1 });
-        audio.playSfx(humanRight ? 'correct' : 'wrong');
+        audio.sfx(humanRight ? 'correct' : 'wrong');
         $('quiz-feedback').innerHTML = `
           <div>${auto ? '激进派小张' : '你'}：<b>${humanRight ? '正确' : '错误'}</b> · 稳健派老李：<b>${aiRight ? '正确' : '错误'}</b><br/>
           ${escapeHtml(answerKnown ? (q.explain || judge.explain || '') : '本题标准答案解析失败，双方均不计分。')}</div>
@@ -2251,7 +2253,7 @@ async function runNightChoice(act) {
     : { label: String(o.label), sub: String(o.sub || ''), key: String(o.key ?? i) }));
 
   $('night-lead').textContent = gen?.lead || '火压低了。没人先开口。';
-  audio.speak('火压低了。后半夜怎么过，明天的口粮怎么带，得在火边定下来。', '旁白', 'narr').catch(() => {});
+  audio.speak({ text: '火压低了。后半夜怎么过，明天的口粮怎么带，得在火边定下来。', actorId: '旁白', voiceId: 'narr' }).catch(() => {});
   const body = $('night-body');
   body.innerHTML = '';
   const picked = await askChoice(body, options, { extraOf: () => '' });

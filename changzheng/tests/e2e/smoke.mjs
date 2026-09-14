@@ -108,12 +108,12 @@ async function run() {
     if (!a) return { ok: false, why: '没有 __czAudio 调试句柄' };
     const wait = (ms) => new Promise((s) => setTimeout(s, ms));
     const clickMute = () => document.getElementById('btn-mute').dispatchEvent(new MouseEvent('click', { bubbles: true, view: window }));
-    const playing = () => !!(a.ambientEl && !a.ambientEl.paused);
+    const playing = () => a.isPlaying('ambient');   // 公共查询：不摸实现细节
     const wasPlaying = playing();
     clickMute(); await wait(300);
     const afterMute = playing();
     clickMute(); await wait(900);
-    return { ok: true, wasPlaying, afterMute, afterUnmute: playing(), wanted: a.wantedAmbient };
+    return { ok: true, wasPlaying, afterMute, afterUnmute: playing(), wanted: a.state().desired.ambient };
   });
   assert(muteCycle.ok, `静音体检：${muteCycle.why || ''}`);
   assert(muteCycle.wasPlaying, '进营地后环境床应在播（拼错了素材名或回退链断了）');

@@ -126,18 +126,23 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
    坑：这一批陆续修掉了一串**"类名在、样式没了"**（框架重做删 `minigames.css` 时漏网，批四批五才逐个抓到）：`runSentry` 的三个处置键用 `.choice-btn`（**CSS 里根本没有这个类**，渲染成浏览器默认按钮）、五子棋石子写 `.p1/.p2` 而 CSS 里只有 `.black/.white`（棋子一直是空圈）、陡坡的 `.grab-*` 三兄弟、沙盘的 `.narr`/`.verdict`/`.sb-person`。批六又抓到两处同族（都在记录屏）：来源标签 JS 输出 `class="src glm"`（两个类）而 CSS 等的是 `.src-glm`（一个类），于是 `source=GLM` 一直是灰字；记录行第一段写 `class="head"` 而 CSS 等的是 `.row`，四段挤成一行。`npm run qa:board` 盯的就是这类事故：元素必须在屏上、契约标记必须真带 `data-mini-action`。
    另一条：e2e 的「五子棋恰好 1 次」断言只靠**可选营地热点**（两个小鬼）触发——act4 的强制链里没有它，营地里那 2 点暮色花在哪由流程决定，偶尔会落空（2026-09-13 遇到一次，重跑即过）。失败信息现在会带「营地历次热点 apN:[…]」用于定位；要稳定覆盖就在 `tests/e2e/full-run.mjs` 的营地分支里保住那条 gomoku 抢先点击。
 
-28. **静音开关必须"记住该响什么"，静态资源不能用长缓存**（2026-09-14 修的两个真问题）
-   - **静音恢复**：`setEnabled(false)` 原先顺手把"本来该放什么"也忘了，取消静音只置回标志位，
-     于是**背景环境床永远不回来**（只有切场景才回来）——玩家体感就是"点了静音再点回来，音效不正常"。
-     现在 `wantedAmbient`（该响什么）与 `currentAmbient`（现在在响什么）分开：静音走 `silence()`（停声、保留意图），
-     切场景才走 `stopAmbient()`（连意图一起清）。`restore()` 负责自愈：恢复 AudioContext、环境床不在响就重起一条，
-     三个触发点是**取消静音 / 任意用户手势 / 标签页重新可见**（顺带覆盖"浏览器把标签页静音、系统休眠"这类外部暂停）。
-     调试句柄：控制台敲 `__czAudio`（`wantedAmbient` / `currentAmbient` / `ambientEl.paused`）一眼分辨"没恢复"还是"被静音"。
-     回归断言在 `npm run qa:smoke`（进营地后在播 → 静音停 → 取消静音恢复）。
-   - **静态缓存**：页面/脚本/图片/音频原先带 `max-age=1h`（图片音频 7d），而这个项目没有构建步骤、
-     承诺是"改文件/换素材，刷新即生效"——实测踩过：改完 `audio.js` 刷新页面，跑的还是缓存里的旧代码，
-     排查半天以为修复没生效。现在只有 `/fonts` 保留 7 天（有意为之、文档也这么写），其余改成回源校验（304）。
-     换素材后如果浏览器还显示旧的，先确认服务端改的是这份 `server/index.js`。
+28. **音频只有一个门面：`public/js/audio/`（批 1 重写，见 docs/AUDIO-SYSTEM.md）**
+   - **结构**：`mix.js`（值：音量/淡入淡出/闪避，唯一允许写这些数字的地方）→ `core.js`（框架：
+     ctx + 四条总线 + `desired`/`actual` + `reconcile()`）→ `channels/{ambient,sfx,voice}.js`（通道）
+     → `index.js`（门面，唯一 import 入口）。批 2 补 `scene-table.js` + BGM 通道，批 3 补音效注册表与试听页。
+   - **心脏**：分清楚「该响什么」`desired` 与「现在在响什么」`actual`，所有入口（进屏/换幕、静音、
+     用户手势、标签页可见性、元素被外部暂停）只改 desired 或调 `reconcile()`。
+     老实现"静音后环境床再也不回来"就是因为没有这一层（`2026-09-14` 玩家反馈，当天重写收口）。
+   - **三层静音**：游戏内 `setMuted`（保留意图、取消即恢复，`qa:smoke` 有断言）· 浏览器/标签页静音
+     （不可直接探测，由 reconcile 的手势/可见性/元素 pause 事件自愈）· 系统静音（应用层不该处理）。
+   - **规矩由 `npm run qa:audio` 的「框架一致性」段强制**：`public/js/` 里除 `audio/` 外不许出现
+     `new Audio(` / `new AudioContext` / `.volume =` / `.gain.value =`，不许残留旧 API 名
+     （`playAmbient`/`stopAmbient`/`playSfx`/`setEnabled`），并且只能从 `./audio/index.js` 进门。
+     落地当天就是这条抓出了沙盘里自己 `new Audio` 的同伴反应音（现走 `audio.speak({ file })`）。
+   - 调试：控制台 `__czAudio.state()` → `{ muted, ctx, desired, actual }`，一眼分清"没恢复"还是"被静音"；
+     `__czAudio.isPlaying('ambient'|'bgm'|'voice')` 供测试用（别去摸实现细节）。
+   - 语音两条老规矩仍在：`voiceId` 必须走 `ACTOR_VOICE` 映射（中文角色名会被清洗成 default，哈希对不上）；
+     文本要与 `data/tts-lines.json` 逐字一致，改台词重跑 `npm run tts:manifest`。
 
 29. **板屏上的三件事：数值签会串写、rAF 不会自己停、点按区有门槛**（批五体检抓的）
    - **数值签串写**：上一局残留的定时器（如五子棋的 AI 落子）会往同一块 `#board-stats` 写、覆盖新一局的板头。`openBoard()` 现在**每局换一个新的数值签节点**，残留写入落在被丢弃的 DOM 上。

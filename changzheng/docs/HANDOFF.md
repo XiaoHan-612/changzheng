@@ -139,7 +139,7 @@ public/js/
   sandbox.js    沙盘循环 v2（事件图卡、语音、存档、目标/记忆、模型收尾）
   ui.js         渲染与浮层（showScreen 按模板选入场动效、板屏清空）
   state.js      资源/好感/失败判定/粮荒（可单测）
-  audio.js      环境床 + SFX + 预置语音
+  audio/        音频框架（门面 / 混音表 / core / channels）——见 docs/AUDIO-SYSTEM.md
 public/css/     fonts → tokens（唯一值源）→ base → framework（模板+区块+动效）→ components
 data/acts.json  五幕定义（热点、dayScenes、强制链、对决）
 data/facts.json 史实卡（real / fiction 分栏）
