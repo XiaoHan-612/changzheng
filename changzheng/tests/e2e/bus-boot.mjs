@@ -82,6 +82,19 @@ const batch3 = await page.evaluate(() => {
 check('启动后无残留锁', (batch3.heldLocks || []).length, 0);
 check('屏清理已登记', ['screen-stage', 'screen-board'].every((s) => (batch3.owners || []).includes(s)) ? 'yes' : `no(${(batch3.owners || []).join(',')})`, 'yes');
 
+// 批 4：只读快照必须已接上（state 模块是唯一提供者），且没开局时不炸
+const batch4 = await page.evaluate(() => {
+  const k = window.__czKernel;
+  return {
+    snapshotProvided: k.snapshot.has(),
+    snapshotIsFrozen: Object.isFrozen(k.snapshot.get()),
+    hasState: !!k.api('state'),
+  };
+});
+check('只读快照已接上', batch4.snapshotProvided ? 'yes' : 'no', 'yes');
+check('快照是冻结的', batch4.snapshotIsFrozen ? 'yes' : 'no', 'yes');
+check('state 模块可用', batch4.hasState ? 'yes' : 'no', 'yes');
+
 console.log('总线体检（运行时）：');
 console.table(rows);
 console.log(`契约表 ${flow?.eventsDeclared ?? 0} 条事件；事件流 ${flow?.total ?? 0} 笔（其中 boot:ready ${flow?.ready ?? 0}）`);

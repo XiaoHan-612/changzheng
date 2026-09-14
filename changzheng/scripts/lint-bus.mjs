@@ -111,6 +111,34 @@ const manifestNames = [...stripComments(wiringSrc).matchAll(/\{\s*name:\s*'([^']
   }
 }
 
+// ── ⑤ 状态写入只能发生在 state 模块（或它的纯函数层 state.js）──
+{
+  const offenders = [];
+  for (const f of walkJs(JS)) {
+    const where = rel(f);
+    const isStore = /^public\/js\/modules\/state\//.test(where);
+    const isPureLayer = /^public\/js\/state\.js$/.test(where);      // 纯函数层：可以改它收到的 state 参数
+    if (isStore || isPureLayer) continue;
+    const src = stripComments(fs.readFileSync(f, 'utf8'));
+    const patterns = [
+      [/S\.[^\s=]+\s*=(?!=)/, '对 S 赋值'],
+      [/S\.\w+\.push\(/, '往 S 的数组里 push'],
+      [/S\.\w+\[[^\]]+\]\s*=/, '往 S 的键值里写'],
+      [/applyEffects\(\s*S/, '直接调 applyEffects(S, …)'],
+    ];
+    for (const [re, what] of patterns) {
+      const m = src.match(re);
+      if (m) {
+        const line = src.slice(0, m.index).split(String.fromCharCode(10)).length;
+        offenders.push(`${where}:${line} ${what}（${m[0].trim()}）`);
+      }
+    }
+  }
+  if (offenders.length) {
+    problems.push(`写状态只有一条路：state 模块的语义动作 / apply()（见 docs/BUS.md）：${String.fromCharCode(10)}      ${offenders.join(String.fromCharCode(10) + '      ')}`);
+  } else ok.push('状态的写入只发生在 modules/state（其它地方只读）');
+}
+
 // ── 报告 ──
 console.log('总线守卫（静态）：');
 for (const o of ok) console.log('  ✓ ' + o);

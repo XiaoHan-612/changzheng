@@ -1,6 +1,6 @@
 import { COMPANIONS, PATH_ZONES } from './data.js';
-import { createState, applyEffects, unlockFact, saveState, checkFailure, addLoss, applyStarvation,
-  markLineDone, linesDoneCount, canNight, apPerDay, dayScene, loadState, resolveLoss } from './state.js';
+// state.js 是**纯函数层**（可单测、无副作用）；写状态一律走 state 模块（见下面的 st()）
+import { apPerDay, dayScene } from './state.js';
 import { ORIGINS, ORIGIN_QUIZ, applyOrigin, applyOriginQuiz, findOrigin } from './origin.js';
 import { applyFeatures, setDevTools, isDevToolsOn } from './features.js';
 import { decide, fetchConfig, fetchLogs, fetchFacts, fetchActs, saveConfig, testConfig, clearLogs } from './ai-client.js';
@@ -31,7 +31,7 @@ async function callAI(payload) {
   if (result?._error) {
     const msg = result.message || '未知错误';
     toast(`模型调用失败：${msg}`, 6000);
-    appendCampLog(S, '错误', `AI 调用失败：${msg}`);
+    st().pushCampLog('错误', `AI 调用失败：${msg}`);
     const again = await askAiRetry(result, payload);
     if (again) return callAI(payload);
     return { _error: true, message: msg };
@@ -123,10 +123,18 @@ import { setStep, setStepState, waitContinue, askChoice, markAction, markMini, c
 // 批 1 只把地基启动起来，业务模块从批 2 起逐个挂上来（见 wiring.js 的 MODULES 清单）。
 import { kernel, loadModules } from './kernel/index.js';
 
-const { $, showScreen, setTopbar, renderStats, renderAp, renderCompanions,
-  appendCampLog, toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
-  flashEffects, setAiMode, bumpAiCount, typeText, escapeHtml, renderLogs, renderFacts,
+const { $, showScreen, setTopbar,
+  toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
+  flashEffects, setAiMode, typeText, escapeHtml, renderLogs, renderFacts,
   showOverlay, hideOverlay, replayAnim, wipe, bindParallax } = UI;
+
+/**
+ * 状态与它的别名：
+ *   `st()` → state 模块（**写状态只有这条路**：语义动作或 `apply()`，写完自动广播 + 存档）
+ *   `S`    → 同一份对象的**只读别名**（历史代码里到处在读 `S.xxx`；批 7 拆 flow 时逐块收掉）
+ * 规矩：`S.xxx = ...` 这种写法不允许（`npm run qa:bus` 会拦）——写一律走 `st().…`。
+ */
+const st = () => kernel.api('state');
 
 let S = null;
 let allFacts = {};
@@ -379,7 +387,7 @@ async function boot() {
 
 /** 有未完成的局就露出「继续上一局」（状态由 sessionStorage 保存） */
 function offerResume() {
-  const saved = loadState();
+  const saved = st().load();
   const btn = $('btn-continue-run');
   if (!saved || !btn || saved.actIndex == null) return;
   btn.classList.remove('hidden');
@@ -387,11 +395,8 @@ function offerResume() {
 }
 
 function resumeRun(saved) {
-  S = { ...createState(), ...saved };
+  S = st().resume(saved);
   setTopbar(true);
-  renderStats(S);
-  renderAp(S);
-  renderCompanions(S);
   renderJourney();
   $('ai-count').textContent = String(S.aiCount || 0);
   const act = currentActDef();
@@ -439,7 +444,7 @@ function exposeSheetHooks() {
     night: () => {
       if (!S) return;
       // 篝火夜的门槛是"点亮 ≥3 条附身线"；截图只需要过门槛，内容仍由模型现场生成
-      S.linesDone = ['fishing', 'candy', 'sentry'];   // linesDone 是数组（markLineDone 往里 push）
+        st().set('linesDone', ['fishing', 'candy', 'sentry'], '调试：预置附身线');
       runNightChoice(currentActDef());
     },
     end: () => { if (S) runEnding(); },
@@ -576,21 +581,19 @@ function openJournal() {
   $('journal-foot').textContent =
     `出身 ${originText()}　｜　`
     + `体力 ${S.体力} · 粮食 ${S.粮食} · 士气 ${S.士气} · 信念 ${S.信念} · 民心 ${S.民心}`
-    + `　｜　附身线 ${linesDoneCount(S)}/${LINES_TOTAL}`
+    + `　｜　附身线 ${st().linesDone()}/${LINES_TOTAL}`
     + `　｜　对决 ${S.quiz?.human ?? 0}:${S.quiz?.ai ?? 0}`
     + `　｜　模型 ${config.model}`;
 }
 
 function logChoice(act, label, mood) {
   if (!S) return;
-  if (!S.choiceLog) S.choiceLog = [];
-  S.choiceLog.push({ act: act?.title || '—', label: String(label).slice(0, 40), mood: mood || '' });
+  st().pushChoice({ act: act?.title || '—', label: String(label).slice(0, 40), mood: mood || '' });
 }
 
 function logShare(label) {
   if (!S) return;
-  if (!S.choiceLog) S.choiceLog = [];
-  S.choiceLog.push({ act: `第 ${S.actIndex + 1} 幕 · 分享`, label: String(label).slice(0, 40), mood: '分粮' });
+  st().pushChoice({ act: `第 ${S.actIndex + 1} 幕 · 分享`, label: String(label).slice(0, 40), mood: '分粮' });
 }
 
 function showLossToast(who, reason) {
@@ -789,7 +792,7 @@ function bindSettings() {
   };
   $('btn-set-clear-logs').onclick = async () => {
     await clearLogs();
-    S && (S.aiCount = 0);
+  if (S) st().set('aiCount', 0, '清零调用计数');
     $('ai-count').textContent = '0';
     toast('调用日志已重置');
     $('set-status').textContent = '日志已清空';
@@ -825,7 +828,7 @@ function showEcho({ title, play, real, fic }) {
 
 async function afterJudge(result, fallbackTitle, defaultFactId) {
   const fid = result.factId || result.fact_id || defaultFactId;
-  if (fid) unlockFact(S, fid);
+  if (fid) st().unlockFact(fid);
   const fact = allFacts?.[fid];
   const play = result.narrative || result.scene_text || result.reply || '';
   if (!fact && !play) return;
@@ -839,17 +842,8 @@ async function afterJudge(result, fallbackTitle, defaultFactId) {
 
 // ─── run ───
 async function startRun(mode = 'study') {
-  S = createState();
-  S.mode = mode;
-  S.actIndex = 0;
-  S.actLog = [];
-  saveState(S);
+  S = st().start(mode);          // 新开一局（state 模块负责广播 + 存档）
   setTopbar(true);
-  renderStats(S);
-  renderAp(S);
-  renderCompanions(S);
-  S.aiCount = 0;
-  $('ai-count').textContent = '0';
   toast(mode === 'march' ? '行军模式：资源与抉择都可能真的带不走一些人' : '研学模式：不会失去战友', 3200);
   if (mode === 'quick') toast('快速演示：每幕只跑主玩法与对决', 3200);
   // 快速模式按定义要短，跳过开场设定；标准/行军模式走一次出身与出发前一问
@@ -872,11 +866,8 @@ async function runOrigin() {
   const { origin, changes } = applyOrigin(S, ORIGINS[picked.index]?.id);
   if (!origin) return;                      // 理论上不会发生：选项由 ORIGINS 生成
   flashEffects(changes);
-  renderStats(S);
-  appendCampLog(S, '出发', `你是${origin.label}：${origin.sub}。`);
+  st().pushCampLog('出发', `你是${origin.label}：${origin.sub}。`);
   logChoice({ title: '出发前' }, `出身：${origin.label}`, '设定');
-  saveState(S);
-
   // 出发前一问：答对加信念，答错不扣（第一屏不给挫败感）
   step('origin:quiz', 'choice');
   setStagePanel(`<p class="hint">${escapeHtml(ORIGIN_QUIZ.question)}</p><div class="choices" id="origin-quiz"></div>`);
@@ -884,9 +875,7 @@ async function runOrigin() {
   const quiz = applyOriginQuiz(S, ans.index);
   if (quiz.right) flashEffects(quiz.changes);
   setStagePanel(`<p class="hint">${quiz.right ? '答对了。' : '记住了。'}${escapeHtml(ORIGIN_QUIZ.explain)}</p>`);
-  appendCampLog(S, '出发', `${quiz.right ? '答对' : '答错'}：${ORIGIN_QUIZ.explain}`);
-  renderStats(S);
-  saveState(S);
+  st().pushCampLog('出发', `${quiz.right ? '答对' : '答错'}：${ORIGIN_QUIZ.explain}`);
   await waitContinue('进入于都河');
 }
 
@@ -901,15 +890,14 @@ function originText() {
 async function settlePressure(act) {
   if (!S) return false;
   // 幕间粮荒
-  const drain = applyStarvation(S);
+  const drain = st().starvation();
   if (drain > 0) {
-    renderStats(S);
-    appendCampLog(S, '粮荒', `断粮，体力 −${drain}`);
+    st().pushCampLog('粮荒', `断粮，体力 −${drain}`);
     toast(`断粮：体力 −${drain}`, 2600);
   }
-  const fail = checkFailure(S);
+  const fail = st().failure();
   if (!fail) return false;
-  S.failure = fail;
+  st().remember('failure', fail);
   await runFailure(fail, act);
   return true;
 }
@@ -941,10 +929,8 @@ async function runFailure(fail, act) {
     $('end-title').textContent = '结算未完成';
     $('end-paras').innerHTML = '<p class="muted">模型没有返回这段失败结算。原因已记入日志，可在「设置 → 测试连接」复查 Key，或翻「记录」看失败详情。</p>';
     $('end-history').innerHTML = '';
-    renderStats(S);
     $('end-rel').innerHTML = renderRelations();
     $('end-personal').textContent = '';
-    saveState(S);
     return;
   }
   $('end-title').textContent = end.title || '掉队';
@@ -954,10 +940,8 @@ async function runFailure(fail, act) {
     await typeText(p, t, 14);
   }
   $('end-history').innerHTML = (end.history_points || []).map((h) => `<li>${escapeHtml(h)}</li>`).join('');
-  renderStats(S);
   $('end-rel').innerHTML = renderRelations();
   $('end-personal').textContent = end.personal || '';
-  saveState(S);
 }
 
 function renderRelations() {
@@ -982,21 +966,12 @@ async function runActIntro() {
 
 /** 快速模式：跳过营地日，只跑「一次关键交谈 + 主玩法 + 对决」 */
 async function runQuickAct(act) {
-  S.day = 1;
-  S.maxAp = 1;
-  S.ap = 1;
-  S.phase = 'camp';
-  renderStats(S);
-  renderAp(S);
-  renderCompanions(S);
+  st().enterDay({ day: 1, ap: 1, maxAp: 1 });
   renderJourney();
   const talkHotspot = (dayScene(act, 1).hotspots || []).find((h) => h.kind === 'talk');
   if (talkHotspot) {
     // 快速模式常在 finishAct 的锁内被调用：内部流转交给 withLock 的 from:'flow' 处理，不用手工解锁
     await withLock(() => doTalk(act, talkHotspot), { from: 'flow', label: '快速演示' });
-    renderStats(S);
-    renderCompanions(S);
-    saveState(S);
   }
   await runForcedChain(act);
 }
@@ -1069,10 +1044,9 @@ async function runPrelude(act) {
       state: publicState(),
       options: [choice],
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || result.scene_text || '');
-    renderStats(S);
   } finally {
     showThinking(false);
   }
@@ -1085,12 +1059,7 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 function enterCampDay(act, day) {
   step(`${act.id}:camp:${day}`, 'camp');
-  S.day = day;
-  S.maxAp = apPerDay(act);
-  S.ap = S.maxAp;
-  S.restCount = 0;                 // 新的一天：休息的恢复收益重置
-  S.phase = 'camp';
-  S.行动日志 = [];
+  st().enterDay({ day, ap: apPerDay(act), maxAp: apPerDay(act) });   // 新的一天：休息收益重置
   const scene = dayScene(act, day);
   showScreen('screen-camp');
   $('pano-img').style.backgroundImage = `url('${sceneImage(scene.alt, scene.pano)}')`;
@@ -1101,15 +1070,12 @@ function enterCampDay(act, day) {
   // 进幕事件：音频（场景表决定环境床与 BGM）、将来的过场/电影、HUD 都听它
   kernel.emit('flow:act-enter', { actId: act.id, day, label: scene.label });
   kernel.emit('sfx:play', { name: 'day' });
-  renderStats(S);
-  renderAp(S);
-  renderCompanions(S);
   renderHotspots(act, scene.hotspots);
   bindMarchButton(act);
   updateDusk();
   renderJourney();
   bindLantern();
-  appendCampLog(S, '系统', `${act.title} · 第 ${day} 日`);
+  st().pushCampLog('系统', `${act.title} · 第 ${day} 日`);
   // 深度调用：进入营地时由模型写场景氛围
   fireSceneGen(act);
 }
@@ -1123,10 +1089,10 @@ async function fireSceneGen(act) {
       state: publicState(),
       extraContext: act.theme,
     });
-    bumpAiCount(S);
+    st().bumpAiCount();
     if (r?.atmosphere) {
       $('camp-hint').textContent = r.atmosphere.slice(0, 80) + (r.atmosphere.length > 80 ? '…' : '');
-      appendCampLog(S, '场景', r.whisper || r.atmosphere.slice(0, 40));
+      st().pushCampLog('场景', r.whisper || r.atmosphere.slice(0, 40));
     }
   } catch { /* 静默 */ }
 }
@@ -1243,12 +1209,11 @@ const LINE_NAMES = {
 };
 const LINES_TOTAL = Object.keys(LINE_NAMES).length;
 
-function markLine(state, key) {
-  if (!state || !LINE_NAMES[key]) return;
-  if (markLineDone(state, key)) {
-    appendCampLog(state, '附身线', `点亮「${LINE_NAMES[key]}」（${linesDoneCount(state)}/${LINES_TOTAL}）`);
+function markLine(_state, key) {
+  if (!LINE_NAMES[key]) return;
+  if (st().markLine(key)) {
+    st().pushCampLog('附身线', `点亮「${LINE_NAMES[key]}」（${st().linesDone()}/${LINES_TOTAL}）`);
   }
-  saveState(state);
 }
 
 /** 热点种类 → 处理函数（新增玩法只加一行，不动主流程） */
@@ -1318,9 +1283,7 @@ async function onHotspot(act, h) {
   }
 
   return withLock(async () => {
-    S.ap -= 1;
-    S.行动日志.push(h.label);
-    renderAp(S);
+    st().spendAp(1, h.label);
     renderHotspots(act, dayScene(act, S.day).hotspots);
     updateMarchButton();
     updateDusk();
@@ -1334,25 +1297,20 @@ async function onHotspot(act, h) {
     // 立刻按新状态重画热点：热点用一次就作废，但 DOM 若不重画就会停在"看着还能点"的样子——
     // 点下去只弹一句「这里已经看过了」，界面对不上状态（自动化会卡在这颗热点上死循环，2026-09-13 实锤）。
     renderHotspots(act, dayScene(act, S.day).hotspots);
-
-    renderStats(S);
-    renderCompanions(S);
-    saveState(S);
     showScreen('screen-camp');
     const ds = dayScene(act, S.day);
     $('pano-img').style.backgroundImage = `url('${sceneImage(ds.alt, ds.pano)}')`;
     updateMarchButton();
     updateDusk();
     if (S.ap <= 0) {
-      appendCampLog(S, '系统', '天黑了，点右下「启程」。');
+      st().pushCampLog('系统', '天黑了，点右下「启程」。');
       toast('天黑了 → 启程', 3200);
     }
   });
 }
 
 function markDone(actId, key) {
-  if (!S.doneKeys) S.doneKeys = {};
-  S.doneKeys[`${actId}:${key}`] = true;
+  st().markDone(actId, key);
 }
 function isDone(actId, key) {
   return !!(S.doneKeys && S.doneKeys[`${actId}:${key}`]);
@@ -1374,17 +1332,12 @@ function renderFireMenu(act) {
       hideOverlay('screen-fire');
       if (S.ap <= 0 || kernel.resources.isHeld('flow')) { showScreen('screen-camp'); return; }
       await withLock(async () => {
-        S.ap -= 1;
-        S.行动日志.push(f.label);
-        renderAp(S);
+        st().spendAp(1, f.label);
         renderHotspots(act, dayScene(act, S.day).hotspots);
         updateMarchButton();
         updateDusk();
         if (f.action === 'talk') await doTalk(act, { npc: '老班长' });
         else await doShare();
-        renderStats(S);
-        renderCompanions(S);
-        saveState(S);
         showScreen('screen-camp');
         const ds2 = dayScene(act, S.day);
         $('pano-img').style.backgroundImage = `url('${sceneImage(ds2.alt, ds2.pano)}')`;
@@ -1453,20 +1406,18 @@ async function sendTalk(npcName, text) {
       situation: `玩家说：${text}`,
       state: publicState(),
     });
-    bumpAiCount(S);
+    st().bumpAiCount();
     const key = npcName.includes('老班') ? '好感_老班长'
       : npcName.includes('指导') ? '好感_指导员'
       : npcName.includes('小鬼') ? '好感_红小鬼'
       : npcName.includes('卫生') ? '好感_卫生员' : '好感_老乡';
     const effects = { 士气: 1 };
     if (typeof result.affinity_delta === 'number') effects[key] = result.affinity_delta;
-    const changes = applyEffects(S, effects);
+    const changes = st().applyEffects(effects);
     await say(npcName, result.reply || '……');
     if (result.mood) $('portrait-mood').textContent = result.mood;
     flashEffects(changes);
-    appendCampLog(S, '交谈', `${npcName}：${(result.reply || '').slice(0, 30)}…`);
-    renderStats(S);
-    renderCompanions(S);
+    st().pushCampLog('交谈', `${npcName}：${(result.reply || '').slice(0, 30)}…`);
   } catch (err) {
     toast('对话失败：' + err.message);
   } finally {
@@ -1483,15 +1434,14 @@ async function doRest() {
   setStagePanel('<p class="hint">靠着背囊眯一会儿。</p>');
   // 体力恢复不交给模型：实测模型很少给正体力，一局净 −152 必然归零。
   // 这里的保底让"休息"成为可控手段；同一天反复休息收益递减，避免刷体力。
-  S.restCount = (S.restCount || 0) + 1;
+  st().bumpRest();
   const heal = S.restCount === 1 ? 10 : S.restCount === 2 ? 5 : 0;
   if (heal) {
-    flashEffects(applyEffects(S, { 体力: heal }));
-    appendCampLog(S, '休息', `缓过来一点（体力 +${heal}）`);
+    flashEffects(st().applyEffects({ 体力: heal }));
+    st().pushCampLog('休息', `缓过来一点（体力 +${heal}）`);
   } else {
-    appendCampLog(S, '休息', '再歇也缓不过来多少了。');
+    st().pushCampLog('休息', '再歇也缓不过来多少了。');
   }
-  renderStats(S);
   showThinking(true);
   let result;
   try {
@@ -1502,10 +1452,10 @@ async function doRest() {
       state: publicState(),
       operation: { type: 'rest' },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || '你歇了一会儿。');
-    appendCampLog(S, '休息', result.narrative || '');
+    st().pushCampLog('休息', result.narrative || '');
   } finally {
     showThinking(false);
   }
@@ -1535,10 +1485,10 @@ async function doShare(h = {}) {
       state: publicState(),
       options: [choice],
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || '');
-    appendCampLog(S, '分享', result.narrative || choice);
+    st().pushCampLog('分享', result.narrative || choice);
   } finally {
     showThinking(false);
   }
@@ -1556,7 +1506,7 @@ async function doSchool() {
   const board = openBoard({ title: '夜校识字', bg: '/assets/scenes/school_close.jpg' });
   const op = await runNightSchool(mountMini(board, 'school', 'school-host'), { stats: board.stats });
   showScreen('screen-stage');                         // 结算回到对白屏：人物 + 叙事 + 继续
-  S.tonightPassword = op.detail?.password || '瑞金';
+  st().remember('tonightPassword', op.detail?.password || '瑞金');
   markLine(S, 'school');
   showThinking(true);
   let result;
@@ -1568,10 +1518,10 @@ async function doSchool() {
       state: publicState(),
       operation: { type: 'school', ...op },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || '');
-    appendCampLog(S, '夜校', `口令「${S.tonightPassword}」`);
+    st().pushCampLog('夜校', `口令「${S.tonightPassword}」`);
   } finally {
     showThinking(false);
   }
@@ -1590,7 +1540,7 @@ async function doCandy() {
   const board = openBoard({ title: '分糖', bg: sceneImage('/assets/scenes/sugar_close.jpg', '/assets/scenes/camp_pano.jpg') });
   const op = await runCandy(mountMini(board, 'candy', 'candy-host'), { stats: board.stats });
   showScreen('screen-stage');
-  S.sugarPlan = op.detail || null;
+  st().remember('sugarPlan', op.detail || null);
   markLine(S, 'candy');
   showThinking(true);
   let result;
@@ -1603,10 +1553,10 @@ async function doCandy() {
       options: [op.summary],
       operation: { type: 'sugar', ...op.detail },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || '');
-    appendCampLog(S, '分糖', op.summary);
+    st().pushCampLog('分糖', op.summary);
   } finally {
     showThinking(false);
   }
@@ -1625,7 +1575,7 @@ async function doSentry() {
   const board = openBoard({ title: '夜岗', bg: sceneImage('/assets/scenes/sentry_night.jpg', '/assets/scenes/camp_pano.jpg') });
   const op = await runSentry(S.tonightPassword, mountMini(board, 'sentry', 'sentry-host'), { stats: board.stats });
   showScreen('screen-stage');
-  S.sentryScore = op.score;
+  st().remember('sentryScore', op.score);
   markLine(S, 'sentry');
   showThinking(true);
   let result;
@@ -1639,10 +1589,10 @@ async function doSentry() {
       state: publicState(),
       operation: { type: 'sentry', ...op.detail },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || '');
-    appendCampLog(S, '夜岗', op.summary);
+    st().pushCampLog('夜岗', op.summary);
   } finally {
     showThinking(false);
   }
@@ -1672,10 +1622,10 @@ async function doGomoku() {
       state: publicState(),
       operation: { type: 'gomoku', ...op.detail },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || '');
-    appendCampLog(S, '五子棋', op.summary || '');
+    st().pushCampLog('五子棋', op.summary || '');
   } finally {
     showThinking(false);
   }
@@ -1703,10 +1653,10 @@ async function doGrab() {
       state: publicState(),
       operation: { type: 'grab', ...op.detail },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || result.scene_text || '');
-    appendCampLog(S, '陡坡', op.summary || '');
+    st().pushCampLog('陡坡', op.summary || '');
   } finally {
     showThinking(false);
   }
@@ -1733,13 +1683,13 @@ async function doRoster() {
         `关系：${COMPANIONS.map((c) => `${c.name}${S[`好感_${c.name}`] ?? 40}`).join('、')}`
         + `；没能跟上的人：${(S.losses || []).map((l) => l.who).join('、') || '无'}`,
     });
-    bumpAiCount(S);
+    st().bumpAiCount();
     const box = $('stage-panel');
     // 这里原先用 mg-title + 手写 style 的 paper-dim：那是"给暗底用的纸色"，落在浅墨纸卷上看不清（批五修）
     box.innerHTML = `<h3 class="blk-title sm">${escapeHtml(r.title || '这一路')}</h3>`
       + (r.lines || []).map((l) => `<p class="blk-body">${escapeHtml(l)}</p>`).join('');
     await say('叙事', (r.lines || []).join(' '));
-    appendCampLog(S, '会师', (r.lines || [])[0] || '');
+    st().pushCampLog('会师', (r.lines || [])[0] || '');
   } catch (err) {
     toast('清点失败：' + err.message);
   } finally {
@@ -1804,7 +1754,7 @@ async function doFishing(act, forced) {
   board = openBoard({ title: '金色的鱼钩', bg: '/assets/scenes/pond_close.jpg' });
   const op = await runFishing(mountMini(board, 'fishing', 'fish-host'), { stats: board.stats });
   showScreen('screen-stage');
-  S.fishingBest = Math.max(S.fishingBest || 0, op.score);
+  st().remember('fishingBest', Math.max(S.fishingBest || 0, op.score));
   markLine(S, 'fishing');
   showThinking(true);
   let result;
@@ -1816,10 +1766,10 @@ async function doFishing(act, forced) {
       state: publicState(),
       operation: { type: 'fishing', ...op },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || '');
-    appendCampLog(S, '钓鱼', result.narrative || '');
+    st().pushCampLog('钓鱼', result.narrative || '');
   } finally {
     showThinking(false);
   }
@@ -1859,8 +1809,8 @@ async function doSoup() {
       options: [choice],
       operation: { type: 'soup', choice },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || '');
   } finally {
     showThinking(false);
@@ -1889,7 +1839,7 @@ async function doChoice(act, actionId) {
       state: publicState(),
       options: cs.options.map((o) => o.label),
     });
-    bumpAiCount(S);
+    st().bumpAiCount();
     (hr.hints || []).forEach((h) => { if (h?.label) hints[h.label] = h; });
   } catch { /* 静默 */ }
 
@@ -1907,10 +1857,10 @@ async function doChoice(act, actionId) {
   logChoice(act, choice, hints[choice]?.trend || '');
   // 行军模式：减员由「作者标注的风险 + 当前资源」决定（见 state.js 的 resolveLoss），不可逆
   if (S.mode === 'march') {
-    const loss = resolveLoss(cs, cs.options.findIndex((o) => o.label === choice), S);
+    const loss = st().lossFor(cs, cs.options.findIndex((o) => o.label === choice));
     if (loss && addLoss(S, loss.who, loss.reason)) {
       showLossToast(loss.who, loss.reason);
-      appendCampLog(S, '损失', `${loss.who} 没能跟上`);
+      st().pushCampLog('损失', `${loss.who} 没能跟上`);
     }
   }
   showThinking(true);
@@ -1924,10 +1874,10 @@ async function doChoice(act, actionId) {
       options: [choice],
       operation: cs.operationType ? { type: cs.operationType, choice } : { choice },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || result.scene_text || '');
-    appendCampLog(S, cs.title, choice);
+    st().pushCampLog(cs.title, choice);
   } finally {
     showThinking(false);
   }
@@ -1947,9 +1897,9 @@ async function doLuding(act) {
   const board = openBoard({ title: '飞夺泸定桥', bg: sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg') });
   const op = await runLuding(mountMini(board, 'luding', 'luding-host'), { stats: board.stats });
   showScreen('screen-stage');
-  S.ludingResult = op.detail || null;
+  st().remember('ludingResult', op.detail || null);
   // 战友拉住的那一下，先落到状态里再交给模型写后果
-  if (op.detail?.retry) applyEffects(S, { 体力: -10 });
+  if (op.detail?.retry) st().applyEffects({ 体力: -10 });
   showThinking(true);
   let result;
   try {
@@ -1960,10 +1910,10 @@ async function doLuding(act) {
       state: publicState(),
       operation: { type: 'luding', ...op.detail },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.narrative || result.scene_text || '');
-    appendCampLog(S, '泸定桥', op.summary || '');
+    st().pushCampLog('泸定桥', op.summary || '');
   } finally {
     showThinking(false);
   }
@@ -2018,7 +1968,7 @@ async function runForcedChain(act) {
       const fid = forced[i];
       // 热点里已经做过的，不再重播
       if (isDone(act.id, fid)) {
-        appendCampLog(S, '系统', `${fid} 已完成，跳过。`);
+        st().pushCampLog('系统', `${fid} 已完成，跳过。`);
         continue;
       }
       if (fid === 'fishing') { await doFishing(act, true); markDone(act.id, 'fishing'); }
@@ -2083,8 +2033,8 @@ async function runPathOnImage() {
       options: [choice.label],
       operation: { type: 'path', choice: choice.id, score: choice.score },
     });
-    bumpAiCount(S);
-    applyEffects(S, result.effects);
+    st().bumpAiCount();
+    st().applyEffects(result.effects);
     await say('叙事', result.scene_text || result.narrative || '');
   } finally {
     showThinking(false);
@@ -2111,7 +2061,7 @@ async function runQuiz(act) {
       state: publicState(),
       extraContext: `本幕主题：${act.theme}；史实：${(act.facts || []).join(',')}`,
     });
-    bumpAiCount(S);
+    st().bumpAiCount();
   } finally {
     showThinking(false);
   }
@@ -2154,7 +2104,7 @@ async function runQuiz(act) {
             agent: '激进派小张',
             options: opts,
           });
-          bumpAiCount(S);
+          st().bumpAiCount();
           humanAns = normIdx(h.answer_index, opts.length);
         } finally {
           showThinking(false);
@@ -2171,15 +2121,14 @@ async function runQuiz(act) {
           agent: '稳健派老李',
           options: opts,
         });
-        bumpAiCount(S);
+        st().bumpAiCount();
         aiAns = normIdx(ai.answer_index, opts.length);
       } finally {
         showThinking(false);
       }
       const humanRight = answerKnown && humanAns === ans;
       const aiRight = answerKnown && aiAns === ans;
-      if (humanRight) S.quiz.human += 1;
-      if (aiRight) S.quiz.ai += 1;
+      st().quizScore({ human: humanRight ? 1 : 0, ai: aiRight ? 1 : 0 });
       $('quiz-score').textContent = `${S.quiz.human} : ${S.quiz.ai}`;
       showThinking(true);
       let judge;
@@ -2192,8 +2141,8 @@ async function runQuiz(act) {
           agent: auto ? 'ai_vs_ai' : 'human_vs_ai',
           operation: { human: humanAns, ai: aiAns, answer_index: ans, mode: auto ? 'ai_vs_ai' : 'human_vs_ai' },
         });
-        bumpAiCount(S);
-        applyEffects(S, judge.effects || { 士气: humanRight ? 3 : -1 });
+        st().bumpAiCount();
+        st().applyEffects(judge.effects || { 士气: humanRight ? 3 : -1 });
         kernel.emit('sfx:play', { name: humanRight ? 'correct' : 'wrong' });
         $('quiz-feedback').innerHTML = `
           <div>${auto ? '激进派小张' : '你'}：<b>${humanRight ? '正确' : '错误'}</b> · 稳健派老李：<b>${aiRight ? '正确' : '错误'}</b><br/>
@@ -2247,13 +2196,12 @@ function nightContext() {
 async function runNightChoice(act) {
   step('night', 'choice');
   if (isDone(act.id, 'night')) return false;
-  if (!canNight(S, 3)) {
-    appendCampLog(S, '系统', `附身线不足三条（${linesDoneCount(S)}/${LINES_TOTAL}），今夜没有议事。`);
+  if (!st().canNight(3)) {
+    st().pushCampLog('系统', `附身线不足三条（${st().linesDone()}/${LINES_TOTAL}），今夜没有议事。`);
     return false;
   }
 
   showScreen('screen-night');
-  renderStats(S);
   $('night-title').textContent = '篝火 · 深夜';
   $('night-lead').textContent = '正在请模型写今夜的抉择…';
   $('night-body').innerHTML = '';
@@ -2268,7 +2216,7 @@ async function runNightChoice(act) {
       state: publicState(),
       extraContext: nightContext(),
     });
-    bumpAiCount(S);
+    st().bumpAiCount();
   } catch { /* 用兜底选项 */ } finally {
     showThinking(false);
   }
@@ -2290,7 +2238,7 @@ async function runNightChoice(act) {
   const picked = await askChoice(body, options, { extraOf: () => '' });
   const choice = picked.raw;
   logChoice(act, choice.label, '篝火夜');
-  S.nightChoice = choice.label;
+  st().remember('nightChoice', choice.label);
   markDone(act.id, 'night');
 
   showThinking(true);
@@ -2305,12 +2253,11 @@ async function runNightChoice(act) {
       operation: { choice: choice.key, label: choice.label },
       extraContext: nightContext(),
     });
-    bumpAiCount(S);
-    applyEffects(S, res?.effects);
-    renderStats(S);
+    st().bumpAiCount();
+    st().applyEffects(res?.effects);
     body.innerHTML = '<p id="night-out" class="blk-body"></p>';   // 纸面用墨字，别用给暗底准备的纸色
     await typeText($('night-out'), res?.narrative || '当夜无事。');
-    appendCampLog(S, '篝火夜', res?.narrative || choice.label);
+    st().pushCampLog('篝火夜', res?.narrative || choice.label);
   } catch (err) {
     body.innerHTML = `<p class="muted">当夜无话：${escapeHtml(err.message)}</p>`;
   } finally {
@@ -2318,12 +2265,11 @@ async function runNightChoice(act) {
   }
   await waitBtn('天亮了 · 继续', body);
   await afterJudge(res || { narrative: `你决定：${choice.label}` }, '篝火之夜', 'h_campfire');
-  saveState(S);
   return true;
 }
 
 async function finishAct(act) {
-  S.actLog.push({ id: act.id, title: act.title, 体力: S.体力, 信念: S.信念 });
+  st().pushLog(act.id, act.title);
   // 幕间 AI 总评
   try {
     showThinking(true);
@@ -2336,7 +2282,7 @@ async function finishAct(act) {
     });
     if (review?.lines?.length) {
       toast(review.title || '本幕小结', 2800);
-      appendCampLog(S, '总评', review.lines[0]);
+      st().pushCampLog('总评', review.lines[0]);
     }
   } catch { /* 非阻塞 */ } finally {
     showThinking(false);
@@ -2345,7 +2291,7 @@ async function finishAct(act) {
   // 第四幕幕末：篝火深夜（模型生成互斥抉择，一局一次）
   if (act.id === 'act4') await runNightChoice(act);
 
-  S.actIndex = (S.actIndex || 0) + 1;
+  st().set('actIndex', (S.actIndex || 0) + 1, '进入下一幕');
   renderJourney();
   // 幕间压力结算：粮荒 + 成败判定
   if (await settlePressure(act)) return;
@@ -2376,7 +2322,7 @@ async function runEnding() {
       state: publicState(),
       extraContext: `幕记录：${JSON.stringify(S.actLog)}；对决 ${S.quiz.human}:${S.quiz.ai}；钓鱼最佳 ${(S.fishingBest || 0).toFixed(2)}`,
     });
-    bumpAiCount(S);
+    st().bumpAiCount();
   } finally {
     showThinking(false);
   }
@@ -2388,11 +2334,8 @@ async function runEnding() {
     await typeText(p, t, 14);
   }
   $('end-history').innerHTML = (end.history_points || []).map((h) => `<li>${escapeHtml(h)}</li>`).join('');
-  renderStats(S);
   $('end-rel').innerHTML = COMPANIONS.map((c) => `${c.name}：${S[`好感_${c.name}`] ?? 40}`).join('<br/>');
   $('end-personal').textContent = end.personal || '';
-  saveState(S);
-
   // 研学报告（课后复盘用；对外不出现行业与场景口径，见 docs/PITCH.md）
   try {
     showThinking(true);
@@ -2410,7 +2353,7 @@ async function runEnding() {
       $('report-knowledge').innerHTML = (report.knowledge || []).map((k) => `<li>${escapeHtml(k)}</li>`).join('');
       $('report-values').innerHTML = (report.values || []).map((k) => `<li>${escapeHtml(k)}</li>`).join('');
       $('report-suggest').textContent = report.suggest || '';
-      S.lastReport = report;
+      st().remember('lastReport', report);
     }
   } catch { /* optional */ } finally {
     showThinking(false);

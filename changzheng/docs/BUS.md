@@ -3,7 +3,7 @@
 > **一句话**：模块之间不直接调用，全部挂在一条事件总线上；谁听什么写在模块自己的描述符里，
 > 内核负责接线；跨模块读数据走只读快照。加模块/加玩法**不需要改内核，也不需要改别人的文件**。
 >
-> 状态：**批 1–3 已落地**（内核地基；audio 与 shell 挂上总线；去越界 + 锁显式化）。
+> 状态：**批 1–4 已落地**（内核地基；audio 与 shell；去越界 + 锁显式化；state 成唯一持有者 + HUD 订阅）。
 > 后续批次把 state / screens / games / ai / flow 逐个迁进来，顺序见 §六。**迁移期间游戏始终可运行**。
 
 ---
@@ -49,7 +49,23 @@ public/js/modules/         IP 模块（业务）
 
 ### 三点五、锁与屏：批 3 收口的两个语义
 
-**① 流程锁（内核资源 `flow`）只占在"用户入口"**
+**① 状态只有一条写路（批 4）**
+
+```js
+const st = () => kernel.api('state');
+st().applyEffects(result.effects);      // 语义动作：内部走 state.js 的纯函数 + 钳制表
+st().spendAp(1, h.label);               // 花行动点
+st().pushCampLog('粮荒', '断粮，体力 −10');
+st().remember('nightChoice', choice.label);
+// 复杂场景：st().apply('说明', (s) => { ...多字段... }, ['字段A','字段B'])
+```
+
+写完自动：**作废快照 → 广播 `state:change` → 存档**（`saveState` 不再需要调用方记得）。
+读数据：其它模块用 `kernel.snapshot.get()`（冻结副本）；渲染器要读嵌套字段用 `st().raw()`（约定只读）。
+`qa:bus` 静态规则拦"绕过 store 写状态"（`S.x = …` / `S.x.push(…)` / `applyEffects(S, …)`），
+所以 `main.js` 里的 `S` 现在只是**只读别名**。
+
+**② 流程锁（内核资源 `flow`）只占在"用户入口"**
 
 ```js
 // 用户入口（点热点 / 启程 / 篝火菜单）：占不到就明说 —— 广播 resource:blocked，shell 模块提示
@@ -89,6 +105,8 @@ kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调�
 |---|---|---|
 | `modules/audio` | `flow:act-enter` · `scene:enter` · `sfx:play` · `voice:say` · `audio:toggle-mute` | **声音的唯一入口**：把事件翻译成 `public/js/audio/` 框架的调用（场景表/通道/静音模型都在框架里）。业务代码从此不认识音频 API |
 | `modules/shell` | `audio:muted` · `audio:suspended` · `resource:blocked` | 外壳对事件的反应：顶栏静音图标、ctx 挂起的提示、**"上一步还在进行…"的提示**（过去每个调用点各写一遍 toast） |
+| `modules/state` | （不订阅别人） | **游戏状态的唯一持有者**：写只有一条路——语义动作或 `apply(label, mutator, keys)`，写完自动**作废快照 → 广播 `state:change` → 存档**；`ready` 里把自己登记为只读快照的唯一提供者 |
+| `modules/hud` | `state:change` | **状态读数渲染**：顶栏五维 / 行动点 / 同伴好感 / 营地手记 / AI 计数。以前这些靠调用方手工配对（`renderStats` 18 次、`renderCompanions` 8 次、`renderAp` 6 次），漏一处就是"数字没更新" |
 | `modules/screens` | `screen:show` · `screen:hide` | **屏的生命周期归属**：各屏宿主用 `own(screenId, onHide)` 登记自己的清理；离开时只调那一屏自己登记的清理函数（取代 `showScreen` 越界清别人容器的做法，见 §三点五） |
 
 **发声音就发事件**（别再调音频门面——`qa:audio` 会拦）：
@@ -115,7 +133,7 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | 1 | 内核地基（本文档 + 内核七件套 + 契约 + 模块/玩法契约 + 四条 lint + `qa:bus`） | ✅ 已完成 |
 | 2 | **audio 挂总线**（声音总入口）+ shell（外壳对事件的反应） | ✅ 已完成 |
 | 3 | **去越界**（`screen:hide` 各屏自清）+ **锁显式化**（`resources` 收编 `S.busy`） | ✅ 已完成 |
-| 4 | state 挂总线 + 只读快照（消掉"绕纯函数直改字段"） | ⏳ |
+| 4 | **state 挂总线** + 只读快照 + HUD 订阅渲染（消掉"绕纯函数直改字段"与"手工 render 配对"） | ✅ 已完成 |
 | 5 | screens / games / sandbox 挂总线（玩法宿主变服务，现有 8 个玩法改成插件形状） | ⏳ |
 | 6 | ai 挂总线 + registry/run 重写（每类预算、预取、`qa:ai` 度量）+ 50 处手工 `showThinking` 收编 | ⏳ |
 | 7 | `main.js` → `flow/*` 拆分；`__czScreens` 由内核供出；同步三个源码扫描脚本（check-handoff / av-audit / check-tts） | ⏳ |

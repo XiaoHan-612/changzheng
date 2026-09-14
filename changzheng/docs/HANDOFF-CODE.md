@@ -27,7 +27,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 |---|---|---|
 | `public/js/main.js` | 主线状态机：五幕、营地日、强制链、对决、失败/终局、篝火夜；**玩法宿主** `openBoard()` + `mountMini()` | 最大的文件；热点用 `HOTSPOT_HANDLERS` 映射表分发，**加玩法只加一行**；玩法一律挂板屏（见第 27 条） |
 | `public/js/kernel/` | **内核**（新）：`bus`（事件总线）/ `contracts`（事件契约唯一真源）/ `plugins`（模块描述符）/ `kernel`（注册·接线·ready·诊断）/ `wiring`（模块清单）/ `resources`（显式锁）/ `snapshot`（只读快照）/ `diag`（事件流黑匣子） | 架构与规矩见 [`BUS.md`](BUS.md)；**模块集合不写死**——加模块只动 `wiring.js` 清单与模块自己的文件 |
-| `public/js/modules/` | **IP 模块**（新）：已挂 `audio`（声音总入口）/ `shell`（外壳反应：静音图标、ctx 挂起、锁被占提示）/ `screens`（屏生命周期归属：宿主登记自己的清理）；`games/` 是交互游戏插件契约 + 模板 | 批 2 起逐个迁入；**业务发声音只发事件**（`sfx:play`/`voice:say`/`scene:enter`/`flow:act-enter`），`qa:audio` 会拦直接 import 音频门面的写法 |
+| `public/js/modules/` | **IP 模块**（新）：已挂 `audio`（声音总入口）/ `shell`（外壳反应）/ `screens`（屏生命周期归属）/ **`state`（状态唯一持有者：写走动作并广播）/ `hud`（订阅 state:change 渲染读数）**；`games/` 是交互游戏插件契约 + 模板 | 批 2 起逐个迁入；**业务发声音只发事件**（`sfx:play`/`voice:say`/`scene:enter`/`flow:act-enter`），`qa:audio` 会拦直接 import 音频门面的写法 |
 | `public/js/step.js` | **交互契约**：`step()` / `askChoice()` / **`choiceButton()`（选项唯一构建处）** / `waitContinue()` / `markMini()` | 新增玩法只要声明契约，测试与自动化无需改动；详见 ARCHITECTURE 的「交互契约」 |
 | `public/js/minigames.js` | **8 个玩法**：钓鱼/弯针/夜校识字/分糖/夜岗/五子棋/泸定桥/陡坡 | 统一返回 `{score, detail, summary?}`，本地只判手感，结算走 `/api/decide`；状态经 `stats(host, [...])` 写进板头数值签 |
 | `public/js/state.js` | 资源/好感/附身线/行动点/每日场景/失败判定 | 纯函数、可单测；新增资源维度要同时改 `applyEffects` 的钳制表 |
@@ -203,7 +203,19 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
    - 模块内的状态放**模块级变量**，别挂描述符上（描述符只放方法与规定字段）——`this.owners.set is not a function`
      这个错就是总线体检当场抓到的。
 
-34. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
+34. **状态只有一条写路；HUD 靠订阅而不是靠调用顺序（批 4）**
+   - **写状态**：一律 `st().动作(...)` 或 `st().apply(label, mutator, keys)`——写完自动
+     **作废快照 → 广播 `state:change` → 存档**。`saveState()` 不再需要调用方记得；`main.js` 里的
+     `S` 只是**只读别名**（历史读法），`qa:bus` 静态规则会拦 `S.x = …` / `S.x.push(…)` / `applyEffects(S, …)`。
+   - **读状态**：其它模块用 `kernel.snapshot.get()`（冻结副本，只读）；渲染器要读嵌套字段用 `st().raw()`。
+   - **HUD 不再被手工调用**：`renderStats` / `renderAp` / `renderCompanions` / 手记 / AI 计数都由
+     `modules/hud` 订阅 `state:change` 自己重渲染（原来散着 32 处手工配对，漏一处就是"数字没更新"）。
+     新增"要跟着状态变的读数" = 在 `modules/hud` 的 PARTS 表里加一行 + 写个渲染函数，不用去改流程代码。
+   - **两个连带教训**：① 批量改代码的补丁脚本必须"要么全成功、要么不写盘"（我们的 `assert` 中止救了半途改坏，
+     但也让另一处插入静默丢失——`st` 未定义就是冒烟抓到的）；② `ui.js` 里"既改状态又画界面"的函数要拆开
+     （`appendCampLog` → `pushCampLog`（写）+ `renderCampLog`（画）、`bumpAiCount` → `state.bumpAiCount()` + `renderAiCount`）。
+
+35. **加热天数必须同时补热点** —— 每幕的「可点热点数」必须 ≥ `apDays × apPerDay`，否则玩家会出现"还有行动点却无事可做"。`tests/unit/acts.test.js` 已把这条固化成断言（含坐标不重叠），改 `acts.json` 后跑 `npm run test:unit` 就会拦住。
 
 ## 六、下一步建议（按价值排序）
 

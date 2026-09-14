@@ -18,6 +18,8 @@ export const MODULES = [
   // 批 2 起逐个挂上来（迁移顺序见 docs/BUS.md）。
   { name: 'audio', path: './modules/audio/index.js', note: '声音总入口：环境床 / BGM / 音效 / 语音' },
   { name: 'shell', path: './modules/shell/index.js', note: '外壳对事件的反应：顶栏静音图标、ctx 挂起提示' },
+  { name: 'state', path: './modules/state/index.js', note: '游戏状态唯一持有者：写走动作并广播 state:change' },
+  { name: 'hud', path: './modules/hud/index.js', note: '状态读数渲染：订阅 state:change，顶栏五维/行动点/同伴/手记' },
   { name: 'screens', path: './modules/screens/index.js', note: '屏的生命周期归属：宿主登记自己的清理，离开只清自己的容器' },
 ];
 

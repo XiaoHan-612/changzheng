@@ -186,13 +186,19 @@ export function renderCompanions(state) {
   }).join('');
 }
 
-export function appendCampLog(state, tag, text) {
-  state.campLog.unshift({ tag, text });
+/**
+ * 渲染营地手记（**纯渲染，不改状态**）。
+ *
+ * 以前叫 `appendCampLog(state, tag, text)`：既往 state.campLog 里塞，又渲染。
+ * 于是"改状态"和"画界面"缠在一起，靠调用方记得调它。现在拆开：
+ * 写走 state 模块的 `pushCampLog()`（会广播 state:change），画由 hud 模块订阅后调这里。
+ */
+export function renderCampLog(list = []) {
   const el = $('camp-log');
   if (!el) return;
-  el.innerHTML = state.campLog
+  el.innerHTML = list
     .slice(0, 12)
-    .map((l) => `<div><span class="tag">${l.tag}</span>${escapeHtml(l.text)}</div>`)
+    .map((l) => `<div><span class="tag">${escapeHtml(l.tag)}</span>${escapeHtml(l.text)}</div>`)
     .join('');
 }
 
@@ -257,10 +263,10 @@ export function setAiMode(cfg) {
   el.classList.toggle('nokey', !cfg.hasKey);
 }
 
-export function bumpAiCount(state) {
-  state.aiCount = (state.aiCount || 0) + 1;
+/** 渲染 AI 调用计数（纯渲染；计数由 state 模块的 bumpAiCount() 维护并广播） */
+export function renderAiCount(n) {
   const el = $('ai-count');
-  if (el) el.textContent = String(state.aiCount);
+  if (el) el.textContent = String(n ?? 0);
 }
 
 export function setPortrait(name, role, ava, mood, img) {
