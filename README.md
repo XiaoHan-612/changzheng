@@ -5,7 +5,7 @@
 
 玩家以「过客」视角走进 1934–1936 年的长征关键节点：在营地画面里点光点附身，
 替他们做完手头那件事——抉择、对弈、辨路、观察与分配全部提交大模型裁决，
-每次调用写入可回放的 JSONL 日志。
+每次调用落 JSONL 日志（含响应、耗时与来源，可审计；明细见 `changzheng/logs/README.md`）。
 
 ## 快速开始
 
@@ -22,9 +22,10 @@ npm start          # http://localhost:3001
 
 已经克隆过的，这里等价于在仓库根执行 `cd changzheng`。每轮开工先 `git pull --rebase`，收工 `git push`。
 
-- 未配置 Key 时自动进入 **MOCK 演示模式**，全流程仍可完整跑通（日志标明 `source=MOCK_AI`）
-- 真实调用：把密钥写进 `changzheng/.env`（`GLM_API_KEY=...`），或在游戏内「设置」里填
-- `.env` 与 `runtime-config.json` 已加入 `.gitignore`，不会入库
+- 密钥：写进 `changzheng/.env`（`GLM_API_KEY=...`），或在游戏内「设置」里填后点「测试连通」；
+  `.env` 与 `runtime-config.json` 已加入 `.gitignore`，不会入库
+- **没有 MOCK 模式**：所有智能判断都走真调。未配置 Key 或调用失败会**明确报错**（界面给原因与「重试」键，
+  日志记 `source=ERROR`），**不编造任何兜底文案**；演示前务必先用「设置 → 测试连通」确认
 
 ## 目录结构
 
@@ -47,7 +48,7 @@ npm start          # http://localhost:3001
 cd changzheng
 npm run test:unit     # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏
 npm run qa:smoke      # 标题 → 营地 → 一次互动（顺带断言用过的热点当场作废）
-npm run qa:board      # 玩法板体检：五个玩法逐屏摆上板（板屏壳 / 数值签 / 契约标记）
+npm run qa:board      # 玩法板体检：8 个玩法逐屏摆上板（板屏壳 / 数值签 / 契约标记）
 npm run test:e2e      # 五幕真调通关（约 76 次调用）+「不重复结算」等回归断言
 npm run qa:sandbox    # 自由行军沙盘：两回合 + 存档恢复
 npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
@@ -71,6 +72,7 @@ node make-docx.js     # 输出 ../长征-抉择-设计方案.docx
 | `changzheng/README.md` | 玩法与交互要点 |
 | `changzheng/docs/ARCHITECTURE.md` | 架构、运行时数据流、设计约束 |
 | `changzheng/docs/HANDOFF.md` | 已完成 / 已知缺口 / **每轮收尾清单** / 接力建议 |
+| `changzheng/docs/HANDOFF-CODE.md` | **代码接手主文档**：模块地图 / 状态机 / 契约 / 29 条踩过的坑 |
 | `changzheng/docs/DESIGN-SYSTEM.md` | 视觉体系（模板 / 区块 / 动效）与逐批打磨进度 |
 | `changzheng/docs/SCORING.md` | 评分对照与路演讲法 |
 | `changzheng/docs/QA.md` | 测试清单（每条命令的通过标准） |

@@ -296,7 +296,7 @@ ch.push(
   bullet("播放时立绘微动（scale 1.02 呼吸）+ 嘴部可选两张帧切换（有资源时）；无资源则光晕脉冲。"),
   bullet("用户点「跳过语音」或再次点击对话区：立即 stop，全文已显示。"),
   bullet("无 TTS 环境/失败：静默降级，不阻塞流程；日志记 audio=fallback。"),
-  bullet("MOCK 模式：可选预录 3–5 句样音循环，或完全静音，保证无网可演示。"),
+  bullet("现场需联网：本项目**没有 MOCK 模式**，断网即 AI 内容全报错（source=ERROR + 界面「重试」键）；但音频本身永远不阻塞流程——放不出来就静默。风险预案（录制真实响应 + 按指纹回放）见 docs/OFFLINE-REPLAY.md，**尚未开发**。"),
 );
 
 ch.push(h3("2.6.3 角色音色映射表（全项目固定）"));
@@ -323,8 +323,9 @@ audio.playAmbient('camp'|'river'|'snow'|'night'|'none')  // crossfade 1s
 await audio.speak({ text, voiceId, actorId })  // 返回 Promise，可被 skip
 
 // 服务端 POST /api/tts
-{ text, voiceId, actorId } → { ok, url: '/audio/cache/xxx.wav', durationMs, source: 'TTS'|'MOCK'|'FAIL' }
-// 生成后写入 public/audio/cache/ 与 logs/ 同源时间戳，便于回放核对
+{ text, voiceId, actorId } → { ok, url: '/audio/cache/<hash>_<voice>.wav', source: 'CACHE' }
+                          | { ok: true, url: null, source: 'NONE', reason: 'no-cached-voice' }  // 没生成就静默降级
+// 缓存文件名 = sha1(voiceId|text) 前 16 位 + _ + voiceId；改台词要重跑 npm run tts:manifest
 `
 ));
 ch.push(
@@ -839,7 +840,7 @@ ch.push(table(
     ["TTS 风格不统一", "音色映射表写死；抽样试听 checklist；失败静默降级"],
     ["音频打断体验", "可关语音；点按跳过；同时只播 1 路人声"],
     ["史实出错", "facts 单一来源；高影响节点人工审"],
-    ["模型慢", "MOCK；FALLBACK；对话限长"],
+    ["模型慢", "「思考中」显示已等秒数；失败重试 2 次后记 source=ERROR 并在界面给原因与「重试」键；对话限长"],
     ["评委问 AI", "行军记录 source；成对对抗日志"],
   ],
   [2400, 6960]
