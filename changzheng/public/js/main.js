@@ -9,19 +9,6 @@ let judgeMode = false;
 // 调用流（答辩面板那份"最近 30 次调用摘要"）已经搬进 `modules/ai`：这里只发事件、按需请它渲染。
 // 批 5 之前是 main.js 自己存数组 + 往 window 挂 __pushAiFeed 让沙盘捅进来——全局与双数据源都没了。
 
-/**
- * 业务侧的唯一调用方式（批 6：实现搬进 `modules/ai`，这里是薄薄一层）。
- *
- * 保留这个名字与返回形状，是为了让 50 个调用点**一行都不用改**——内部已经是"发事件 + 等裁决"：
- * 思考提示与「重试／跳过」面板在 `modules/shell`（订阅 ai:start / done / fail），每类预算在
- * `modules/ai/registry.js`，计数、账目、busy 状态都归 ai 模块。
- * 因此调用点里那 26 处 `showThinking(true/false)` 与 24 处 `st().bumpAiCount()` 全部删除
- * （见 HANDOFF-CODE 坑 46：这种"每处都要记得配一句"的样板，早晚会漏一处）。
- */
-function callAI(payload, opts) {
-  return kernel.api('ai').ask(payload, opts);
-}
-
 // 「重试 / 跳过」面板与"思考中"提示都搬进了 modules/shell（订阅 ai:start / ai:done / ai:fail）——
 // 批 6 之前是 50 个调用点各自 showThinking(true/false) 成对写，漏一处就"转圈停不下来"。
 function setJudgeMode(on) {
@@ -39,34 +26,23 @@ import { setStep, setStepState, waitContinue, askChoice, markAction, choiceButto
 // 内核：模块注册 / 事件总线 / 契约 / 只读快照 / 诊断（架构见 docs/BUS.md）。
 // 批 1 只把地基启动起来，业务模块从批 2 起逐个挂上来（见 wiring.js 的 MODULES 清单）。
 import { kernel, loadModules, exposeDevFacade } from './kernel/index.js';
+// 流程层的共用地基（批 7）：状态读写、模型调用、步骤契约、只读上下文、记流水
+import {
+  S, hasS, st, gamesApi, callAI, step, waitBtn, publicState, currentActDef,
+  logChoice, logShare, markDone, isDone, LINE_NAMES, LINES_TOTAL,
+  getActsData, setActsData, getFacts, setFacts, getConfig, setConfig,
+} from './flow/kit.js';
 
 const { $, showScreen, setTopbar,
   toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
   flashEffects, setAiMode, typeText, escapeHtml, renderLogs, renderFacts,
   showOverlay, hideOverlay, replayAnim, wipe, bindParallax, isTypingTarget, contentFace, actionHost } = UI;
 
-/**
- * 状态与它的别名：
- *   `st()` → state 模块（**写状态只有这条路**：语义动作或 `apply()`，写完自动广播 + 存档）
- *   `S`    → 同一份对象的**只读别名**（历史代码里到处在读 `S.xxx`；批 7 拆 flow 时逐块收掉）
- * 规矩：`S.xxx = ...` 这种写法不允许（`npm run qa:bus` 会拦）——写一律走 `st().…`。
- */
-const st = () => kernel.api('state');
-/** 玩法宿主服务（批 5）：开板屏、题名、数值签、契约声明、清理都归它；这里只按 id 开一局 */
-const gamesApi = () => kernel.api('games');
 
-let S = null;
-let allFacts = {};
-let actsData = null;
-let config = { model: 'glm-5.1', hasKey: false };   // 占位：真值由 /api/config 覆盖（赛制指定 glm-5.1）
 let echoResolve = null;
 let talkPending = false;
 
 /** 声明当前步骤：全项目统一的交互契约入口（见 step.js） */
-function step(id, kind = 'choice', state = 'awaiting') {
-  setStep(id, kind, state);
-}
-
 /**
  * 素材「落盘即生效」：优先用新图，探测不到就退回占位图。
  * 生图模型按 docs/HANDOFF-ART.md 的表把文件放进 public/assets/scenes/，
@@ -286,11 +262,11 @@ async function boot() {
   // 幂等，且模块加载失败不影响启动（分批迁移期清单里可能列着还没写的模块）。
   await loadModules();
   kernel.boot();
-  config = await fetchConfig();
-  setAiMode(config);
-  $('title-model').textContent = config.model;
-  allFacts = (await fetchFacts()) || {};
-  actsData = await fetchActs();
+  setConfig(await fetchConfig());
+  setAiMode(getConfig());
+  $('title-model').textContent = getConfig().model;
+  setFacts(await fetchFacts() || {});
+  setActsData(await fetchActs());
   bindChrome();
   exposeSheetHooks();
   // 微视差：两幅整屏插画（封面与营地全景）随指针轻微位移；减动效偏好下 bindParallax 自己跳过
@@ -315,7 +291,7 @@ function offerResume() {
 }
 
 function resumeRun(saved) {
-  S = st().resume(saved);
+  st().resume(saved);
   setTopbar(true);
   renderJourney();
   $('ai-count').textContent = String(S.aiCount || 0);
@@ -326,13 +302,6 @@ function resumeRun(saved) {
   }
   toast(`接着上一局：${act.title} · 第 ${S.day || 1} 日`, 3200);
   enterCampDay(act, S.day || 1);
-}
-
-function currentActDef() {
-  const order = actsData?.order || [];
-  const idx = S.actIndex || 0;
-  const id = order[idx];
-  return actsData?.acts?.[id] || null;
 }
 
 /**
@@ -354,7 +323,7 @@ function exposeSheetHooks() {
     pathZones: () => renderPathZones($('path-zones'), () => {}),
     // 篝火菜单只在第四幕营地的 fire 热点出现，跑一遍太贵；这里直接走它的真实渲染函数
     fire: () => {
-      if (!S) return;
+      if (!hasS()) return;
       showOverlay('screen-fire');
       renderFireMenu(currentActDef());
     },
@@ -368,7 +337,7 @@ function exposeSheetHooks() {
       return contentFace(target);
     },
     night: () => {
-      if (!S) return;
+      if (!hasS()) return;
       // 篝火夜的门槛是"点亮 ≥3 条附身线"；截图只需要过门槛，内容仍由模型现场生成
         st().set('linesDone', ['fishing', 'candy', 'sentry'], '调试：预置附身线');
       runNightChoice(currentActDef());
@@ -379,7 +348,7 @@ function exposeSheetHooks() {
     // 玩法板同理：四个玩法都在幕深处，截图/体检直接把它们摆到板屏上
     // 玩法清单只有一份（modules/games/manifest.js）——这里不再抄第二张表
     mini: (name) => {
-      if (!S) return false;
+      if (!hasS()) return false;
       const g = gamesApi();
       if (!g?.has?.(name)) return false;
       g.play(name, { params: { password: S.tonightPassword } });
@@ -404,7 +373,7 @@ function bindChrome() {
   };
   $('btn-facts').onclick = () => {
     showOverlay('screen-facts');
-    renderFacts(allFacts, S?.unlockedFacts || []);
+    renderFacts(getFacts(), S?.unlockedFacts || []);
     replayAnim($('facts-list'), 'anim-stagger');
   };
   $('btn-facts-close').onclick = () => hideOverlay('screen-facts');
@@ -449,14 +418,14 @@ function bindChrome() {
     }
     if (isTypingTarget(e)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return; // 组合键留给浏览器（复制/粘贴/开发者工具）
-    if (e.key.toLowerCase() === 'j' && S) { openJournal(); return; }
+    if (e.key.toLowerCase() === 'j' && hasS()) { openJournal(); return; }
     const n = Number(e.key);
     if (n >= 1 && n <= 9 && activateChoice(n)) kernel.emit('sfx:play', { name: 'click' });
   });
 }
 
 function openJournal() {
-  if (!S) return;
+  if (!hasS()) return;
   showOverlay('screen-journal');
   // 手记底图：有 map_route 就用它当"回望这一路"的地图底（图层压暗保证可读）
   const mapImg = sceneImage('/assets/scenes/map_route.jpg', '');
@@ -467,11 +436,11 @@ function openJournal() {
       ? `linear-gradient(160deg, rgba(244,237,223,0.9), rgba(230,218,195,0.94)), url('${mapImg}')`
       : '';
   }
-  const order = actsData?.order || [];
+  const order = getActsData()?.order || [];
   const now = S.actIndex ?? 0;
   $('journal-route').innerHTML = order
     .map((id, i) => {
-      const a = actsData.acts[id];
+      const a = getActsData().acts[id];
       const cls = i < now ? 'done' : i === now ? 'now' : '';
       const mark = i < now ? '✓ ' : i === now ? '▸ ' : '';
       return `<span class="jr-chip ${cls}">${mark}${a?.title || id}</span>`;
@@ -486,7 +455,7 @@ function openJournal() {
   const unlocked = S.unlockedFacts || [];
     $('journal-facts').innerHTML = unlocked.length
       ? unlocked.map((id) => {
-          const f = allFacts?.[id];
+          const f = getFacts()?.[id];
           return `<li><b>${escapeHtml(f?.title || id)}</b>${f?.date ? ` <span class="muted">${escapeHtml(f.date)}</span>` : ''}</li>`;
         }).join('')
       : '<li class="empty">还没有照亮史实。</li>';
@@ -499,17 +468,7 @@ function openJournal() {
     + `体力 ${S.体力} · 粮食 ${S.粮食} · 士气 ${S.士气} · 信念 ${S.信念} · 民心 ${S.民心}`
     + `　｜　附身线 ${st().linesDone()}/${LINES_TOTAL}`
     + `　｜　对决 ${S.quiz?.human ?? 0}:${S.quiz?.ai ?? 0}`
-    + `　｜　模型 ${config.model}`;
-}
-
-function logChoice(act, label, mood) {
-  if (!S) return;
-  st().pushChoice({ act: act?.title || '—', label: String(label).slice(0, 40), mood: mood || '' });
-}
-
-function logShare(label) {
-  if (!S) return;
-  st().pushChoice({ act: `第 ${S.actIndex + 1} 幕 · 分享`, label: String(label).slice(0, 40), mood: '分粮' });
+    + `　｜　模型 ${getConfig().model}`;
 }
 
 function showLossToast(who, reason) {
@@ -548,7 +507,7 @@ async function openDefense() {
   const cards = [
     { k: '总调用', v: logs.length, n: '每次决策均有 JSONL' },
     { k: '平均延迟', v: avg + 'ms', n: '真调 1–8s（推理档位 low）' },
-    { k: 'GLM 真调', v: glmCalls, n: `source=GLM · ${config?.model || 'glm'}` },
+    { k: 'GLM 真调', v: glmCalls, n: `source=GLM · ${getConfig()?.model || 'glm'}` },
     { k: 'ERROR', v: bySource.ERROR || 0, n: '失败已记录（可重试）' },
   ];
   Object.entries(byType).forEach(([t, n]) => {
@@ -625,7 +584,7 @@ function renderSettingsStatus(cfg) {
 
 async function openSettings() {
   const cfg = await fetchConfig();
-  config = cfg;
+  setConfig(cfg);
   const sel = $('set-model');
   sel.innerHTML = (cfg.availableModels || ['glm-5.1', 'glm-5.3-flash'])
     .map((m) => `<option value="${m}" ${m === cfg.model ? 'selected' : ''}>${m}</option>`)
@@ -668,10 +627,10 @@ function bindSettings() {
     if (key) body.apiKey = key;
     try {
       const r = await saveConfig(body);
-      config = await fetchConfig();
-      setAiMode(config);
-      $('title-model').textContent = config.model;
-      renderSettingsStatus(config);
+      setConfig(await fetchConfig());
+      setAiMode(getConfig());
+      $('title-model').textContent = getConfig().model;
+      renderSettingsStatus(getConfig());
       $('set-status').textContent = `已保存并生效：${r.model}　推理档位 ${r.reasoningEffort || '（默认）'}${r.hasKey ? '' : '　⚠ 未配置 Key'}`;
       $('set-key').value = '';
       $('set-model-custom').value = '';
@@ -745,7 +704,7 @@ function showEcho({ title, play, real, fic }) {
 async function afterJudge(result, fallbackTitle, defaultFactId) {
   const fid = result.factId || result.fact_id || defaultFactId;
   if (fid) st().unlockFact(fid);
-  const fact = allFacts?.[fid];
+  const fact = getFacts()?.[fid];
   const play = result.narrative || result.scene_text || result.reply || '';
   if (!fact && !play) return;
   await showEcho({
@@ -758,7 +717,7 @@ async function afterJudge(result, fallbackTitle, defaultFactId) {
 
 // ─── run ───
 async function startRun(mode = 'study') {
-  S = st().start(mode);          // 新开一局（state 模块负责广播 + 存档）
+  st().start(mode);          // 新开一局（state 模块负责广播 + 存档）
   setTopbar(true);
   toast(mode === 'march' ? '行军模式：资源与抉择都可能真的带不走一些人' : '研学模式：不会失去战友', 3200);
   if (mode === 'quick') toast('快速演示：每幕只跑主玩法与对决', 3200);
@@ -816,7 +775,7 @@ function originText() {
 
 /** 成败与粮荒结算：返回 true 表示已进入失败流程 */
 async function settlePressure(act) {
-  if (!S) return false;
+  if (!hasS()) return false;
   // 幕间粮荒
   const drain = st().starvation();
   if (drain > 0) {
@@ -1026,11 +985,11 @@ function updateDusk() {
 
 function renderJourney() {
   const el = $('journey');
-  if (!el || !actsData) return;
-  const order = actsData.order || [];
+  if (!el || !getActsData()) return;
+  const order = getActsData().order || [];
   const now = S?.actIndex ?? 0;
   el.innerHTML = order.map((id, i) => {
-    const a = actsData.acts[id];
+    const a = getActsData().acts[id];
     const cls = i < now ? 'done' : i === now ? 'now' : '';
     const line = i < order.length - 1 ? `<div class="j-line ${i < now ? 'done' : ''}"></div>` : '';
     return `<div class="j-node ${cls}"><span class="j-dot"></span><span class="j-label">${a?.title || id}</span></div>${line}`;
@@ -1119,14 +1078,6 @@ function renderHotspots(act, hotspots) {
 }
 
 /** 第四幕营地的五条附身线：点亮 ≥3 条解锁篝火夜 */
-const LINE_NAMES = {
-  fishing: '钓鱼分汤',
-  candy: '分糖',
-  sentry: '夜岗',
-  school: '夜校识字',
-  gomoku: '五子棋',
-};
-const LINES_TOTAL = Object.keys(LINE_NAMES).length;
 
 function markLine(key) {
   if (!LINE_NAMES[key]) return;
@@ -1228,12 +1179,6 @@ async function onHotspot(act, h) {
   });
 }
 
-function markDone(actId, key) {
-  st().markDone(actId, key);
-}
-function isDone(actId, key) {
-  return !!(S.doneKeys && S.doneKeys[`${actId}:${key}`]);
-}
 
 function renderFireMenu(act) {
   const box = $('fire-opts');
@@ -1739,7 +1684,6 @@ async function doLuding(act) {
 }
 
 // 「继续」统一走 step.js 的 waitContinue（带 data-action 契约标记）
-const waitBtn = waitContinue;
 
 /**
  * 流程锁（内核资源 'flow'）。语义在批 3 收口为两条：
@@ -2085,11 +2029,11 @@ async function finishAct(act) {
   renderJourney();
   // 幕间压力结算：粮荒 + 成败判定
   if (await settlePressure(act)) return;
-  const order = actsData.order || [];
+  const order = getActsData().order || [];
   if (S.actIndex >= order.length) {
     await runEnding();
   } else {
-    const next = actsData.acts[order[S.actIndex]];
+    const next = getActsData().acts[order[S.actIndex]];
     await marchTransition('前往 ' + next.title);
     await runActIntro();
   }
@@ -2199,18 +2143,6 @@ function bindEndActions(end) {
   };
 }
 
-function publicState() {
-  return {
-    体力: S.体力, 粮食: S.粮食, 士气: S.士气, 信念: S.信念, 民心: S.民心,
-    好感_老班长: S.好感_老班长, 好感_指导员: S.好感_指导员, 好感_红小鬼: S.好感_红小鬼,
-    好感_卫生员: S.好感_卫生员, 好感_老乡: S.好感_老乡,
-    tonightPassword: S.tonightPassword, 行动日志: S.行动日志, day: S.day, act: S.actIndex,
-    附身线: (S.linesDone || []).map((k) => LINE_NAMES[k] || k),
-    夜岗表现: S.sentryScore || 0,
-    分糖方案: S.sugarPlan || null,
-    夜间抉择: S.nightChoice || '',
-  };
-}
 
 void wait;
 boot();
