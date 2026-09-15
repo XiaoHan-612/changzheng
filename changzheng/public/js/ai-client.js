@@ -55,6 +55,17 @@ export async function fetchActs() {
   }
 }
 
+/** 终局升华的诗（`data/poem.json`）：拿不到就当没有——升华退化成"只演题字与落款"，不阻塞收尾 */
+export async function fetchPoem() {
+  try {
+    const res = await fetch('/api/data/poem');
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function saveConfig(body) {
   const res = await fetch('/api/config', {
     method: 'POST',

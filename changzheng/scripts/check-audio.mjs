@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { ensureServer, BASE as SERVER_BASE } from '../tests/e2e/lib/server.mjs';
 import { audioInfo, bytesLabel } from './lib/audio-info.mjs';
+import { hashName } from './lib/tts-hash.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const AUDIO = path.join(ROOT, 'public/audio');
@@ -26,22 +27,22 @@ const problems = [];
 const notes = [];
 
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
-const TTS_HASH = (voice, text) => crypto.createHash('sha1').update(`${voice}|${text}`).digest('hex').slice(0, 16);
 
 /**
  * 默认音色：`/api/tts` 的缓存文件名 = sha1(`音色|文本`) + 音色，所以"没指定音色时算哪个 id"
  * 是**双方约定的一部分**——服务端算 'default'、前端算 'narr' 的话哈希对不上，缓存永远命中不了。
- * 这里把两处抠出来对一下（以前脚本自己硬写 'narr'，正是这条约定悄悄分岔的地方）。
+ * 三处都抠出来对一下（服务端 / 前端门面 / 脚本共用的 lib；以前脚本自己硬写 'narr'，正是这里悄悄分岔的）。
  */
 const DEFAULT_VOICE = {
   server: (read('server/index.js').match(/voiceId = '([^']+)'/) || [])[1] || '',
   client: (read('public/js/audio/channels/voice.js').match(/export const DEFAULT_VOICE = '([^']+)'/) || [])[1] || '',
+  scripts: (read('scripts/lib/tts-hash.mjs').match(/export const DEFAULT_VOICE = '([^']+)'/) || [])[1] || '',
 };
 
 /** 收集所有音频文件（按目录分类） */
 function listAudio() {
   const out = [];
-  for (const dir of ['ambient', 'bgm', 'cache', 'voices']) {
+  for (const dir of ['ambient', 'bgm', 'cache', 'voices', 'poem']) {
     const abs = path.join(AUDIO, dir);
     if (!fs.existsSync(abs)) continue;
     for (const f of fs.readdirSync(abs).filter((x) => /\.(wav|ogg|mp3)$/i.test(x)).sort()) {
@@ -69,10 +70,27 @@ function references() {
   const voices = new Set();
   const voiceLines = JSON.parse(read('public/audio/voice-lines.json')).lines || [];
   for (const l of voiceLines) voices.add(path.basename(l.file));
+  // 两个集合的语义不同，别合并：
+  //   cache         —— data/tts-lines.json 声明的：**必须存在**（反向也查：少一个就报缺失）
+  //   cacheOptional —— 诗那 8 句配音：**有就好、没有照走**（缺音频时按 poem.json 的 pace 逐字），
+  //                    只用于正向判定"cache/ 里这个文件有没有被引用到"
   const cache = new Set();
+  const cacheOptional = new Set();
   const ttsLines = JSON.parse(read('data/tts-lines.json')).lines || [];
-  for (const l of ttsLines) cache.add(`${TTS_HASH(l.voiceId || DEFAULT_VOICE.client, l.text)}_${l.voiceId || DEFAULT_VOICE.client}.wav`);
-  return { ambient: new Set([...ambient, ...ambientAlt]), bgm, voices, cache, voiceLines, ttsLines };
+  for (const l of ttsLines) cache.add(hashName(l.text, l.voiceId));
+  // 终局升华的诗（data/poem.json）：两条音频路线都算"被请求得到"——
+  //   ① 逐句配音：与其它台词同一条道，cache/<sha1(voiceId|句)>_<voiceId>.wav（/api/tts 命中）
+  //   ② 整段录音：public/audio/poem/<audio.full>；或按句放 poem_<句号>.ogg|wav（播放器逐句探测）
+  const poem = (() => { try { return JSON.parse(read('data/poem.json')); } catch { return null; } })();
+  const poemVoice = poem?.audio?.voiceId || 'narr';
+  const poemFiles = new Set();
+  if (poem?.audio?.full) poemFiles.add(path.basename(poem.audio.full));
+  for (const l of poem?.lines || []) {
+    cacheOptional.add(hashName(l.text, poemVoice));
+    poemFiles.add(`poem_${l.i}.ogg`);
+    poemFiles.add(`poem_${l.i}.wav`);
+  }
+  return { ambient: new Set([...ambient, ...ambientAlt]), bgm, voices, cache, cacheOptional, poemFiles, voiceLines, ttsLines };
 }
 
 async function main() {
@@ -153,7 +171,9 @@ async function main() {
     if (!referenced(r.file, refs.voices)) problems.push(`${r.url} 没有任何 voice-lines 指向它 → 永远播不到`);
   }
   for (const r of byDir('cache')) {
-    if (!referenced(r.file, refs.cache)) problems.push(`${r.url} 的哈希与 data/tts-lines.json 对不上 → /api/tts 永远取不到它`);
+    if (!referenced(r.file, refs.cache) && !referenced(r.file, refs.cacheOptional)) {
+      problems.push(`${r.url} 的哈希与 data/tts-lines.json（或 data/poem.json 的诗句）对不上 → /api/tts 永远取不到它`);
+    }
   }
   // 反向：清单里写了但文件不在
   const have = new Set(rows.map((r) => r.file));
@@ -163,14 +183,34 @@ async function main() {
   }
   for (const name of refs.cache) if (!have.has(name)) problems.push(`data/tts-lines.json 对应的缓存缺失：${name}（重跑 npm run tts:manifest 对照）`);
   // 默认音色两处必须一致（否则哈希分岔，缓存永远命中不了）——顺手防"守卫自己被改成永远绿"
-  if (!DEFAULT_VOICE.server || !DEFAULT_VOICE.client) {
-    problems.push(`读不出默认音色（服务端 ${DEFAULT_VOICE.server || '?'} / 前端 ${DEFAULT_VOICE.client || '?'}）——check-audio 的正则与代码写法对不上了（守卫不能静默失效）`);
-  } else if (DEFAULT_VOICE.server !== DEFAULT_VOICE.client) {
-    problems.push(`默认音色不一致：服务端 '${DEFAULT_VOICE.server}'、前端 '${DEFAULT_VOICE.client}' —— sha1 会算出两个文件名，TTS 缓存永远命中不了`);
+  if (!DEFAULT_VOICE.server || !DEFAULT_VOICE.client || !DEFAULT_VOICE.scripts) {
+    problems.push(`读不出默认音色（服务端 ${DEFAULT_VOICE.server || '?'} / 前端 ${DEFAULT_VOICE.client || '?'} / 脚本 lib ${DEFAULT_VOICE.scripts || '?'}）——check-audio 的正则与代码写法对不上了（守卫不能静默失效）`);
+  } else if (new Set(Object.values(DEFAULT_VOICE)).size !== 1) {
+    problems.push(`默认音色不一致：服务端 '${DEFAULT_VOICE.server}'、前端 '${DEFAULT_VOICE.client}'、脚本 lib '${DEFAULT_VOICE.scripts}' —— sha1 会算出不同文件名，TTS 缓存永远命中不了`);
   }
   for (const r of byDir('bgm')) {
     if (!Object.values(mapOf(read('public/js/audio/channels/bgm.js'), BGM_ENTRY)).some((u) => path.basename(u) === r.file)) {
       problems.push(`${r.url} 没有任何 BGM_FILE 映射指向它 → 永远播不到`);
+    }
+  }
+  // 终局升华的诗：放进 poem/ 的文件必须被 data/poem.json 指到（否则白放）；逐句配音缺了只提示不报错
+  for (const r of byDir('poem')) {
+    if (!refs.poemFiles.has(r.file)) {
+      problems.push(`${r.url} 没有被 data/poem.json 指到（整段录音填 audio.full；逐句按 poem_<句号>.ogg|wav 命名）→ 永远播不到`);
+    }
+  }
+  {
+    const poem = (() => { try { return JSON.parse(read('data/poem.json')); } catch { return null; } })();
+    const poemLines = poem?.lines || [];
+    // 声明了整段录音就必须在：`audio.full` 是"我打算用这段录音"的意思，文件不在就只是悄悄退化——
+    // 这正是最难发现的一类（屏幕照演，只是没声）。逐句配音不适用这条：它走的是"有就好、没有照走"。
+    if (poem?.audio?.full && !have.has(path.basename(poem.audio.full))) {
+      problems.push(`data/poem.json 的 audio.full 指向 ${poem.audio.full}，但 public/audio/poem/ 里没有它（整段朗诵会退化成逐句/无声）`);
+    }
+    if (poemLines.length) {
+      const voice = poem.audio?.voiceId || 'narr';
+      const voiced = poemLines.filter((l) => have.has(hashName(l.text, voice))).length;
+      notes.push(`诗（终局升华）：逐句配音 ${voiced}/${poemLines.length} 条就位 · 整段录音 ${byDir('poem').length} 个 —— 全无音频时按 data/poem.json 的 pace 逐字走（流程照旧）`);
     }
   }
 
@@ -178,7 +218,7 @@ async function main() {
   const lines = [
     '# 音频体检报告',
     '',
-    `> 由 \`npm run qa:audio\` 生成 · 共 ${rows.length} 个文件（ambient ${byDir('ambient').length} · bgm ${byDir('bgm').length} · cache ${byDir('cache').length} · voices ${byDir('voices').length}）`,
+    `> 由 \`npm run qa:audio\` 生成 · 共 ${rows.length} 个文件（ambient ${byDir('ambient').length} · bgm ${byDir('bgm').length} · cache ${byDir('cache').length} · voices ${byDir('voices').length} · poem ${byDir('poem').length}）`,
     '',
     '| 文件 | 容器 | 采样 | 声道 | 时长 | 体积 | HTTP | MIME | 可解码 |',
     '|---|---|---|---|---|---|---|---|---|',

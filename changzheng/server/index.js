@@ -140,16 +140,15 @@ app.post('/api/config/test', async (req, res) => {
   }
 });
 
-app.get('/api/data/facts', (_req, res) => {
-  const p = path.join(__dirname, '..', 'data', 'facts.json');
-  if (fs.existsSync(p)) res.sendFile(p);
-  else res.json({});
-});
-
-app.get('/api/data/acts', (_req, res) => {
-  const p = path.join(__dirname, '..', 'data', 'acts.json');
-  if (fs.existsSync(p)) res.sendFile(p);
-  else res.json({ ok: false, error: 'no acts' });
+// 数据文件服务：**白名单**，加新表就在这一行加名字。
+// 不要写成"任意文件名"——那是目录穿越（`..%2f` 这类），而且漏了白名单就等于把 data/ 全暴露。
+const DATA_FILES = ['facts', 'acts', 'poem'];
+app.get('/api/data/:name', (req, res) => {
+  const name = String(req.params.name || '').replace(/\.json$/i, '');
+  if (!DATA_FILES.includes(name)) return res.status(404).json({ ok: false, error: 'no such data file' });
+  const p = path.join(__dirname, '..', 'data', `${name}.json`);
+  if (fs.existsSync(p)) return res.sendFile(p);
+  res.json(name === 'acts' ? { ok: false, error: 'no acts' } : {});
 });
 
 // SPA 兜底：只对"页面路由"回 index.html。

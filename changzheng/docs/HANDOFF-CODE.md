@@ -10,11 +10,12 @@
 cd changzheng
 npm install
 npm start                 # http://localhost:3001
-npm run test:unit         # 53 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致
+npm run test:unit         # 58 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制
 npm run test:e2e          # 五幕**真调**通关（含快速模式：node tests/e2e/full-run.mjs --quick）
 npm run qa:smoke          # 标题→营地→一次互动
 npm run qa:audit          # 日志 schema 审计 → docs/LOG-AUDIT.md
 npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表）
+npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 句 + 目标文件名 + 时间轴）
 ```
 
 **没有 MOCK 模式**：所有智能判断都真调。`GLM_MODEL` 默认 `glm-5.1`（赛制指定），本机在 `.env` 用 `glm-5.3-flash` 替代；`GLM_REASONING_EFFORT` 默认 `low`（必须设，否则「始终思考」的模型会把 token 用在推理上、`content` 返回空）。
@@ -37,7 +38,7 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 | `server/logger.js` | JSONL 落库（按日文件 + 会话镜像 + 契约戳记 + 8MB 轮转） | 落库只有这一处，新增字段在这里加 |
 | `server/balance.js` | 数值护栏（单维单次上限 / 单次最多 3 维 / 信念只在关键抉择正向） | 改数值要同时改提示词与单测（第 25 条） |
 | `public/css/` | fonts → tokens（唯一值源）→ base → framework（模板 + 区块 + 动效）→ components | 页面不写样式（`qa:frames` 拦）；颜色/字号/圆角不许写死（`qa:tokens` 拦） |
-| `server/index.js` | 路由 + 静态 + gzip + 缓存头 | 新增数据文件记得加 `/api/data/*` 路由 |
+| `server/index.js` | 路由 + 静态 + gzip + 缓存头 | 新增数据文件要在 `DATA_FILES` 白名单里加名字（别写成任意文件名：那是目录穿越） |
 | `data/acts.json` | 五幕定义：热点、`dayScenes`、强制链、对决 | 改热点等于改玩法入口 |
 | `data/facts.json` | 史实卡 14 张（real/fiction 分栏） | 新增卡片要同步 `acts[].facts` |
 | `data/tts-lines.json` | 固定台词清单 | 改文本会让哈希文件名变化，要重跑 `npm run tts:manifest` |
@@ -278,6 +279,11 @@ npm run tts:manifest      # 生成 docs/TTS-MANIFEST.md（音频模型对照表�
 50. **内核会"捕获并跳过"模块抛的错：功能静默少一块，而不是当场炸**（批 A 自己踩的，值得单列） —— 新加的"框架 → 总线"回执 `audio.onReport(fn)` 我写在了 `AudioCore` 上，而调用方 `modules/audio` 的 `ready()` 里写的是**门面** `audio.onReport(fn)`——`TypeError: audio.onReport is not a function`。内核把这条吞成 `ready-error` 诊断，于是：**声音照响**（通道没问题）、**事件一条不发**（回执没接上），游戏看起来一切正常，只有未来靠这些事件的逐字跟读会"永远不动"。是"拿真页面跑一次探针"才挖出来的（探针当时还是我临时写的）。
     - 教训一：**"内核不崩"的设计必须配一条"别让它静默变残"的守卫**。`dev:check` 现在断言 `init-error / ready-error / subscriber-error` 为 0（以前只查契约违规、坏描述符、模块没注册），负向测试验过会红。新增模块的 `ready()` 里接了事件/回调的，这条会替你看着。
     - 教训二：**新通道上线前拿真页面验一次"回声"**，别只验"声音在响"（`isPlaying` 为真不等于事件在流）。验的时候记得先等 `__czKernel.state().booted === true`——`__czKernel` 在模块加载前就挂上了，等它就是不等启动（第一版探针正是这么误判的，看到的"没反应"其实是探针太早）。
+
+51. **写死了文件清单的测试命令，会让新加的守卫文件"永远不跑"**（批 B 顺手挖出来的，代价可能已经付过一次） —— `package.json` 里 `test:unit` 一直是手列文件：`node --test tests/unit/state.test.js tests/unit/config.test.js …`（6 个）。上一轮加的 `companions.test.js`（好感维度一致性守卫）**没有被任何命令跑到**——`verify:fast` 走 `npm run test:unit`、`dev:check` 走通配符，于是"本机快检绿、提交前的验收也绿"，而那条守卫一次都没执行过（跟坑 47 最后一条同一个病：**守卫静默失效比没有守卫更坏**）。
+    - 改成 `node --test "tests/unit/*.test.js"`：加文件不用改命令，数字也对得上（49 → 58 项）。
+    - **别写成 `node --test tests/unit/`**：Node 24 在 Windows 上会把目录当测试文件，报 `MODULE_NOT_FOUND`（试过）。通配符形式两个平台都稳。
+    - 同类自查：凡"新加东西要记得登记进某个列表"的地方（测试文件、扫描脚本的目录清单、允许的事件名），一律改成按目录/模式发现；确实必须手列时，就加一条断言"清单里的文件都存在"，让漏登记当场变红。
 
 ## 六、下一步建议（按价值排序）
 1. **真调验证已全覆盖**（2026-09-13）：标准模式一局 76 次调用全 `source=GLM`、无 ERROR；`failure_review` 由 `npm run qa:failure` 单独覆盖（注入"断粮+体力见底"走失败线，断言真调 1 次且渲染出标题/段落/史实要点）。15 类 callType 全部有真调记录。

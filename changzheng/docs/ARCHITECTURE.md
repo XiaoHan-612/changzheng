@@ -40,13 +40,15 @@ changzheng/
     dev/audio.html      # 音频试听页：按通道逐个点播，标出用文件/合成兜底/缺文件
     fonts/              # 五族自托管字体（tools/build-fonts.mjs 生成）
     assets/scenes|characters|events/
-    audio/ambient|sfx|cache|reactions|voices/
+    audio/ambient|sfx|cache|voices/           # 环境床 / 操作音 / TTS 缓存 / 预录台词
+    audio/poem/                               # 终局升华的整段朗诵（**不入库**，见该目录 README）
   data/
     acts.json           # 五幕定义（热点、dayScenes、强制链、对决）
     facts.json          # 史实卡 14 张 real/fiction
     tts-lines.json      # 固定台词清单（改文本要重跑 tts:manifest）
+    poem.json           # 终局升华的诗与落款（**诗的唯一真源**：屏幕/逐字/配音都读它；改文本要重跑 poem:manifest）
   tests/
-    unit/               # node --test：状态层 / 契约 / 配置层 / 减员 / 数值护栏
+    unit/               # node --test：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制
     e2e/                # full-run（五幕真调）/ smoke / sandbox / regressions / failure
                         # av-audit（影音）/ layout-audit（逐屏布局）/ asset-drop
     manual/             # 体检与一次性排查：qa-board / qa-motion / qa-hud / screen-sheet …
@@ -119,12 +121,13 @@ UI 事件 ─┤ kernel.emit('ai:request', …)                                 
 npm run test:e2e      # 五幕真调通关（~76 次调用）+ 不重复结算等断言
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
 # 局部（多数不烧 AI）
-npm run test:unit     # 53 项：资源钳制 / 史实解锁 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致
+npm run test:unit     # 58 项：资源钳制 / 史实解锁 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制
 npm run qa:smoke      # 标题→营地→一次互动（含"用过的热点当场作废"断言）
 npm run qa:board      # 玩法板体检 36 项（板屏壳 / 数值签 / 契约标记）
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫
 npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md · qa:handoff 交接文档一致性
 npm run tts:manifest  # 更新语音清单（改台词后必跑）
+npm run poem:manifest # 更新诗的音频对照表 docs/POEM-TTS.md（改诗或改音色后必跑）
 ```
 
 有 Key 时：设置里测试连通，再手玩一幕真调。

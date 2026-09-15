@@ -21,3 +21,8 @@ data/replay/
 # 环境床的 WAV 兼容格式：能用，但体积约为 Ogg 的 10 倍。
 # 等音频模型按同名导出 Ogg Vorbis 后再入库（代码优先用 .ogg）。
 public/audio/ambient/*.wav
+
+# 终局升华的整段朗诵：网上找的/别人录的音频**不进公开仓库**（仓库是公开的），
+# 本机与演示机照常能播。目录里那份"怎么放"的说明留着（public/audio/poem/README.md）。
+public/audio/poem/*
+!public/audio/poem/README.md

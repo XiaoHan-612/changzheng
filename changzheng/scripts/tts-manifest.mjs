@@ -3,19 +3,15 @@
 // 用法：node scripts/tts-manifest.mjs
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { hashName } from './lib/tts-hash.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'data', 'tts-lines.json');
 const OUT = path.join(ROOT, 'docs', 'TTS-MANIFEST.md');
 const CACHE = path.join(ROOT, 'public', 'audio', 'cache');
 
-export function hashName(text, voiceId) {
-  const voice = String(voiceId || 'default').replace(/[^\w-]/g, '') || 'default';
-  const hash = crypto.createHash('sha1').update(`${voice}|${text}`).digest('hex').slice(0, 16);
-  return `${hash}_${voice}.wav`;
-}
+export { hashName };
 
 const data = JSON.parse(fs.readFileSync(SRC, 'utf8'));
 const lines = data.lines || [];

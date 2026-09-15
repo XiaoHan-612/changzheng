@@ -3,10 +3,10 @@
 // 用法：node scripts/check-tts.mjs
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { hashName } from './lib/tts-hash.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = process.env.PORT || 3001;
@@ -48,10 +48,6 @@ function wavInfo(buf) {
   return { ...fmt, dur: dataLen / (fmt.rate * fmt.channels * (fmt.bits / 8)) };
 }
 
-const hashName = (text, voiceId) => {
-  const voice = String(voiceId || 'default').replace(/[^\w-]/g, '') || 'default';
-  return crypto.createHash('sha1').update(`${voice}|${text}`).digest('hex').slice(0, 16) + `_${voice}.wav`;
-};
 
 async function main() {
   await ensureServer();
@@ -64,7 +60,11 @@ async function main() {
       : []);
   const appSource = flowFiles
     .map((p) => { try { return fs.readFileSync(path.join(ROOT, 'public/js', p), 'utf8'); } catch { return ''; } })
-    .concat([fs.readFileSync(path.join(ROOT, 'data/facts.json'), 'utf8')])
+    // 数据侧也算"会被请求到的地方"：史实卡、以及终局升华的诗（诗的一字一句都在 data/poem.json 里，
+    // 屏幕与配音都读它——将来把诗句加进 tts-lines 时，这条会替它守着"清单与代码文本一致"）
+    .concat(['data/facts.json', 'data/poem.json'].map((p) => {
+      try { return fs.readFileSync(path.join(ROOT, p), 'utf8'); } catch { return ''; }
+    }))
     .join('\n');
   const problems = [];
   const rows = [];

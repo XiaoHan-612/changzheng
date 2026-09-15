@@ -153,6 +153,7 @@ reconcile(): 让 actual 追上 desired —— 该起的起（带淡入）、该�
 | 新 BGM | **② 已就绪**：`channels/bgm.js` 的 `BGM_FILE` 加一行 + 场景表指向它 + `public/audio/bgm/<kind>_bgm.ogg` 落盘即生效 |
 | 新音效 | **③ 已就绪**：`sfx-table.js` 加一条配方（`audio.sfx('新名字')` 即可用）；**或**直接把 `public/audio/sfx/<name>.ogg` 落盘——同名文件自动顶替合成音，连表都不用改 |
 | 新台词 / 新角色语音 | `data/tts-lines.json` 加条 + `ACTOR_VOICE` 加一行 → `npm run tts:manifest` 产出文件名交给音频模型 |
+| 终局升华的诗（逐句或整段） | 诗与落款写进 `data/poem.json` → 逐句配音走 `npm run poem:manifest` 的对照表（落 `cache/`）；整段录音落 `public/audio/poem/` 并填 `audio.full`。**两条都没有也能演**（按 `pace` 逐字），见 HANDOFF-AUDIO §六点五 |
 | 新屏（新场景） | `audio.scene('新场景名')` 或走幕轴（`{ act, label }`）→ 在 `scene-table.js` 的 `SCENE_SOUNDS` 加一行。**守卫会核对**：场景表写的 kind 必须在文件映射里存在，否则 `qa:audio` 报错（写错 kind = 静默无声） |
 | 新玩法 / 新小游戏 | 若要用自己的床：表里加一行；只加音效：直接用已注册的 sfx |
 
