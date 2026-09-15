@@ -72,7 +72,9 @@ npm start                   # http://localhost:3001
   别在页面里新写样式（`qa:frames` 会拦）
 
 ### 日志与证据
-- 仓库里入库一份**真实全程样本** `logs/sample-full-run.jsonl`（96 条、覆盖 16/15 类、零违约），
+- 仓库里入库一份**真实全程样本** `logs/sample-full-run.jsonl`（96 条、覆盖**当时全部 16 类**，零违约）——
+  其中沙盘 `sim_turn` 属于**已删模式**（2026-09-15 删除自由行军），本版本的调用面是 **15 类**；
+  样本保留原样（它是当时真调的留档，不是当前能力清单）
   运行时的按日日志不入库（见 [`../logs/README.md`](../logs/README.md)）
 - `npm run qa:audit` → `docs/LOG-AUDIT.md`：本版本字段缺失 0、FALLBACK 0
 
