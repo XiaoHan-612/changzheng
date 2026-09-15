@@ -2,7 +2,7 @@
  * 自由行军沙盘 v2 — 有图、有声、人物有记忆、可存档
  * 一句话行动 → 模型裁判 + 世界推进 + NPC 反应 → 事件图卡 + 语音
  */
-import { runSimTurn, decide } from './ai-client.js';
+// 调用一律走 ai 模块（预算/账目/计数都在那儿）；本文件不再直接碰端点
 import { kernel } from './kernel/index.js';
 
 const START_PEOPLE = [
@@ -310,13 +310,13 @@ function checkCollapse(w) {
 async function runSimEnding(w, reason) {
   pushFeed('<div class="turn thinking">模型在写这一段路的小结…</div>');
   try {
-    const end = await decide({
+    const end = await kernel.api('ai').ask({
       scene: '沙盘收尾',
       callType: 'ending_review',
       situation: reason,
       state: { 体力: w.stamina, 粮食: w.food, 士气: w.morale, 信念: 60, 民心: 50 },
       extraContext: `天数 ${w.day}，地点 ${w.place}，损失 ${w.people.filter((p) => /掉队|牺牲/.test(p.status)).map((p) => p.name).join('、') || '无'}；行动 ${w.log.map((l) => l.action).join('；')}`,
-    });
+    }, { quiet: true });          // 沙盘自己的气泡已经在转，别再顶一个全局「思考中」
     kernel.emit('ai:feed', { entry: {
       callType: 'ending_review',
       scene: '沙盘收尾',
@@ -379,7 +379,13 @@ export async function bindSandbox({ onExit }) {
   let result;
   const t0 = Date.now();
     try {
-      result = await runSimTurn({ world: state.world, action });
+      // 走模块：sim_turn 的端点与预算由 modules/ai/registry.js 决定（调用方不必知道端点在哪儿）
+      result = await kernel.api('ai').ask({
+        callType: 'sim_turn',
+        world: state.world,
+        situation: action,
+        scene: `沙盘·${state.world.place}`,
+      }, { quiet: true });
       kernel.emit('sfx:play', { name: 'echo' });
       kernel.emit('ai:feed', { entry: {
         callType: 'sim_turn',

@@ -16,6 +16,11 @@ export function getMode() {
   return modeCache;
 }
 
+/**
+ * 主线调用。/api/decide 的**唯一入口**（批 6：业务侧走 modules/ai 的 ask()，不直接调这里）。
+ * payload 里的 maxTokens / temperature 会随请求带给服务器，服务器按它们收口并记账
+ * （每类预算见 modules/ai/registry.js）。
+ */
 export async function decide(payload) {
   const res = await fetch('/api/decide', {
     method: 'POST',
@@ -72,11 +77,11 @@ export async function testConfig(payload = {}) {
   return data;
 }
 
-export async function runSimTurn({ world, action, intent }) {
+export async function runSimTurn({ world, action, intent, maxTokens, temperature }) {
   const res = await fetch('/api/sim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ world, action, intent }),
+    body: JSON.stringify({ world, action, intent, maxTokens, temperature }),
   });
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || '沙盘推进失败');

@@ -88,7 +88,14 @@ export async function callGlm51(payload) {
     operation = null,
     callType = 'minigame_review',
     agent = null,
+    // 每类调用的预算（批 6）：策略表在 public/js/modules/ai/registry.js，客户端随请求带过来。
+    // 服务器只做上下界收口，不猜策略——没有就按老默认值走（老客户端/脚本仍然能跑）。
+    maxTokens,
+    temperature,
   } = payload || {};
+  // 上下界：太低会截断 JSON（实测 max_tokens=1000 时偶发空 JSON），太高等于放任模型写长
+  const budgetTokens = Math.min(4000, Math.max(300, Number(maxTokens) || 2000));
+  const temper = Math.min(1.2, Math.max(0, Number.isFinite(Number(temperature)) ? Number(temperature) : 0.75));
 
   const startTime = Date.now();
   const system = systemPrompt || buildSystemPrompt(callType, scene, operation);
@@ -129,10 +136,10 @@ export async function callGlm51(payload) {
               { role: 'system', content: system },
               { role: 'user', content: userMessage },
             ],
-            temperature: 0.75,
+            temperature: temper,
             ...(CONFIG.GLM_REASONING_EFFORT ? { reasoning_effort: CONFIG.GLM_REASONING_EFFORT } : {}),
-            // 留足 token：实测 max_tokens=1000 时模型偶发返回空 JSON（内容被推理占满）
-            max_tokens: 2000,
+            // 额度按调用类型给（见 modules/ai/registry.js）：短结论类收窄，既省额度也少"写太长"
+            max_tokens: budgetTokens,
             response_format: { type: 'json_object' },
           }),
           signal: controller.signal,
@@ -186,6 +193,8 @@ export async function callGlm51(payload) {
         source: 'GLM',
         attempt,
         requestId: data.id,
+        budgetTokens,             // 这次的额度（qa:ai 拿它核对策略表）
+        usage: data.usage || null, // token 用量（有就记，便于算"每类花了多少"）
       });
       return parsed;
     } catch (err) {

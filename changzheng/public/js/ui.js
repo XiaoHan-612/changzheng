@@ -51,6 +51,22 @@ function entranceTarget(el) {
 }
 
 /**
+ * 当前可见屏里适合"临时挂一行东西"的容器（重试键、提示键这类）。
+ *
+ * 与 contentFace() 的分工：那个回答"这一屏的内容面是哪个盒子"，这个在其之上再挑出
+ * 舞台正文 / 夜间正文 / 舞台操作区这些**更具体**的落点；都没有才退回内容面。
+ * 批 6 从 main.js 搬来——shell 的「重试／跳过」面板与 main.js 的提示键共用这一份。
+ */
+export function actionHost() {
+  const visible = [...document.querySelectorAll('.screen')].find((s) => !s.classList.contains('hidden'));
+  if (!visible) return document.body;
+  return visible.querySelector('#night-body')
+    || visible.querySelector('#stage-panel')
+    || visible.querySelector('#sheet-actions')
+    || contentFace(visible);
+}
+
+/**
  * 一个屏的**内容面**：能承载"临时插一行东西"的那个盒子（面板 / 纸卷 / 模板内容盒 / 世界面板…）。
  *
  * 为什么不能直接把行插进 `<section class="screen">`：屏的背景层（`.end-bg` / `.pano-img` /

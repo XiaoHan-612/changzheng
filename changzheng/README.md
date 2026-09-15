@@ -32,6 +32,7 @@ npm run qa:board      # 玩法板体检：玩法逐屏摆上板 + 清单/体检�
 npm run qa:bus        # 总线守卫：模块化规则（六条）+ 内核运行时体检
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫（字面量/模板/纸面/动效）
 npm run qa:handoff    # 交接文档与代码一致
+npm run qa:ai         # AI 调用体检：预算表 ↔ 字段契约（16 类）↔ 真调日志三方对账
 npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md · tts:manifest 语音清单
 ```
 `dev:check` 9 步约 7 秒（不真调）· `test:unit` 53 项 · `qa:board` 66 项 · `qa:motion` 16 项；`test:e2e` 一次真调约 76 次。

@@ -117,9 +117,7 @@ kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调�
 | `modules/hud` | `state:change` | **状态读数渲染**：顶栏五维 / 行动点 / 同伴好感 / 营地手记 / AI 计数。以前这些靠调用方手工配对（`renderStats` 18 次、`renderCompanions` 8 次、`renderAp` 6 次），漏一处就是"数字没更新" |
 | `modules/screens` | `screen:show` · `screen:hide` | **屏的生命周期归属**：各屏宿主用 `own(screenId, onHide)` 登记自己的清理；离开时只调那一屏自己登记的清理函数（取代 `showScreen` 越界清别人容器的做法，见 §三点五） |
 | `modules/games` | （不订阅；发 `game:start` / `game:end`） | **玩法宿主服务**：开板屏、写题名与背景、写数值签、建 `[data-mini]` host、声明契约、收尾清理；玩法是 `manifest.js` 里的一行插件。流程层只写 `games.play(id, {params})`，不碰板屏 DOM |
-| `modules/ai` | `ai:feed` | **调用的观测与账目**（批 5 先落"调用流"，批 6 再长 registry/run）：谁发起调用谁发事件，面板渲染与列表归它。取代了 main.js 的 `aiFeed` + `window.__pushAiFeed` 全局 |
-| `modules/games` | （不订阅；发 `game:start` / `game:end`） | **玩法宿主服务**：开板屏、写题名与背景、写数值签、建 `[data-mini]` host、声明契约、收尾清理；玩法是 `manifest.js` 里的一行插件。流程层只写 `games.play(id, {params})`，不碰板屏 DOM |
-| `modules/ai` | `ai:feed` | **调用的观测与账目**（批 5 先落"调用流"，批 6 再长 registry/run）：谁发起调用谁发事件，面板渲染与列表归它。取代了 main.js 的 `aiFeed` + `window.__pushAiFeed` 全局 |
+| `modules/ai` | `ai:feed` · `ai:verdict` | **模型的唯一入口与唯一账目**：`api.ask(payload)` 是业务侧唯一的调用方式；广播 `ai:request/start/done/fail`，等 UI 用 `ai:verdict` 裁决重试；每类预算在 `registry.js`（改行为只改那张表），请求怎么发在 `run.js`，计数与 `metrics()` 在这里 |
 
 **发声音就发事件**（别再调音频门面——`qa:audio` 会拦）：
 
@@ -148,7 +146,7 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | 3 | **去越界**（`screen:hide` 各屏自清）+ **锁显式化**（`resources` 收编 `S.busy`） | ✅ 已完成 |
 | 4 | **state 挂总线** + 只读快照 + HUD 订阅渲染（消掉"绕纯函数直改字段"与"手工 render 配对"） | ✅ 已完成 |
 | 5 | **games 宿主变服务**（8 个玩法改成插件、清单一行可插）+ **sandbox 去 window 全局**（`ai:feed` 事件）+ 屏自清补齐 | ✅ 已完成（2026-09-15） |
-| 6 | ai 挂总线 + registry/run 重写（每类预算、预取、`qa:ai` 度量）+ 50 处手工 `showThinking` 收编 | ⏳ |
+| 6 | **ai 挂总线**：registry（每类预算/温度/端点）+ run（唯一调用实现）+ 事件化（`ai:start/done/fail/verdict`）+ `qa:ai` 度量；**50 处手工 `showThinking` 与 24 处 `bumpAiCount` 收编** | ✅ 已完成（2026-09-15） |
 | 7 | `main.js` → `flow/*` 拆分；`__czScreens` 由内核供出；同步三个源码扫描脚本（check-handoff / av-audit / check-tts） | ⏳ |
 
 ## 七、怎么加东西（两个最常见）
@@ -159,6 +157,15 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 
 写描述符时的两条：**订阅处理器写在描述符上没问题**（那是方法），但**不许往描述符里塞数据**——
 那会变成"模块偷偷带状态"，正是老代码里 `S` 满天飞的翻版（守卫会报"既不是规定字段也不是方法"）。
+
+**改一类模型调用的行为（预算 / 温度 / 端点）**：只改 [`modules/ai/registry.js`](../modules/ai/registry.js) 的一张表，别的都不用动——
+把它调窄是省额度，调宽是给长文本留地方；新增 callType 时**必须**同步 `server/schema.js` 的 REQUIRED 表（字段契约的唯一真源），
+`npm run qa:ai` 会对账"策略表 ↔ 字段契约 ↔ 真调日志"三方，漂了就红。
+后台静默调用（营地氛围、选项预告、沙盘收尾）写 `callAI({ … }, { quiet: true })`：
+**quiet 只关进度 UI**（不弹「思考中」、失败也不弹重试面板），**预算、账目、计数照走**——
+这类调用自己吞错、自己管气泡，顶一个全局提示反而打扰玩家。
+调用点只写 `await callAI({ callType, scene, … })`（内部走 `kernel.api('ai').ask`）：**不要再手工写
+`showThinking(true/false)`、`bumpAiCount()`、`setStepState('busy')`**——那三样现在归 ai 模块与 shell（坑 46）。
 
 **加一个交互游戏**：读 [`modules/games/README.md`](../modules/games/README.md) —— 复制 `_template.js`，填 `id/title/stats/actions/mount`，
 在 `modules/games/manifest.js` 里加**两行**（import 一行 + GAMES 一行），再到 `tests/manual/qa-board.mjs` 的 `specs` 里登记一行。

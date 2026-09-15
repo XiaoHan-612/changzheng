@@ -39,6 +39,7 @@ const FAST = [
   { name: 'motion', cmd: 'npm', args: ['run', 'qa:motion'] },
   { name: 'board', cmd: 'npm', args: ['run', 'qa:board'] },
   { name: 'audio', cmd: 'npm', args: ['run', 'qa:audio'] },
+  { name: 'ai', cmd: 'npm', args: ['run', 'qa:ai'] },
   { name: 'assets', cmd: 'npm', args: ['run', 'qa:assets'] },
 ];
 

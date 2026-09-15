@@ -31,6 +31,7 @@
     "qa:motion": "node tests/manual/qa-motion.mjs",
     "fonts:build": "node tools/build-fonts.mjs",
     "qa:audit": "node scripts/audit-logs.mjs",
+    "qa:ai": "node scripts/check-ai.mjs",
     "qa:assets": "node tests/e2e/asset-drop.mjs",
     "qa:inspect": "node scripts/inspect-assets.mjs",
     "qa:tts": "node scripts/check-tts.mjs",

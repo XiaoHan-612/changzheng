@@ -6,10 +6,13 @@ import { missingFields } from './schema.js';
  * 沙盘世界模拟：一次调用同时完成「裁判 + 世界更新 + NPC 反应」
  * 与 /api/decide 分离，避免污染既有 VN 流程。
  */
-export async function callSim({ world, action, intent }) {
+export async function callSim({ world, action, intent, maxTokens, temperature }) {
   const startTime = Date.now();
   const system = buildSimSystem();
   const user = buildSimUser({ world, action, intent });
+  // 同 ai.js：预算可来自客户端（策略表在 modules/ai/registry.js），服务器只收口
+  const budgetTokens = Math.min(4000, Math.max(300, Number(maxTokens) || 2400));
+  const temper = Math.min(1.2, Math.max(0, Number.isFinite(Number(temperature)) ? Number(temperature) : 0.8));
 
   if (!CONFIG.GLM_API_KEY) {
     logAiCall({
@@ -45,9 +48,9 @@ export async function callSim({ world, action, intent }) {
               { role: 'system', content: system },
               { role: 'user', content: user },
             ],
-            temperature: 0.8,
+            temperature: temper,
             ...(CONFIG.GLM_REASONING_EFFORT ? { reasoning_effort: CONFIG.GLM_REASONING_EFFORT } : {}),
-            max_tokens: 2400,
+            max_tokens: budgetTokens,
             response_format: { type: 'json_object' },
           }),
           signal: controller.signal,
@@ -89,6 +92,8 @@ export async function callSim({ world, action, intent }) {
         durationMs: Date.now() - startTime,
         source: 'GLM',
         attempt,
+        budgetTokens,
+        usage: data.usage || null,
       });
       return parsed;
     } catch (err) {

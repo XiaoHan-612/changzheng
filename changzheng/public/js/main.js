@@ -9,82 +9,21 @@ let judgeMode = false;
 // 调用流（答辩面板那份"最近 30 次调用摘要"）已经搬进 `modules/ai`：这里只发事件、按需请它渲染。
 // 批 5 之前是 main.js 自己存数组 + 往 window 挂 __pushAiFeed 让沙盘捅进来——全局与双数据源都没了。
 
-async function callAI(payload) {
-  const t0 = Date.now();
-  setStepState('busy');           // 契约：告诉所有人"这一步在等模型，先别点"
-  let result;
-  try {
-    result = await decide(payload);
-  } catch (err) {
-    result = { _error: true, message: String(err.message || err) };
-  } finally {
-    setStepState('awaiting');
-  }
-  // 不再用兜底文案编造叙事：失败就明说，并给一个重试键
-  if (result?._error) {
-    const msg = result.message || '未知错误';
-    toast(`模型调用失败：${msg}`, 6000);
-    st().pushCampLog('错误', `AI 调用失败：${msg}`);
-    const again = await askAiRetry(result, payload);
-    if (again) return callAI(payload);
-    return { _error: true, message: msg };
-  }
-  const entry = {
-    callType: payload.callType || 'decide',
-    scene: payload.scene || '',
-    ms: Date.now() - t0,
-    model: config?.model || 'glm',
-    snippet: (result.narrative || result.reply || result.scene_text || result.title || result.question || '').slice(0, 80),
-  };
-  // 走总线：沙盘、别的入口都发同一条事件，这里只负责收（数据源唯一，见上面的订阅）
-  kernel.emit('ai:feed', { entry });
-  const label = $('thinking-label');
-  if (label) label.textContent = `${entry.callType} · ${entry.model}`;
-  return result;
+/**
+ * 业务侧的唯一调用方式（批 6：实现搬进 `modules/ai`，这里是薄薄一层）。
+ *
+ * 保留这个名字与返回形状，是为了让 50 个调用点**一行都不用改**——内部已经是"发事件 + 等裁决"：
+ * 思考提示与「重试／跳过」面板在 `modules/shell`（订阅 ai:start / done / fail），每类预算在
+ * `modules/ai/registry.js`，计数、账目、busy 状态都归 ai 模块。
+ * 因此调用点里那 26 处 `showThinking(true/false)` 与 24 处 `st().bumpAiCount()` 全部删除
+ * （见 HANDOFF-CODE 坑 46：这种"每处都要记得配一句"的样板，早晚会漏一处）。
+ */
+function callAI(payload, opts) {
+  return kernel.api('ai').ask(payload, opts);
 }
 
-/** 当前可见屏里适合挂按钮的容器 */
-function actionHost() {
-  const visible = [...document.querySelectorAll('.screen')].find((s) => !s.classList.contains('hidden'));
-  if (!visible) return document.body;
-  // 落到"内容面"而不是 section 本身：屏的背景层是 position:absolute; inset:0，
-  // 插在 section 里的行会被它盖住（看得见、点不到）——终局的重试键就这么废过。
-  return visible.querySelector('#night-body')
-    || visible.querySelector('#stage-panel')
-    || visible.querySelector('#sheet-actions')
-    || contentFace(visible);
-}
-
-/** 调用失败时给「重试 / 跳过」两个明确选择（不再自动编造内容） */
-function askAiRetry(info, payload) {
-  return new Promise((resolve) => {
-    const host = actionHost();
-    host.querySelectorAll('#ai-retry-row').forEach((n) => n.remove());
-    const row = document.createElement('div');
-    row.id = 'ai-retry-row';
-    row.className = 'blk-actions';   // 区块；与内容的间距由 #ai-retry-row 一条规则给（components.css）
-    const retryBtn = document.createElement('button');
-    retryBtn.type = 'button';
-    retryBtn.className = 'btn primary';
-    retryBtn.textContent = '重试这一次调用';
-    retryBtn.dataset.action = 'ai-retry';
-    const skipBtn = document.createElement('button');
-    skipBtn.type = 'button';
-    skipBtn.className = 'btn ghost';
-    skipBtn.textContent = '跳过（本次不留叙事）';
-    skipBtn.dataset.action = 'ai-skip';
-    const tip = document.createElement('div');
-    tip.className = 'muted sm';
-    tip.style.width = '100%';
-    tip.textContent = `失败原因：${info.message || '未知'}`;
-    retryBtn.onclick = () => { row.remove(); resolve(true); };
-    skipBtn.onclick = () => { row.remove(); resolve(false); };
-    row.append(tip, retryBtn, skipBtn);
-    host.appendChild(row);
-    void payload;
-  });
-}
-
+// 「重试 / 跳过」面板与"思考中"提示都搬进了 modules/shell（订阅 ai:start / ai:done / ai:fail）——
+// 批 6 之前是 50 个调用点各自 showThinking(true/false) 成对写，漏一处就"转圈停不下来"。
 function setJudgeMode(on) {
   judgeMode = !!on;
   const el = $('ai-inspector');
@@ -104,7 +43,7 @@ import { kernel, loadModules } from './kernel/index.js';
 const { $, showScreen, setTopbar,
   toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
   flashEffects, setAiMode, typeText, escapeHtml, renderLogs, renderFacts,
-  showOverlay, hideOverlay, replayAnim, wipe, bindParallax, isTypingTarget, contentFace } = UI;
+  showOverlay, hideOverlay, replayAnim, wipe, bindParallax, isTypingTarget, contentFace, actionHost } = UI;
 
 /**
  * 状态与它的别名：
@@ -898,7 +837,6 @@ async function runFailure(fail, act) {
   $('end-title').textContent = '结算中…';
   $('end-paras').innerHTML = '';
   $('end-history').innerHTML = '';
-  showThinking(true);
   let end;
   try {
     end = await callAI({
@@ -910,8 +848,6 @@ async function runFailure(fail, act) {
     });
   } catch {
     end = null;
-  } finally {
-    showThinking(false);
   }
   // 模型没给出结算就明说，不编造叙事（callAI 内部已给过「重试 / 跳过」）
   if (!end || end._error) {
@@ -1023,22 +959,16 @@ async function runPrelude(act) {
   kernel.emit('voice:say', { text: '他接过外衣，没说谢。后来在你走不动时，递了水壶。', actorId: '叙事', voiceId: 'narr_snow' });
   const cs = CHOICE_SETS[pre.choice];
   const choice = (await askChoice($('pre-opts'), cs.options)).label;
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: `${act.title}·${cs.title}`,
-      callType: cs.callType,
-      situation: `玩家选择：${choice}`,
-      state: publicState(),
-      options: [choice],
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || result.scene_text || '');
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: `${act.title}·${cs.title}`,
+    callType: cs.callType,
+    situation: `玩家选择：${choice}`,
+    state: publicState(),
+    options: [choice],
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || result.scene_text || '');
   await waitBtn('继续');
   await afterJudge(result, cs.title, cs.factId);
 }
@@ -1071,14 +1001,14 @@ function enterCampDay(act, day) {
 
 async function fireSceneGen(act) {
   try {
-    const r = await decide({
+    // 后台调用（quiet）：结果只用来填营地提示那一行，失败静默；预算/账目照样走模块
+    const r = await callAI({
       scene: `${act.title}·进入营地`,
       callType: 'scene_gen',
       situation: `第 ${S.day} 日，体力${S.体力} 粮食${S.粮食} 士气${S.士气} 信念${S.信念}`,
       state: publicState(),
       extraContext: act.theme,
-    });
-    st().bumpAiCount();
+    }, { quiet: true });
     if (r?.atmosphere) {
       $('camp-hint').textContent = r.atmosphere.slice(0, 80) + (r.atmosphere.length > 80 ? '…' : '');
       st().pushCampLog('场景', r.whisper || r.atmosphere.slice(0, 40));
@@ -1387,7 +1317,6 @@ async function sendTalk(npcName, text) {
   // 上一句还没回来就不接第二句：避免狂点/回车刷出重复调用，日志也更好审计
   if (talkPending) return;
   talkPending = true;
-  showThinking(true);
   try {
     const result = await callAI({
       scene: `交谈·${npcName}`,
@@ -1395,7 +1324,6 @@ async function sendTalk(npcName, text) {
       situation: `玩家说：${text}`,
       state: publicState(),
     });
-    st().bumpAiCount();
     const key = npcName.includes('老班') ? '好感_老班长'
       : npcName.includes('指导') ? '好感_指导员'
       : npcName.includes('小鬼') ? '好感_红小鬼'
@@ -1411,7 +1339,6 @@ async function sendTalk(npcName, text) {
     toast('对话失败：' + err.message);
   } finally {
     talkPending = false;
-    showThinking(false);
   }
 }
 
@@ -1431,23 +1358,17 @@ async function doRest() {
   } else {
     st().pushCampLog('休息', '再歇也缓不过来多少了。');
   }
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '营地休息',
-      callType: 'minigame_review',
-      situation: '休息',
-      state: publicState(),
-      operation: { type: 'rest' },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || '你歇了一会儿。');
-    st().pushCampLog('休息', result.narrative || '');
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '营地休息',
+    callType: 'minigame_review',
+    situation: '休息',
+    state: publicState(),
+    operation: { type: 'rest' },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '你歇了一会儿。');
+  st().pushCampLog('休息', result.narrative || '');
   await waitBtn('继续');
 }
 
@@ -1464,23 +1385,17 @@ async function doShare(h = {}) {
     extraOf: () => '',
   })).label;
   logShare(choice);
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '分享口粮',
-      callType: 'share_judge',
-      situation: `玩家选择：${choice}`,
-      state: publicState(),
-      options: [choice],
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || '');
-    st().pushCampLog('分享', result.narrative || choice);
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '分享口粮',
+    callType: 'share_judge',
+    situation: `玩家选择：${choice}`,
+    state: publicState(),
+    options: [choice],
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('分享', result.narrative || choice);
   await waitBtn('继续');
   await afterJudge(result, '行军中的分享', 'h_share');
 }
@@ -1496,23 +1411,17 @@ async function doSchool() {
   showScreen('screen-stage');                         // 结算回到对白屏：人物 + 叙事 + 继续
   st().remember('tonightPassword', op.detail?.password || '瑞金');
   markLine('school');
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '夜校识字',
-      callType: 'minigame_review',
-      situation: `识字正确率 ${(op.score * 100) | 0}%`,
-      state: publicState(),
-      operation: { type: 'school', ...op },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || '');
-    st().pushCampLog('夜校', `口令「${S.tonightPassword}」`);
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '夜校识字',
+    callType: 'minigame_review',
+    situation: `识字正确率 ${(op.score * 100) | 0}%`,
+    state: publicState(),
+    operation: { type: 'school', ...op },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('夜校', `口令「${S.tonightPassword}」`);
   await waitBtn('继续');
   await afterJudge(result, '行军中的文化学习', 'h_nightschool');
 }
@@ -1529,24 +1438,18 @@ async function doCandy() {
   showScreen('screen-stage');
   st().remember('sugarPlan', op.detail || null);
   markLine('candy');
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '分糖·红小鬼',
-      callType: 'share_judge',
-      situation: `三颗糖的分配：${op.summary}`,
-      state: publicState(),
-      options: [op.summary],
-      operation: { type: 'sugar', ...op.detail },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || '');
-    st().pushCampLog('分糖', op.summary);
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '分糖·红小鬼',
+    callType: 'share_judge',
+    situation: `三颗糖的分配：${op.summary}`,
+    state: publicState(),
+    options: [op.summary],
+    operation: { type: 'sugar', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('分糖', op.summary);
   await waitBtn('继续');
   await afterJudge(result, '行军中的分享', 'h_share');
 }
@@ -1563,25 +1466,19 @@ async function doSentry() {
   showScreen('screen-stage');
   st().remember('sentryScore', op.score);
   markLine('sentry');
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '夜岗·哨位',
-      callType: 'minigame_review',
-      situation:
-        `五个信号处置 ${op.detail.hits}/${op.detail.total}`
-        + (S.tonightPassword ? `，夜校口令「${S.tonightPassword}」用上了` : '，未学过口令只能硬扛'),
-      state: publicState(),
-      operation: { type: 'sentry', ...op.detail },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || '');
-    st().pushCampLog('夜岗', op.summary);
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '夜岗·哨位',
+    callType: 'minigame_review',
+    situation:
+      `五个信号处置 ${op.detail.hits}/${op.detail.total}`
+      + (S.tonightPassword ? `，夜校口令「${S.tonightPassword}」用上了` : '，未学过口令只能硬扛'),
+    state: publicState(),
+    operation: { type: 'sentry', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('夜岗', op.summary);
   await waitBtn('继续');
   await afterJudge(result, '夜间警戒', 'h_sentry');
 }
@@ -1597,23 +1494,17 @@ async function doGomoku() {
   const op = await gamesApi().play('gomoku');
   showScreen('screen-stage');
   markLine('gomoku');
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '泥地五子棋',
-      callType: 'minigame_review',
-      situation: op.summary || '两个小鬼下了一盘棋',
-      state: publicState(),
-      operation: { type: 'gomoku', ...op.detail },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || '');
-    st().pushCampLog('五子棋', op.summary || '');
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '泥地五子棋',
+    callType: 'minigame_review',
+    situation: op.summary || '两个小鬼下了一盘棋',
+    state: publicState(),
+    operation: { type: 'gomoku', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('五子棋', op.summary || '');
   await waitBtn('继续');
 }
 
@@ -1627,23 +1518,17 @@ async function doGrab() {
   await say('你', '他的手在滑。前面的雪是硬的，下面是空的。');
   const op = await gamesApi().play('grab');
   showScreen('screen-stage');
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '雪山·拽住同伴',
-      callType: 'minigame_review',
-      situation: op.summary || '在陡坡上拉住同伴',
-      state: publicState(),
-      operation: { type: 'grab', ...op.detail },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || result.scene_text || '');
-    st().pushCampLog('陡坡', op.summary || '');
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '雪山·拽住同伴',
+    callType: 'minigame_review',
+    situation: op.summary || '在陡坡上拉住同伴',
+    state: publicState(),
+    operation: { type: 'grab', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || result.scene_text || '');
+  st().pushCampLog('陡坡', op.summary || '');
   await waitBtn('继续');
   await afterJudge(result, '风雪中的手', 'h_xueshan');
 }
@@ -1655,7 +1540,6 @@ async function doRoster() {
   setPortrait('你', '年轻战士', '你', '平静');
   setStagePanel('<p class="hint">队伍汇合了，人山人海。你在人群里找那些熟悉的脸。</p>');
   await say('你', '（你在数。有些位置，怎么数都空着。）');
-  showThinking(true);
   let r = null;
   try {
     r = await callAI({
@@ -1667,7 +1551,6 @@ async function doRoster() {
         `关系：${COMPANIONS.map((c) => `${c.name}${S[`好感_${c.name}`] ?? 40}`).join('、')}`
         + `；没能跟上的人：${(S.losses || []).map((l) => l.who).join('、') || '无'}`,
     });
-    st().bumpAiCount();
     const box = $('stage-panel');
     // 这里原先用 mg-title + 手写 style 的 paper-dim：那是"给暗底用的纸色"，落在浅墨纸卷上看不清（批五修）
     box.innerHTML = `<h3 class="blk-title sm">${escapeHtml(r.title || '这一路')}</h3>`
@@ -1676,8 +1559,6 @@ async function doRoster() {
     st().pushCampLog('会师', (r.lines || [])[0] || '');
   } catch (err) {
     toast('清点失败：' + err.message);
-  } finally {
-    showThinking(false);
   }
   await waitBtn('继续');
 }
@@ -1715,23 +1596,17 @@ async function doFishing(act, forced) {
   showScreen('screen-stage');
   st().remember('fishingBest', Math.max(S.fishingBest || 0, op.score));
   markLine('fishing');
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '钓鱼·咬钩起竿',
-      callType: 'minigame_review',
-      situation: '钓鱼小游戏结束',
-      state: publicState(),
-      operation: { type: 'fishing', ...op },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || '');
-    st().pushCampLog('钓鱼', result.narrative || '');
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '钓鱼·咬钩起竿',
+    callType: 'minigame_review',
+    situation: '钓鱼小游戏结束',
+    state: publicState(),
+    operation: { type: 'fishing', ...op },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('钓鱼', result.narrative || '');
   await waitBtn('继续');
   await afterJudge(result, '金色的鱼钩', 'h_fishhook');
   if (!forced) markDone(act.id, 'fishing');
@@ -1757,23 +1632,17 @@ async function doSoup() {
   ];
   const choice = (await askChoice($('soup-opts'), soupOpts)).label;
   logShare(choice);
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '煮粥分汤',
-      callType: 'share_judge',
-      situation: `分配：${choice}`,
-      state: publicState(),
-      options: [choice],
-      operation: { type: 'soup', choice },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || '');
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '煮粥分汤',
+    callType: 'share_judge',
+    situation: `分配：${choice}`,
+    state: publicState(),
+    options: [choice],
+    operation: { type: 'soup', choice },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
   await waitBtn('继续');
   await afterJudge(result, '金色的鱼钩', 'h_fishhook');
 }
@@ -1788,17 +1657,17 @@ async function doChoice(act, actionId) {
   if (cs.npc) showNpc(cs.npc, { role: cs.npcRole, mood: '决断' });
   else setPortrait('你', act.title, '你', '决断');
   setStagePanel(`<div class="choice-row" id="ch-opts"></div>`);
-  // 深度调用：选项倾向预告（类 Reigns 卡牌预览）
+  // 深度调用：选项倾向预告（类 Reigns 卡牌预览）。后台调用（quiet）——玩家在读选项，
+  // 不该顶一个「思考中」；失败静默，选项照常可点。
   let hints = {};
   try {
-    const hr = await decide({
+    const hr = await callAI({
       scene: `${act.title}·${cs.title}`,
       callType: 'choice_hint',
       situation: '为选项生成倾向预告',
       state: publicState(),
       options: cs.options.map((o) => o.label),
-    });
-    st().bumpAiCount();
+    }, { quiet: true });
     (hr.hints || []).forEach((h) => { if (h?.label) hints[h.label] = h; });
   } catch { /* 静默 */ }
 
@@ -1824,24 +1693,18 @@ async function doChoice(act, actionId) {
       st().pushCampLog('损失', `${loss.who} 没能跟上`);
     }
   }
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: `${act.title}·${cs.title}`,
-      callType: cs.callType,
-      situation: `玩家选择：${choice}`,
-      state: publicState(),
-      options: [choice],
-      operation: cs.operationType ? { type: cs.operationType, choice } : { choice },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || result.scene_text || '');
-    st().pushCampLog(cs.title, choice);
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: `${act.title}·${cs.title}`,
+    callType: cs.callType,
+    situation: `玩家选择：${choice}`,
+    state: publicState(),
+    options: [choice],
+    operation: cs.operationType ? { type: cs.operationType, choice } : { choice },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || result.scene_text || '');
+  st().pushCampLog(cs.title, choice);
   await waitBtn('继续');
   await afterJudge(result, cs.title, cs.factId);
 }
@@ -1860,23 +1723,17 @@ async function doLuding(act) {
   st().remember('ludingResult', op.detail || null);
   // 战友拉住的那一下，先落到状态里再交给模型写后果
   if (op.detail?.retry) st().applyEffects({ 体力: -10 });
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: `${act.title}·飞夺泸定桥`,
-      callType: 'minigame_review',
-      situation: op.summary || '突击队过桥',
-      state: publicState(),
-      operation: { type: 'luding', ...op.detail },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.narrative || result.scene_text || '');
-    st().pushCampLog('泸定桥', op.summary || '');
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: `${act.title}·飞夺泸定桥`,
+    callType: 'minigame_review',
+    situation: op.summary || '突击队过桥',
+    state: publicState(),
+    operation: { type: 'luding', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || result.scene_text || '');
+  st().pushCampLog('泸定桥', op.summary || '');
   await waitBtn('继续');
   await afterJudge(result, '飞夺泸定桥', 'h_luding');
 }
@@ -1982,23 +1839,17 @@ async function runPathOnImage() {
   setStageBanner('过草地', '/assets/scenes/marsh.jpg');
   setPortrait('指导员', '连队指导员', '指', '严肃', '/assets/characters/zhiyuan.png');
   setStagePanel(`<p class="hint">你选了：${escapeHtml(choice.label)}</p>`);
-  showThinking(true);
   let result;
-  try {
-    result = await callAI({
-      scene: '过草地·路线抉择',
-      callType: 'branch_judge',
-      situation: `玩家选择：${choice.label}`,
-      state: publicState(),
-      options: [choice.label],
-      operation: { type: 'path', choice: choice.id, score: choice.score },
-    });
-    st().bumpAiCount();
-    st().applyEffects(result.effects);
-    await say('叙事', result.scene_text || result.narrative || '');
-  } finally {
-    showThinking(false);
-  }
+  result = await callAI({
+    scene: '过草地·路线抉择',
+    callType: 'branch_judge',
+    situation: `玩家选择：${choice.label}`,
+    state: publicState(),
+    options: [choice.label],
+    operation: { type: 'path', choice: choice.id, score: choice.score },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.scene_text || result.narrative || '');
   await waitBtn('继续');
   await afterJudge(result, '过松潘草地', 'h_grassland');
 }
@@ -2011,20 +1862,14 @@ async function runQuiz(act) {
   const body = $('quiz-body');
   body.innerHTML = '<p class="muted">正在出题…</p>';
   kernel.emit('voice:say', { text: '停一停。刚才走过的路，你还记得多少。', actorId: '叙事', voiceId: 'narr_quiz' });
-  showThinking(true);
   let q;
-  try {
-    q = await callAI({
-      scene: `知识对决·${act.title}`,
-      callType: 'quiz_generate',
-      situation: `根据「${act.title}·${act.subtitle}」出一道长征史实单选题`,
-      state: publicState(),
-      extraContext: `本幕主题：${act.theme}；史实：${(act.facts || []).join(',')}`,
-    });
-    st().bumpAiCount();
-  } finally {
-    showThinking(false);
-  }
+  q = await callAI({
+    scene: `知识对决·${act.title}`,
+    callType: 'quiz_generate',
+    situation: `根据「${act.title}·${act.subtitle}」出一道长征史实单选题`,
+    state: publicState(),
+    extraContext: `本幕主题：${act.theme}；史实：${(act.facts || []).join(',')}`,
+  });
   // 出题失败（玩家点了跳过／两次重试用尽）：**明说 + 跳过本题**，本节双方都不计分。
   // 以前会拿"题目 /（题目选项缺失）"当一道真题继续走：玩家答一道不存在的题，
   // 还要再烧 3 次调用（两个 AI 作答 + 判分）才能过去（2026-09-15 修，见 HANDOFF-CODE 坑 41）。
@@ -2065,66 +1910,48 @@ async function runQuiz(act) {
       answered = true;
       const ans = normIdx(q.answer_index, opts.length);
       const answerKnown = ans >= 0;
-      showThinking(true);
       // ai_vs_ai：玩家这一侧由第二个 AI 人设代答
       let humanAns = humanIdx;
       if (auto) {
-        try {
-          const h = await callAI({
-            scene: '知识对决·AI 代答（ai_vs_ai）',
-            callType: 'quiz_answer_ai',
-            situation: `题目：${q.question}\n选项：${opts.join(' / ')}`,
-            state: publicState(),
-            agent: '激进派小张',
-            options: opts,
-          });
-          st().bumpAiCount();
-          humanAns = normIdx(h.answer_index, opts.length);
-        } finally {
-          showThinking(false);
-          showThinking(true);
-        }
-      }
-      let aiAns;
-      try {
-        const ai = await callAI({
-          scene: '知识对决·AI作答',
+        const h = await callAI({
+          scene: '知识对决·AI 代答（ai_vs_ai）',
           callType: 'quiz_answer_ai',
           situation: `题目：${q.question}\n选项：${opts.join(' / ')}`,
           state: publicState(),
-          agent: '稳健派老李',
+          agent: '激进派小张',
           options: opts,
         });
-        st().bumpAiCount();
-        aiAns = normIdx(ai.answer_index, opts.length);
-      } finally {
-        showThinking(false);
+        humanAns = normIdx(h.answer_index, opts.length);
       }
+      let aiAns;
+      const ai = await callAI({
+        scene: '知识对决·AI作答',
+        callType: 'quiz_answer_ai',
+        situation: `题目：${q.question}\n选项：${opts.join(' / ')}`,
+        state: publicState(),
+        agent: '稳健派老李',
+        options: opts,
+      });
+      aiAns = normIdx(ai.answer_index, opts.length);
       const humanRight = answerKnown && humanAns === ans;
       const aiRight = answerKnown && aiAns === ans;
       st().quizScore({ human: humanRight ? 1 : 0, ai: aiRight ? 1 : 0 });
       $('quiz-score').textContent = `${S.quiz.human} : ${S.quiz.ai}`;
-      showThinking(true);
       let judge;
-      try {
-        judge = await callAI({
-          scene: '知识对决·判分',
-          callType: 'quiz_judge',
-          situation: `标准答案 index=${ans}。${auto ? '红方(激进派小张)' : '玩家'}=${humanAns}。蓝方(稳健派老李)=${aiAns}`,
-          state: publicState(),
-          agent: auto ? 'ai_vs_ai' : 'human_vs_ai',
-          operation: { human: humanAns, ai: aiAns, answer_index: ans, mode: auto ? 'ai_vs_ai' : 'human_vs_ai' },
-        });
-        st().bumpAiCount();
-        st().applyEffects(judge.effects || { 士气: humanRight ? 3 : -1 });
-        kernel.emit('sfx:play', { name: humanRight ? 'correct' : 'wrong' });
-        $('quiz-feedback').innerHTML = `
-          <div>${auto ? '激进派小张' : '你'}：<b>${humanRight ? '正确' : '错误'}</b> · 稳健派老李：<b>${aiRight ? '正确' : '错误'}</b><br/>
-          ${escapeHtml(answerKnown ? (q.explain || judge.explain || '') : '本题标准答案解析失败，双方均不计分。')}</div>
-        `;
-      } finally {
-        showThinking(false);
-      }
+      judge = await callAI({
+        scene: '知识对决·判分',
+        callType: 'quiz_judge',
+        situation: `标准答案 index=${ans}。${auto ? '红方(激进派小张)' : '玩家'}=${humanAns}。蓝方(稳健派老李)=${aiAns}`,
+        state: publicState(),
+        agent: auto ? 'ai_vs_ai' : 'human_vs_ai',
+        operation: { human: humanAns, ai: aiAns, answer_index: ans, mode: auto ? 'ai_vs_ai' : 'human_vs_ai' },
+      });
+      st().applyEffects(judge.effects || { 士气: humanRight ? 3 : -1 });
+      kernel.emit('sfx:play', { name: humanRight ? 'correct' : 'wrong' });
+      $('quiz-feedback').innerHTML = `
+        <div>${auto ? '激进派小张' : '你'}：<b>${humanRight ? '正确' : '错误'}</b> · 稳健派老李：<b>${aiRight ? '正确' : '错误'}</b><br/>
+        ${escapeHtml(answerKnown ? (q.explain || judge.explain || '') : '本题标准答案解析失败，双方均不计分。')}</div>
+      `;
       [...optsBox.children].forEach((el, i) => {
         el.disabled = true;
         if (i === ans) el.classList.add('correct');
@@ -2180,7 +2007,6 @@ async function runNightChoice(act) {
   $('night-lead').textContent = '正在请模型写今夜的抉择…';
   $('night-body').innerHTML = '';
 
-  showThinking(true);
   let gen = null;
   try {
     gen = await callAI({
@@ -2190,10 +2016,7 @@ async function runNightChoice(act) {
       state: publicState(),
       extraContext: nightContext(),
     });
-    st().bumpAiCount();
-  } catch { /* 用兜底选项 */ } finally {
-    showThinking(false);
-  }
+  } catch { /* 用兜底选项 */ }
 
   const raw = Array.isArray(gen?.options)
     ? gen.options.filter((o) => o && (typeof o === 'string' || o.label))
@@ -2215,7 +2038,6 @@ async function runNightChoice(act) {
   st().remember('nightChoice', choice.label);
   markDone(act.id, 'night');
 
-  showThinking(true);
   let res = null;
   try {
     res = await callAI({
@@ -2227,15 +2049,12 @@ async function runNightChoice(act) {
       operation: { choice: choice.key, label: choice.label },
       extraContext: nightContext(),
     });
-    st().bumpAiCount();
     st().applyEffects(res?.effects);
     body.innerHTML = '<p id="night-out" class="blk-body"></p>';   // 纸面用墨字，别用给暗底准备的纸色
     await typeText($('night-out'), res?.narrative || '当夜无事。');
     st().pushCampLog('篝火夜', res?.narrative || choice.label);
   } catch (err) {
     body.innerHTML = `<p class="muted">当夜无话：${escapeHtml(err.message)}</p>`;
-  } finally {
-    showThinking(false);
   }
   await waitBtn('天亮了 · 继续', body);
   await afterJudge(res || { narrative: `你决定：${choice.label}` }, '篝火之夜', 'h_campfire');
@@ -2246,7 +2065,6 @@ async function finishAct(act) {
   st().pushLog(act.id, act.title);
   // 幕间 AI 总评
   try {
-    showThinking(true);
     const review = await callAI({
       scene: `幕间总评·${act.title}`,
       callType: 'act_review',
@@ -2258,9 +2076,7 @@ async function finishAct(act) {
       toast(review.title || '本幕小结', 2800);
       st().pushCampLog('总评', review.lines[0]);
     }
-  } catch { /* 非阻塞 */ } finally {
-    showThinking(false);
-  }
+  } catch { /* 非阻塞 */ }
 
   // 第四幕幕末：篝火深夜（模型生成互斥抉择，一局一次）
   if (act.id === 'act4') await runNightChoice(act);
@@ -2286,20 +2102,14 @@ async function runEnding() {
   $('end-title').textContent = '结算中…';
   $('end-paras').innerHTML = '';
   $('end-history').innerHTML = '';
-  showThinking(true);
   let end;
-  try {
-    end = await callAI({
-      scene: '终局总评',
-      callType: 'ending_review',
-      situation: '长征五幕结束，综合资源、关系、抉择与对决',
-      state: publicState(),
-      extraContext: `幕记录：${JSON.stringify(S.actLog)}；对决 ${S.quiz.human}:${S.quiz.ai}；钓鱼最佳 ${(S.fishingBest || 0).toFixed(2)}`,
-    });
-    st().bumpAiCount();
-  } finally {
-    showThinking(false);
-  }
+  end = await callAI({
+    scene: '终局总评',
+    callType: 'ending_review',
+    situation: '长征五幕结束，综合资源、关系、抉择与对决',
+    state: publicState(),
+    extraContext: `幕记录：${JSON.stringify(S.actLog)}；对决 ${S.quiz.human}:${S.quiz.ai}；钓鱼最佳 ${(S.fishingBest || 0).toFixed(2)}`,
+  });
   // 模型没给终局总评（玩家点了「跳过」/两次重试都用尽）：**明说 + 可重试**，不摆一个空壳结算。
   // 以前这里直接用 end.xxx，失败了整屏只剩一个标题、没有正文也没有说明——终局是最容易被看到的一屏，
   // 空屏等于翻车（2026-09-15 修，见 HANDOFF-CODE 坑 41）。
@@ -2318,7 +2128,6 @@ async function runEnding() {
     markAction(again, 'end-retry');
     again.addEventListener('click', () => {
       again.remove();
-      showThinking(true);
       runEnding();
     });
     box.appendChild(again);
@@ -2340,7 +2149,6 @@ async function runEnding() {
   $('end-personal').textContent = end.personal || '';
   // 研学报告（课后复盘用；对外不出现行业与场景口径，见 docs/PITCH.md）
   try {
-    showThinking(true);
     const report = await callAI({
       scene: '研学报告',
       callType: 'study_report',
@@ -2357,9 +2165,7 @@ async function runEnding() {
       $('report-suggest').textContent = report.suggest || '';
       st().remember('lastReport', report);
     }
-  } catch { /* optional */ } finally {
-    showThinking(false);
-  }
+  } catch { /* optional */ }
 
   bindEndActions(end);
   toast('全主线完成 · 可打开行军记录', 4000);

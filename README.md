@@ -58,6 +58,7 @@ npm run test:e2e      # 五幕真调通关（约 76 次调用）+「不重复结
 npm run qa:sandbox    # 自由行军沙盘：两回合 + 存档恢复
 npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
+npm run qa:ai         # AI 调用体检：预算表 ↔ 字段契约 ↔ 真调日志三方对账
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫
 npm run qa:bus        # 总线守卫：模块化规则（六条）+ 内核运行时体检
 ```

@@ -29,7 +29,8 @@ export const EVENTS = {
   'ai:request': { note: '发起一次模型调用（业务侧只发这个，不直接调 ai-client）', fields: ['callType', 'scene'], optional: ['situation'] },
   'ai:start': { note: '调用开始等待（UI 据此显示「思考中」，不再由调用方手工成对写）', fields: ['callType'] },
   'ai:done': { note: '调用成功返回', fields: ['callType', 'ms'], optional: ['source', 'usage'] },
-  'ai:fail': { note: '调用失败（重试用尽）', fields: ['callType', 'error'] },
+  'ai:fail': { note: '调用失败（重试用尽）——UI 据此挂「重试／跳过」', fields: ['callType', 'error'] },
+  'ai:verdict': { note: 'UI 对失败的裁决：ai 模块等它决定要不要再发一次。事件往返，所以模块不碰 DOM、UI 不碰调用细节', fields: ['id', 'retry'] },
 
   // ── 声音（audio 模块订阅：业务只发事件，不直接调音频门面）──
   'scene:enter': { note: '进入一个独立场景（title / sandbox / luding / ending —— 幕轴上的场景走 flow:act-enter）', fields: ['name'] },
