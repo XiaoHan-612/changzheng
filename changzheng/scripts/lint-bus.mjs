@@ -128,6 +128,11 @@ const manifestNames = [...stripComments(wiringSrc).matchAll(/\{\s*name:\s*'([^']
 // 守卫照样报 ✓（假绿），于是"状态只有一条写路"实际上没人守。判断守卫死没死的办法只有一条：
 // 故意写一行违规，看它红不红（本轮就是这么发现的）。
 const MUTATORS = ['applyEffects', 'applyStarvation', 'addLoss', 'unlockFact', 'markLineDone', 'saveState'];
+/**
+ * 允许"把整个状态对象交出去"的**只读**函数（默认空：一律走 st() 动作或只读快照）。
+ * 真有只读助手需要收整份状态时再往这里加，并写清为什么它不会改状态。
+ */
+const STATE_READERS = [];
 {
   const offenders = [];
   // 字段名**不能用 \w**：本项目的状态字段大多是中文（体力/粮食/士气…），\w 一个也匹配不到，
@@ -140,6 +145,10 @@ const MUTATORS = ['applyEffects', 'applyStarvation', 'addLoss', 'unlockFact', 'm
     [new RegExp('\\bS\\.' + FIELD + '(\\+\\+|--)'), '自增/自减 S 的字段'],
     [new RegExp('\\b(' + MUTATORS.join('|') + ')\\s*\\(\\s*S\\b'), '把 S 交给写函数直接改（要走 st() 的动作）'],
   ];
+  // 把**整个** S 交给别的函数：`applyOrigin(S, …)` 就是这么绕过写路的
+  // （不广播 state:change → HUD 停在旧数字；2026-09-15 修）。
+  // 注意 `S.x` / `S?.x` / `String(S.x)` 是"读字段"，不算。
+  const handOver = /\b([A-Za-z_$][\w$]*)\s*\(\s*S(?![\w$.?])/;
   for (const f of walkJs(JS)) {
     const where = rel(f);
     if (/^public\/js\/modules\/state\//.test(where)) continue;   // store 本体
@@ -156,6 +165,10 @@ const MUTATORS = ['applyEffects', 'applyStarvation', 'addLoss', 'unlockFact', 'm
       const m = stripped.match(re);
       if (!m) continue;
       offenders.push(`${where}:${lineAt(stripped, m.index)} ${what}（${m[0].trim()}）`);
+    }
+    const h = stripped.match(handOver);
+    if (h && !STATE_READERS.includes(h[1])) {
+      offenders.push(`${where}:${lineAt(stripped, h.index)} 把整个 S 交给了 ${h[1]}()（写状态请走 st() 的动作，读请用快照或 S.字段）`);
     }
   }
   if (offenders.length) {

@@ -32,13 +32,16 @@ export function createResources({ bus, onEvent } = {}) {
     /** 释放；返回 true = 确实释放了（重复释放是 false，不是错） */
     release(name, who) {
       if (!held.has(name)) return false;
+      const holder = held.get(name);
       // 只有持有者能放（防止 A 把 B 的锁放了——正是"手工置 false 解锁"埋下的隐患）
-      if (who && held.get(name) !== who) {
-        onEvent?.({ kind: 'resource-release-denied', name, who, holder: held.get(name) });
+      if (who && holder !== who) {
+        onEvent?.({ kind: 'resource-release-denied', name, who, holder });
         return false;
       }
       held.delete(name);
-      bus.emit('resource:release', { name, who: who || held.get(name) });
+      // 先取 holder 再 delete：反过来写，`who || held.get(name)` 永远拿到 undefined——
+      // 不只是"诊断里看不出谁放的"，契约表里 who 是必需字段，内核还会记一条契约违规（2026-09-15 修）
+      bus.emit('resource:release', { name, who: who || holder });
       return true;
     },
 

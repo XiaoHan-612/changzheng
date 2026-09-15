@@ -111,32 +111,38 @@ export async function callGlm51(payload) {
   for (let attempt = 1; attempt <= CONFIG.MAX_RETRIES; attempt++) {
     try {
       const controller = new AbortController();
+      // 超时定时器必须 try/finally 清掉：fetch 抛网络错误时不会走到 clearTimeout，
+      // 那个定时器会挂到 25 秒才自己醒（行为无害——它 abort 的是已经失败的那一次——
+      // 但白占事件循环，也让"超时"的语义看着不干净）。2026-09-15 修。
       const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
-      const res = await fetch(CONFIG.GLM_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${CONFIG.GLM_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: CONFIG.GLM_MODEL,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: userMessage },
-          ],
-          temperature: 0.75,
-          ...(CONFIG.GLM_REASONING_EFFORT ? { reasoning_effort: CONFIG.GLM_REASONING_EFFORT } : {}),
-          // 留足 token：实测 max_tokens=1000 时模型偶发返回空 JSON（内容被推理占满）
-          max_tokens: 2000,
-          response_format: { type: 'json_object' },
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`HTTP ${res.status}: ${text.slice(0, 240)}`);
+      let res;
+      try {
+        res = await fetch(CONFIG.GLM_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${CONFIG.GLM_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: CONFIG.GLM_MODEL,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: userMessage },
+            ],
+            temperature: 0.75,
+            ...(CONFIG.GLM_REASONING_EFFORT ? { reasoning_effort: CONFIG.GLM_REASONING_EFFORT } : {}),
+            // 留足 token：实测 max_tokens=1000 时模型偶发返回空 JSON（内容被推理占满）
+            max_tokens: 2000,
+            response_format: { type: 'json_object' },
+          }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP ${res.status}: ${text.slice(0, 240)}`);
+        }
+      } finally {
+        clearTimeout(timeout);
       }
 
       const data = await res.json();

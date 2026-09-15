@@ -70,6 +70,44 @@ function checkTts() {
 }
 
 // 立绘：HANDOFF-ART 承诺"落盘即生效"的角色 vs main.js 的 PORTRAIT_FILE 映射
+// 策划案里的初始数值 vs 代码：这两张表评委是拿来对着看的，漂了就成了"文档说一套、游戏跑一套"
+// （2026-09-15 发现：策划案写 体力75/信念65，代码早已调成 72/58，五项好感也全对不上）。
+async function checkInitialStats() {
+  const docx = read('../design/make-docx.js');
+  const state = await import('../public/js/state.js');
+  const s = state.createState();
+
+  const 五维 = ['体力', '粮食', '士气', '信念', '民心'];
+  const attrLine = docx.match(/\["初始属性",\s*"([^"]+)"\]/);
+  const relLine = docx.match(/\["初始关系",\s*"([^"]+)"\]/);
+  if (!attrLine || !relLine) {
+    // 解析不到就明确报错：这类检查"静默通过"比没有更坏（本项目在正则被写坏时踩过）
+    problems.push('策划案里找不到「初始属性」/「初始关系」两行，检查无法进行（改过 make-docx.js 的格式？）');
+    return;
+  }
+  const wrong = [];
+  for (const k of 五维) {
+    const m = attrLine[1].match(new RegExp(`${k}\\s*(\\d+)`));
+    if (!m) { wrong.push(`初始属性里没有${k}`); continue; }
+    if (Number(m[1]) !== s[k]) wrong.push(`${k}: 策划案 ${m[1]} vs 代码 ${s[k]}`);
+  }
+  const relNames = [];
+  for (const m of relLine[1].matchAll(/([\u4e00-\u9fa5]+?)\s*(\d+)/g)) {
+    relNames.push(m[1]);
+    const key = `好感_${m[1]}`;
+    if (!(key in s)) { wrong.push(`初始关系里的「${m[1]}」在代码里没有这个维度`); continue; }
+    if (Number(m[2]) !== s[key]) wrong.push(`好感_${m[1]}: 策划案 ${m[2]} vs 代码 ${s[key]}`);
+  }
+  const missInDoc = Object.keys(s).filter((k) => k.startsWith('好感_') && !relNames.includes(k.slice(3)));
+  if (missInDoc.length) wrong.push(`策划案漏了这些好感维度：${missInDoc.map((k) => k.slice(3)).join('、')}`);
+
+  if (wrong.length) {
+    problems.push('策划案初始数值与代码不一致（改完记得 `node design/make-docx.js` 重新生成 docx）：\n      ' + wrong.join('\n      '));
+  } else {
+    ok.push(`策划案初始数值一致（五维 + ${relNames.length} 项好感）`);
+  }
+}
+
 function checkPortraitDropin() {
   const md = read('docs/HANDOFF-ART.md');
   const anchor = md.indexOf('**立绘同样落盘即生效**');
@@ -92,6 +130,7 @@ checkSceneDropin();
 checkAmbient();
 checkTts();
 checkPortraitDropin();
+await checkInitialStats();
 
 console.log('交接就绪检查：');
 for (const o of ok) console.log('  ✓ ' + o);

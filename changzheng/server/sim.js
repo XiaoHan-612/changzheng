@@ -29,28 +29,33 @@ export async function callSim({ world, action, intent }) {
   for (let attempt = 1; attempt <= CONFIG.MAX_RETRIES; attempt++) {
     try {
       const controller = new AbortController();
+      // 与 server/ai.js 同款：超时定时器用 try/finally 清掉，别让它在网络错误后挂满 25 秒
       const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
-      const res = await fetch(CONFIG.GLM_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${CONFIG.GLM_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: CONFIG.GLM_MODEL,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          temperature: 0.8,
-          ...(CONFIG.GLM_REASONING_EFFORT ? { reasoning_effort: CONFIG.GLM_REASONING_EFFORT } : {}),
-          max_tokens: 2400,
-          response_format: { type: 'json_object' },
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      let res;
+      try {
+        res = await fetch(CONFIG.GLM_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${CONFIG.GLM_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: CONFIG.GLM_MODEL,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+            temperature: 0.8,
+            ...(CONFIG.GLM_REASONING_EFFORT ? { reasoning_effort: CONFIG.GLM_REASONING_EFFORT } : {}),
+            max_tokens: 2400,
+            response_format: { type: 'json_object' },
+          }),
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      } finally {
+        clearTimeout(timeout);
+      }
       const data = await res.json();
       const content = data.choices?.[0]?.message?.content || '{}';
       let parsed;
