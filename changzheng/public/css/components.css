@@ -211,6 +211,28 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .cut-caption { font-family: var(--font); font-size: 18px; line-height: var(--lh-loose); letter-spacing: 0.08em; min-height: 5.5em; }
 /* 路线缎带（map 拍子）：与字幕留一点呼吸，别贴在一起 */
 .cut-caption-wrap .journey { margin-bottom: var(--sp-3); }
+
+/* 诗（poem 拍子）：题字一行 + 八句两句一行；每个字一个 span，显现时挂 .on */
+.poem { text-align: center; }
+.poem-title {
+  font-family: var(--font-kai); font-size: var(--fs-h2); color: var(--gold);
+  letter-spacing: 0.22em; margin-bottom: var(--sp-4);
+}
+.poem-title span { font-size: var(--fs-micro); color: var(--paper-dim); letter-spacing: 0.12em; margin-left: var(--sp-3); }
+.poem-body { display: flex; flex-direction: column; gap: var(--sp-2); }
+.poem-line {
+  font-family: var(--font); font-size: var(--fs-h2); color: var(--paper);
+  letter-spacing: 0.14em; line-height: var(--lh-normal);
+}
+.poem-ch { opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
+.poem-ch.on { opacity: 1; }
+/* 减动效：整段直显（逐字跟着音频这件事只影响"什么时候出现"，不掺音画同步） */
+@media (prefers-reduced-motion: reduce) {
+  .poem-ch { opacity: 1; transition: none; }
+}
+
+/* 钤印收束（seal 拍子）：印章 + 落款，居中 */
+.poem-seal { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); }
 .cut-actions { display: flex; gap: var(--sp-3); justify-content: center; margin-top: var(--sp-4); }
 
 /* 会话与提示 */

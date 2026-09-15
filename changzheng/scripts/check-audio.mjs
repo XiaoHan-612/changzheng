@@ -119,8 +119,9 @@ async function main() {
       rows.push(row);
       continue;
     }
-    if (info.codec === 'wav' && ext !== 'wav') problems.push(`${f.url} 内容是 WAV 但扩展名是 .${ext}（MIME 会错）`);
-    if (info.codec !== 'wav' && ext !== 'ogg') problems.push(`${f.url} 内容是 ${info.codec} 但扩展名是 .${ext}`);
+    // 容器 ↔ 扩展名必须一致；mp3 是 2026-09-15 起为"整段朗诵素材"按需放开的一种（见 audio-info.mjs 的说明）
+    const wantExt = info.codec === 'wav' ? 'wav' : info.codec === 'mp3' ? 'mp3' : 'ogg';
+    if (ext !== wantExt) problems.push(`${f.url} 内容是 ${info.codec} 但扩展名是 .${ext}（MIME 会错）`);
     if (!(info.dur > 0)) problems.push(`${f.url} 时长为 0，文件可能是截断的`);
 
     const res = await fetch(BASE + f.url).catch(() => null);
@@ -129,7 +130,9 @@ async function main() {
     if (!res || !res.ok) problems.push(`${f.url} 请求失败：HTTP ${row.http}`);
     else if (info.codec === 'wav' && !/audio\/(x-)?wav|application\/octet-stream/.test(row.mime)) {
       problems.push(`${f.url} MIME 可疑：${row.mime}（WAV 内容）`);
-    } else if (info.codec !== 'wav' && !/audio\/(ogg|opus)|application\/ogg/.test(row.mime)) {
+    } else if (info.codec === 'mp3' && !/audio\/mpeg|audio\/mp3|application\/octet-stream/.test(row.mime)) {
+      problems.push(`${f.url} MIME 可疑：${row.mime}（mp3 内容）`);
+    } else if (info.codec !== 'wav' && info.codec !== 'mp3' && !/audio\/(ogg|opus)|application\/ogg/.test(row.mime)) {
       problems.push(`${f.url} MIME 可疑：${row.mime}（${info.codec} 内容）`);
     }
     rows.push(row);

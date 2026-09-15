@@ -28,12 +28,32 @@ const TYPE_MS = 24;
 /** 没有 holdMs 时的默认停留 */
 const DEFAULT_HOLD_MS = 1500;
 
-/** 语音通道的回声：由描述符的 `voice:*` 订阅喂进来（通道不认识播放器，见 kernel/contracts.js） */
-const voice = { playing: false, startedAt: 0, endedAt: 0 };
-export function onVoiceStart() { voice.playing = true; voice.startedAt = Date.now(); }
+/**
+ * 语音通道的回声：由描述符的 `voice:*` 订阅喂进来（通道不认识播放器，见 kernel/contracts.js）。
+ * `t` / `duration` 是**逐字跟音频的唯一时钟**（批 A 建立）：诗那一拍只认它，不自造第二个时钟。
+ */
+const voice = { playing: false, startedAt: 0, endedAt: 0, t: 0, duration: 0 };
+export function onVoiceStart(p = {}) {
+  voice.playing = true;
+  voice.startedAt = Date.now();
+  voice.t = 0;
+  voice.duration = Number(p.durationMs) || 0;
+}
+export function onVoiceProgress(p = {}) {
+  voice.t = Number(p.t) || 0;
+  if (Number(p.duration)) voice.duration = Number(p.duration);
+}
 export function onVoiceEnd() { voice.playing = false; voice.endedAt = Date.now(); }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** 可用语速档位：问音频模块要（值在 audio/mix.js 一处），拿不到就只按原速演 */
+function rateOptions() {
+  try {
+    const list = kernel.api('audio')?.voiceRates?.();
+    return Array.isArray(list) && list.length ? list : [1];
+  } catch { return [1]; }
+}
 const reduceMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let running = '';      // 正在播的编排 id（'' = 没在播）
@@ -91,7 +111,9 @@ export async function play(id, opts = {}) {
   // 交互：点按推进（下一句 / 屏上任意处）+ 跳过（一跳到底）
   let skipped = false;
   let waitClick = null;
+  let aborted = false;                       // 这一拍被点按/跳过了（正在跑的 render 靠它收手）
   const tap = () => {
+    aborted = true;
     if (!waitClick) return;
     const r = waitClick;
     waitClick = null;
@@ -105,25 +127,55 @@ export async function play(id, opts = {}) {
   if (f.skip) { f.skip.onclick = onSkip; markAction(f.skip, 'skip'); }
   f.screen.onclick = onClick;
 
+  // 语速：整条编排共用一个档位（可加速的拍子由拍子自己声明 `speeds`，播放器据此露出速度键）
+  let rate = Number(opts.ctx?.rate) || 1;
+  let restartBeat = null;                  // 改变语速要"这一拍重来"（音频没法中途变速）
+  const speedBtn = $('btn-cut-speed');
+  const applySpeedBtn = (speeds) => {
+    if (!speedBtn) return;
+    if (!speeds || speeds.length < 2) { speedBtn.classList.add('hidden'); delete speedBtn.dataset.action; return; }
+    speedBtn.classList.remove('hidden');
+    speedBtn.textContent = `${rate}× 语速`;
+    markAction(speedBtn, 'speed');
+    speedBtn.onclick = (e) => {
+      e.stopPropagation();
+      const i = speeds.indexOf(rate);
+      rate = speeds[(i + 1) % speeds.length];
+      speedBtn.textContent = `${rate}× 语速`;
+      kernel.emit('voice:stop', {});
+      if (restartBeat) restartBeat();       // 这一拍从头再演一遍（新语速）
+    };
+  };
+
   let n = 0;
   for (const beat of seq) {
     if (skipped) break;
     const impl = beatOf(beat.kind);
     if (!impl) continue;                   // 未登记的拍子：已经报过错了，跳过这一拍继续演
+    let again = true;
+    while (again && !skipped) {
+    again = false;
     n += 1;
+    applySpeedBtn(beat.speeds || impl.speeds);
     clearTimers();
     const myGen = gen;
     let gone = false;                      // 这一拍过去了：它起的定时器再写就作废
+    restartBeat = () => { gone = true; again = true; };   // 让本拍的循环与定时器全部失效，再跑一遍
+    aborted = false;
     const ctx = {
       ...f,
       reduce,
+      rate,
       extra: opts.ctx || {},
+      voice: () => ({ ...voice }),
+      skipped: () => skipped,
       after(ms, fn) {
         const t = setTimeout(() => { if (!gone && !skipped && gen === myGen) fn(); }, Math.max(0, ms));
         timers.push(t);
         return t;
       },
-      gone: () => gone || skipped || gen !== myGen,
+      // gone：这一拍作废（点按/跳过/换拍/换语速都会置位）——长拍子（诗）的循环靠它收手
+      gone: () => gone || skipped || aborted || gen !== myGen,
     };
     if (opts.onBeat) { try { opts.onBeat(beat, n); } catch { /* 回调出错不拖垮播放 */ } }
 
@@ -133,7 +185,13 @@ export async function play(id, opts = {}) {
     f.stage.className = `cut-stage${beat.stageClass ? ' ' + beat.stageClass : ''}`;
     // 拍子可以声明一个音效（如幕间启程的鼓点）：走事件，交给音频模块放
     if (beat.sfx) kernel.emit('sfx:play', { name: beat.sfx });
-    impl.render?.(ctx, beat, opts.ctx || {});
+    // 拍子的 render 允许是异步的，而且**必须等它**：终章的诗要自己演一分钟（逐字跟音频），
+    // 早先没 await（批 C 的拍子都是同步的，看不出来），诗会刚摆上来就被下一拍顶掉。
+    if (skipped) break;
+    try { await impl.render?.(ctx, beat, opts.ctx || {}); } catch (err) {
+      console.error(`[cinema] 拍子「${beat.kind}」演出时出错（继续往下演）：`, err);
+    }
+    if (skipped) break;
 
     // 字幕：减动效直接给全文；点按先把剩下的一次性显示完，再一次点按才走（老行为，别改）
     const text = String(beat.text || '');
@@ -170,12 +228,16 @@ export async function play(id, opts = {}) {
       await Promise.race([sleep(hold), waitUser()]);
     }
     gone = true;
+    if (again && !skipped) { f.cap.textContent = ''; f.beat.innerHTML = ''; }   // 重来一拍：清干净再演
+    }
   }
 
   // ── 收尾：清定时器、摘契约标记、回到干净状态 ──
   clearTimers();
   if (f.next) { f.next.onclick = null; delete f.next.dataset.action; }
   if (f.skip) { f.skip.onclick = null; delete f.skip.dataset.action; }
+  if (speedBtn) { speedBtn.onclick = null; speedBtn.classList.add('hidden'); delete speedBtn.dataset.action; }
+  restartBeat = null;
   f.screen.onclick = null;
   f.cap.classList.remove('typing');
   running = '';

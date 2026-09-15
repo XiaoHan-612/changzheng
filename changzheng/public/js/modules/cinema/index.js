@@ -12,10 +12,10 @@
  * 所以：**模块不认识流程，流程也不认识拍子**——加一处电影化 = sequences.js 加一条编排。
  *
  * 事件面（契约见 kernel/contracts.js）：
- *   订阅 voice:start / voice:ended  → 音画同步（等这句念完再走；等不到就当无声）
+ *   订阅 voice:start / voice:progress / voice:ended → 音画同步（等这句念完再走；终章的诗逐字跟进度）
  *   发出 voice:say / voice:stop     → 配音交给 audio 模块去放（cinema 不碰音频门面）
  */
-import { play, clearCutscene, current, voiceLive, onVoiceStart, onVoiceEnd } from './player.js';
+import { play, clearCutscene, current, voiceLive, onVoiceStart, onVoiceProgress, onVoiceEnd } from './player.js';
 import { SEQUENCE_IDS } from './sequences.js';
 import { BEAT_KINDS } from './beats.js';
 
@@ -26,6 +26,7 @@ export default {
 
   subscriptions: {
     'voice:start': 'onVoiceStart',
+    'voice:progress': 'onVoiceProgress',
     'voice:ended': 'onVoiceEnd',
   },
 
@@ -51,6 +52,7 @@ export default {
     if (screens?.own) screens.own('screen-cutscene', clearCutscene);
   },
 
-  onVoiceStart() { onVoiceStart(); },
+  onVoiceStart(p) { onVoiceStart(p); },
+  onVoiceProgress(p) { onVoiceProgress(p); },
   onVoiceEnd() { onVoiceEnd(); },
 };

@@ -52,9 +52,49 @@ export function oggInfo(buf) {
   return { codec: isOpus ? 'opus' : 'vorbis', rate: sampleRate, channels, dur: samples / sampleRate };
 }
 
+/**
+ * 读 MP3 头（ID3v2 之后逐帧数）：返回 { codec:'mp3', rate, channels, dur }。
+ *
+ * 为什么现在需要它：终局升华用的整段朗诵是 mp3（外找的素材），而 qa:audio 原先只认 WAV/Ogg——
+ * "只认两种容器"这条口径本来是为了防"扩展名与内容不一致"，mp3 没有那层歧义（浏览器普遍直接支持，
+ * MIME 是 audio/mpeg），所以按需放开一种容器，而不是让素材迁就守卫（见 docs/HANDOFF-AUDIO 第六点五节）。
+ */
+export function mp3Info(buf) {
+  if (buf.length < 4) return null;
+  let off = 0;
+  if (buf.slice(0, 3).toString('latin1') === 'ID3') {                 // 跳过 ID3v2 标签
+    const sz = (buf[6] & 0x7f) << 21 | (buf[7] & 0x7f) << 14 | (buf[8] & 0x7f) << 7 | (buf[9] & 0x7f);
+    off = 10 + sz;
+  }
+  const BR_V1L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
+  let frames = 0;
+  let dur = 0;
+  let rate = 0;
+  let channels = 0;
+  let i = off;
+  while (i + 4 <= buf.length) {
+    if (buf[i] === 0xFF && (buf[i + 1] & 0xe0) === 0xe0) {
+      const ver = (buf[i + 1] >> 3) & 3;                                // 3 = MPEG1
+      const layer = (buf[i + 1] >> 1) & 3;                              // 1 = Layer III
+      const bitrate = BR_V1L3[(buf[i + 2] >> 4) & 0xf];
+      const srate = [44100, 48000, 32000][(buf[i + 2] >> 2) & 3];
+      const pad = (buf[i + 2] >> 1) & 1;
+      if (ver === 3 && layer === 1 && bitrate && srate) {
+        channels = ((buf[i + 3] >> 6) & 3) === 3 ? 1 : 2;
+        rate = srate;
+        const len = Math.floor((1152 / 8) * bitrate * 1000 / srate) + pad;
+        if (len > 4) { frames += 1; dur += 1152 / srate; i += len; continue; }
+      }
+    }
+    i += 1;                                                            // 不是帧头就往后挪一格（含尾部的 ID3v1）
+  }
+  if (!frames) return null;
+  return { codec: 'mp3', rate, channels, dur };
+}
+
 /** 自动识别容器 */
 export function audioInfo(buf) {
-  return wavInfo(buf) || oggInfo(buf);
+  return wavInfo(buf) || oggInfo(buf) || mp3Info(buf);
 }
 
 export function bytesLabel(n) {

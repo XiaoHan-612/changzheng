@@ -1,5 +1,5 @@
 # 音频体检报告
-> 由 `npm run qa:audio` 生成 · 共 49 个文件（ambient 8 · bgm 0 · cache 20 · voices 21 · poem 0）
+> 由 `npm run qa:audio` 生成 · 共 50 个文件（ambient 8 · bgm 0 · cache 20 · voices 21 · poem 1）
 | 文件 | 容器 | 采样 | 声道 | 时长 | 体积 | HTTP | MIME | 可解码 |
 |---|---|---|---|---|---|---|---|---|
 | `public/audio/ambient/depart_river.ogg` | vorbis | 44100 | 1 | 24.4s | 117 KB | 200 | audio/ogg | ✅ |
@@ -51,8 +51,9 @@
 | `public/audio/voices/zhiyuan_grass.wav` | wav | 24000 | 1 | 2.2s | 105 KB | 200 | audio/wav | ✅ |
 | `public/audio/voices/zhiyuan_hello.wav` | wav | 24000 | 1 | 2.6s | 120 KB | 200 | audio/wav | ✅ |
 | `public/audio/voices/zhiyuan_path.wav` | wav | 24000 | 1 | 6.6s | 308 KB | 200 | audio/wav | ✅ |
+| `public/audio/poem/qilv-changzheng.mp3` | mp3 | 44100 | 2 | 59.3s | 927 KB | 200 | audio/mpeg | ✅ |
 ## 结论
 全部通过：容器/扩展名一致、HTTP 200、MIME 正确、浏览器可解码、且都能被代码路径引用到。
 ## 提示
 
-- 诗（终局升华）：逐句配音 0/8 条就位 · 整段录音 0 个 —— 全无音频时按 data/poem.json 的 pace 逐字走（流程照旧）
+- 诗（终局升华）：逐句配音 0/8 条就位 · 整段录音 1 个 —— 全无音频时按 data/poem.json 的 pace 逐字走（流程照旧）

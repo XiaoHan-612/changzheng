@@ -9,7 +9,7 @@ import { $, toast, typeText, escapeHtml, showScreen } from '../ui.js';
 import { markAction } from '../step.js';
 import { kernel } from '../kernel/index.js';
 import { COMPANIONS } from '../data.js';
-import { S, hasS, st, callAI, step, publicState } from './kit.js';
+import { S, hasS, st, callAI, step, publicState, cinemaApi } from './kit.js';
 import { originText } from './view.js';
 
 export async function runFailure(fail, act) {
@@ -110,6 +110,14 @@ export async function runEnding() {
   $('end-history').innerHTML = (end.history_points || []).map((h) => `<li>${escapeHtml(h)}</li>`).join('');
   $('end-rel').innerHTML = renderRelations();
   $('end-personal').textContent = end.personal || '';
+
+  // 升华（电影化，见 modules/cinema）：会宁空镜 → 诗八句逐字 → 钤印。
+  // 位置就卡在这儿——**终局总评成功之后、研学报告渲染之前**：
+  //   · 失败分支（上面的结算未完成）不会走到这里，所以失败局不演升华；
+  //   · 报告是"可带走的纸面"，让它落在诗之后，玩家读完诗再去看报告。
+  // 它全程可跳过（一跳到底），且**不做任何模型调用**（诗与时间是本地数据）。
+  await cinemaApi()?.play('ending-poem');
+
   // 研学报告（课后复盘用；对外不出现行业与场景口径，见 docs/PITCH.md）
   try {
     const report = await callAI({
