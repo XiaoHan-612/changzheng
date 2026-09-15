@@ -38,7 +38,7 @@ async function main() {
   // 注入五子棋界面并直接调用小游戏模块
   await page.evaluate(async () => {
     const host = document.createElement('div');
-    host.id = 'gomoku-host';
+    host.id = 'game-host';   // 宿主统一容器（批 5）
     host.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;background:#111;padding:8px';
     document.body.appendChild(host);
     const { runGomoku } = await import('/js/minigames.js');
@@ -52,7 +52,7 @@ async function main() {
   const seen = [];
   while (Date.now() - t0 < 120000) {
     const state = await page.evaluate(() => {
-      const host = document.getElementById('gomoku-host');
+      const host = document.querySelector('[data-mini="gomoku"]');
       if (!host) return { gone: true };
       const status = host.querySelector('.score-line')?.textContent || '';
       const enabled = host.querySelectorAll('.wzq-cell:not([disabled])').length;

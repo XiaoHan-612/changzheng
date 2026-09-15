@@ -53,7 +53,7 @@ npm run verify:fast   # 提交前那一档：上面这些 + 动效 / 音频 / �
 npm run verify:full   # 推送与交付前：真调那一档（e2e / av / sandbox / …），分钟级
 npm run test:unit     # 53 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致
 npm run qa:smoke      # 标题 → 营地 → 一次互动（顺带断言用过的热点当场作废）
-npm run qa:board      # 玩法板体检：8 个玩法逐屏摆上板（板屏壳 / 数值签 / 契约标记）
+npm run qa:board      # 玩法板体检：玩法逐屏摆上板（板屏壳/数值签/契约标记）+ 三方对账
 npm run test:e2e      # 五幕真调通关（约 76 次调用）+「不重复结算」等回归断言
 npm run qa:sandbox    # 自由行军沙盘：两回合 + 存档恢复
 npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位

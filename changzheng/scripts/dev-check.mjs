@@ -174,7 +174,16 @@ await step('内核启动', async () => {
   });
   const risky = faces.filter((f) => f.危险).map((f) => f.屏);
   assert(!risky.length, `这些屏插行会落到 section、被背景层盖住：${risky.join('、')}`);
-  return `${k.registered.length} 个模块 · 事件流 ${k.events} 笔 · 全屏可插行`;
+
+  // 批 5 新挂的"调用流"链路：发一条事件，ai 模块要收到（事件名/接线写错在这里就露头，0 真调）
+  const fed = await page.evaluate(() => {
+    const k = window.__czKernel;
+    k.emit('ai:feed', { entry: { callType: 'devcheck', model: 'probe', ms: 0, snippet: '冒烟' } });
+    return k.api('ai')?.recent(1)?.[0]?.callType || '';
+  });
+  assert(fed === 'devcheck', `ai:feed 没有被 ai 模块收到（实测「${fed || '空'}」）——事件名或接线写错了？`);
+
+  return `${k.registered.length} 个模块 · 事件流 ${k.events} 笔 · 全屏可插行 · 调用流链通`;
 });
 
 await step('开局到营地', async () => {

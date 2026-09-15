@@ -28,13 +28,13 @@ npm run test:e2e      # 五幕真调通关（加 --quick 跑快速模式）
 npm run qa:sandbox    # 自由行军沙盘 · qa:regress 沙盘回归 · qa:failure 失败线
 npm run qa:av         # 影音运行时审计（资源 404 / 立绘 / 环境床 / TTS 能否解码）
 npm run test:unit     # 状态层 / 契约 / 配置层 · qa:smoke UI 冒烟
-npm run qa:board      # 玩法板体检：8 个玩法逐屏摆上板，验板屏壳与契约标记
+npm run qa:board      # 玩法板体检：玩法逐屏摆上板 + 清单/体检表/actions 三方对账
 npm run qa:bus        # 总线守卫：模块化规则（六条）+ 内核运行时体检
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫（字面量/模板/纸面/动效）
 npm run qa:handoff    # 交接文档与代码一致
 npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md · tts:manifest 语音清单
 ```
-`dev:check` 9 步约 7 秒（不真调）· `test:unit` 53 项 · `qa:board` 57 项 · `qa:motion` 16 项；`test:e2e` 一次真调约 76 次。
+`dev:check` 9 步约 7 秒（不真调）· `test:unit` 53 项 · `qa:board` 66 项 · `qa:motion` 16 项；`test:e2e` 一次真调约 76 次。
 
 ## 玩法一句话
 

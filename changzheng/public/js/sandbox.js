@@ -317,13 +317,13 @@ async function runSimEnding(w, reason) {
       state: { 体力: w.stamina, 粮食: w.food, 士气: w.morale, 信念: 60, 民心: 50 },
       extraContext: `天数 ${w.day}，地点 ${w.place}，损失 ${w.people.filter((p) => /掉队|牺牲/.test(p.status)).map((p) => p.name).join('、') || '无'}；行动 ${w.log.map((l) => l.action).join('；')}`,
     });
-    window.__pushAiFeed?.({
+    kernel.emit('ai:feed', { entry: {
       callType: 'ending_review',
       scene: '沙盘收尾',
       ms: 0,
-        model: 'glm',
+      model: 'glm',
       snippet: end.title || '',
-    });
+    } });
     clearThinkingBubbles();
     pushFeed(`<div class="turn">
       <div class="act-line">${esc(end.title || '这一段路')}</div>
@@ -331,11 +331,11 @@ async function runSimEnding(w, reason) {
       <div class="deltas">${(end.history_points || []).map(esc).join(' · ')}</div>
       ${end.personal ? `<div class="deltas">${esc(end.personal)}</div>` : ''}
     </div>`);
-    renderSuggestions(['回到标题'], () => window.__sbExit?.());
+    renderSuggestions(['回到标题'], () => exit());
   } catch {
     clearThinkingBubbles();
     pushFeed(`<div class="turn"><div class="narr">你在 ${w.day} 天里做了 ${w.log.length} 次决策。这一段路告一段落。</div></div>`);
-    renderSuggestions(['回到标题'], () => window.__sbExit?.());
+    renderSuggestions(['回到标题'], () => exit());
   }
 }
 
@@ -345,7 +345,9 @@ export async function bindSandbox({ onExit }) {
     activeSubmit = null;
     onExit && onExit();
   };
-  window.__sbExit = exit;
+  // 屏自清（批 3 契约、批 5 补齐）：沙盘屏由本文件渲染，离开时也由本文件清理——
+  // 以前只由「回到标题」那条路走到 exit()，别的路径换屏就漏了。
+  kernel.api('screens')?.own?.('screen-sandbox', exit);
   const saved = loadWorld();
   const state = { world: saved || createSandboxWorld(), busy: false, restored: !!saved };
 
@@ -379,13 +381,13 @@ export async function bindSandbox({ onExit }) {
     try {
       result = await runSimTurn({ world: state.world, action });
       kernel.emit('sfx:play', { name: 'echo' });
-      window.__pushAiFeed?.({
+      kernel.emit('ai:feed', { entry: {
         callType: 'sim_turn',
         scene: `沙盘·${state.world.place}`,
         ms: Date.now() - t0,
         model: 'glm',
         snippet: result.verdict || (result.narrative || '').slice(0, 60),
-      });
+      } });
     } catch (e) {
       clearThinkingBubbles();
       pushFeed(`<div class="turn"><div class="narr">推演失败：${esc(e.message)}</div></div>`);

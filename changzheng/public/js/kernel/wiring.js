@@ -21,6 +21,8 @@ export const MODULES = [
   { name: 'state', path: './modules/state/index.js', note: '游戏状态唯一持有者：写走动作并广播 state:change' },
   { name: 'hud', path: './modules/hud/index.js', note: '状态读数渲染：订阅 state:change，顶栏五维/行动点/同伴/手记' },
   { name: 'screens', path: './modules/screens/index.js', note: '屏的生命周期归属：宿主登记自己的清理，离开只清自己的容器' },
+  { name: 'games', path: './modules/games/index.js', note: '玩法宿主服务：开板屏/题名/数值签/契约声明/清理；玩法只是清单里的插件' },
+  { name: 'ai', path: './modules/ai/index.js', note: '大模型调用的观测与账目：收 ai:feed、渲染答辩面板调用流（批 6 再长 registry/run）' },
 ];
 
 /** 内核启动阶段（boot 编排）：需要插在某个阶段之间的模块，用 stage 字段声明 */

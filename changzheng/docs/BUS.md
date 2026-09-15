@@ -116,6 +116,10 @@ kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调�
 | `modules/state` | （不订阅别人） | **游戏状态的唯一持有者**：写只有一条路——语义动作或 `apply(label, mutator, keys)`，写完自动**作废快照 → 广播 `state:change` → 存档**；`ready` 里把自己登记为只读快照的唯一提供者 |
 | `modules/hud` | `state:change` | **状态读数渲染**：顶栏五维 / 行动点 / 同伴好感 / 营地手记 / AI 计数。以前这些靠调用方手工配对（`renderStats` 18 次、`renderCompanions` 8 次、`renderAp` 6 次），漏一处就是"数字没更新" |
 | `modules/screens` | `screen:show` · `screen:hide` | **屏的生命周期归属**：各屏宿主用 `own(screenId, onHide)` 登记自己的清理；离开时只调那一屏自己登记的清理函数（取代 `showScreen` 越界清别人容器的做法，见 §三点五） |
+| `modules/games` | （不订阅；发 `game:start` / `game:end`） | **玩法宿主服务**：开板屏、写题名与背景、写数值签、建 `[data-mini]` host、声明契约、收尾清理；玩法是 `manifest.js` 里的一行插件。流程层只写 `games.play(id, {params})`，不碰板屏 DOM |
+| `modules/ai` | `ai:feed` | **调用的观测与账目**（批 5 先落"调用流"，批 6 再长 registry/run）：谁发起调用谁发事件，面板渲染与列表归它。取代了 main.js 的 `aiFeed` + `window.__pushAiFeed` 全局 |
+| `modules/games` | （不订阅；发 `game:start` / `game:end`） | **玩法宿主服务**：开板屏、写题名与背景、写数值签、建 `[data-mini]` host、声明契约、收尾清理；玩法是 `manifest.js` 里的一行插件。流程层只写 `games.play(id, {params})`，不碰板屏 DOM |
+| `modules/ai` | `ai:feed` | **调用的观测与账目**（批 5 先落"调用流"，批 6 再长 registry/run）：谁发起调用谁发事件，面板渲染与列表归它。取代了 main.js 的 `aiFeed` + `window.__pushAiFeed` 全局 |
 
 **发声音就发事件**（别再调音频门面——`qa:audio` 会拦）：
 
@@ -133,7 +137,7 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | `__czKernel.state()` | 已注册模块、每个模块订阅了什么、锁被谁占着、快照状态、契约违规 |
 | `__czKernel.diag.dump()` / `.toJsonl()` | 事件流（黑匣子）。答辩时可以演示"一个动作如何驱动多个模块" |
 | `npm run qa:bus` | 静态六条 lint + 运行时体检（内核启动、事件在流、契约无违规、JSONL 可导出） |
-| `npm run dev:check` | **加完模块/玩法立刻跑这个**：约 6 秒、0 次真调。它断言"清单里的模块都真的注册上了""契约违规 0""快照已冻结"，还会把一个玩法摆到板屏上点一下——`wiring.js` 路径写错、事件没登记、描述符导出成坏形状，都在这里当场红 |
+| `npm run dev:check` | **加完模块/玩法立刻跑这个**：约 7 秒、0 次真调。它断言"清单里的模块都真的注册上了""契约违规 0""快照已冻结""事件真的被模块收到（`ai:feed` 链路）"，还会把一个玩法摆到板屏上点一下——`wiring.js` 路径写错、事件没登记、描述符导出成坏形状，都在这里当场红 |
 
 ## 六、迁移顺序（每批一个提交，可运行 + 守卫全绿）
 
@@ -143,7 +147,7 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | 2 | **audio 挂总线**（声音总入口）+ shell（外壳对事件的反应） | ✅ 已完成 |
 | 3 | **去越界**（`screen:hide` 各屏自清）+ **锁显式化**（`resources` 收编 `S.busy`） | ✅ 已完成 |
 | 4 | **state 挂总线** + 只读快照 + HUD 订阅渲染（消掉"绕纯函数直改字段"与"手工 render 配对"） | ✅ 已完成 |
-| 5 | screens / games / sandbox 挂总线（玩法宿主变服务，现有 8 个玩法改成插件形状） | ⏳ |
+| 5 | **games 宿主变服务**（8 个玩法改成插件、清单一行可插）+ **sandbox 去 window 全局**（`ai:feed` 事件）+ 屏自清补齐 | ✅ 已完成（2026-09-15） |
 | 6 | ai 挂总线 + registry/run 重写（每类预算、预取、`qa:ai` 度量）+ 50 处手工 `showThinking` 收编 | ⏳ |
 | 7 | `main.js` → `flow/*` 拆分；`__czScreens` 由内核供出；同步三个源码扫描脚本（check-handoff / av-audit / check-tts） | ⏳ |
 
@@ -157,7 +161,9 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 那会变成"模块偷偷带状态"，正是老代码里 `S` 满天飞的翻版（守卫会报"既不是规定字段也不是方法"）。
 
 **加一个交互游戏**：读 [`modules/games/README.md`](../modules/games/README.md) —— 复制 `_template.js`，填 `id/title/stats/actions/mount`，
-在 `games/index.js` 的 GAMES 里加一行。宿主（玩法板）会替你开屏、写题名、写数值签、声明自动化契约。
+在 `modules/games/manifest.js` 里加**两行**（import 一行 + GAMES 一行），再到 `tests/manual/qa-board.mjs` 的 `specs` 里登记一行。
+宿主（`modules/games/index.js`）替你开屏、写题名与背景、写数值签、声明自动化契约、收尾清理。
+**加玩法不必碰 `main.js`、内核或别的模块**——`npm run dev:check` 与 `npm run qa:board` 会告诉你哪一步没做全。
 
 ## 八、暂时搁置（接口已预留）
 

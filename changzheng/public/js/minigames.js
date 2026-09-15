@@ -29,24 +29,12 @@ function mount(parent, root) {
 }
 
 /**
- * 玩法板的数值签：把这一局的状态写进板头（鱼篓/咬钩、信号 x/5、还剩 N 颗…）。
- * 值只用区块 .blk-stat —— 不另写一套"玩法数值"的样式（批四统一口径）。
- * 文案都是代码里的固定词，不含模型返回，所以直接拼。
- */
-function stats(host, items) {
-  if (!host) return {};
-  const rows = items.filter(Boolean);
-  host.innerHTML = rows
-    .map(([label, value, cls]) => `<span class="blk-stat ${cls || ''}">${label}<b>${value}</b></span>`)
-    .join('');
-  // 返回句柄：频繁变化的数值（倒计时、手数）直接改 <b> 的文本，不必重写整行 HTML
-  return Object.fromEntries([...host.children].map((el, i) => [rows[i][0], el.querySelector('b')]));
-}
-
-/**
  * 钓鱼：漂相三档，空格/点击起竿
  * @param {HTMLElement} container 玩法区（板屏的 #board-body 里的 host）
- * @param {{stats?: HTMLElement}} [opts] opts.stats 是板头的数值签容器
+ * @param {{stats: (items: Array<[string, any, string?]>) => object}} opts
+ *        opts.stats 由**玩法宿主**注入（`modules/games` 的板屏服务）：调它更新板头数值签，
+ *        返回句柄（要频繁改的数只改句柄，别重写整行 HTML）。本文件不再自带数值签渲染——
+ *        那是宿主的事（批五：宿主变服务）。本文件的 8 个玩法只作**占位**，同事重做后逐个替换。
  * @returns {Promise<{score:number, detail:object}>}
  */
 export function runFishing(container, opts = {}) {
@@ -150,7 +138,7 @@ export function runFishing(container, opts = {}) {
 
     /** 板头数值签：鱼篓=入篓的（score≥0.5），咬钩=本局出现的咬口数 */
     function refreshStats() {
-      stats(opts.stats, [
+      opts.stats([
         ['鱼篓', hits.filter((h) => h.score >= 0.5).length],
         ['咬钩', hits.length],
         ['竿', `${Math.min(castIndex + 1, TOTAL)}/${TOTAL}`],
@@ -302,7 +290,7 @@ export function runFishing(container, opts = {}) {
 /** 夜校识字：3 小关 */
 /** 夜校识字：3 小关
  * @param {HTMLElement} container 玩法区
- * @param {{stats?: HTMLElement}} [opts]
+ * @param {{stats: (items) => object}} [opts]   // opts.stats 由宿主注入（modules/games）
  */
 export function runNightSchool(container, opts = {}) {
   return new Promise((resolve) => {
@@ -331,7 +319,7 @@ export function runNightSchool(container, opts = {}) {
 
     function render() {
       if (idx >= rounds.length) {
-        stats(opts.stats, [['识字', `${correct}/${rounds.length}`], ['口令', '瑞金']]);
+        opts.stats([['识字', `${correct}/${rounds.length}`], ['口令', '瑞金']]);
         container.innerHTML = `
           <div class="float-result">
             <div class="big">${correct} / ${rounds.length}</div>
@@ -341,7 +329,7 @@ export function runNightSchool(container, opts = {}) {
         return;
       }
       const r = rounds[idx];
-      stats(opts.stats, [['第', `${idx + 1}/${rounds.length} 关`], ['识字', `${correct}/${rounds.length}`]]);
+      opts.stats([['第', `${idx + 1}/${rounds.length} 关`], ['识字', `${correct}/${rounds.length}`]]);
       container.innerHTML = `
         <p class="blk-note">${r.tip}</p>
         <p class="blk-body">${r.q}</p>
@@ -366,7 +354,7 @@ export function runNightSchool(container, opts = {}) {
 /**
  * 红小鬼 · 分糖：点一颗糖 → 点一个人给出；也能「自己收好」。
  * @param {HTMLElement} container 玩法区
- * @param {{stats?: HTMLElement}} [opts]
+ * @param {{stats: (items) => object}} [opts]   // opts.stats 由宿主注入（modules/games）
  */
 export function runCandy(container, opts = {}) {
   return new Promise((resolve) => {
@@ -443,7 +431,7 @@ export function runCandy(container, opts = {}) {
     confirmBtn.disabled = true;
     /** 板头数值签：还剩几颗 + 给出去几颗 */
     function refreshStats() {
-      stats(opts.stats, [
+      opts.stats([
         ['还剩', left],
         ['已给出', 3 - left],
       ]);
@@ -484,7 +472,7 @@ export function runCandy(container, opts = {}) {
  * 5 个信号，判断后处置；若在夜校学过口令，这里会用上。
  * @param {string} knownPassword 今晚口令（可空）
  * @param {HTMLElement} container 玩法区
- * @param {{stats?: HTMLElement}} [opts]
+ * @param {{stats: (items) => object}} [opts]   // opts.stats 由宿主注入（modules/games）
  */
 export function runSentry(knownPassword, container, opts = {}) {
   return new Promise((resolve) => {
@@ -514,7 +502,7 @@ export function runSentry(knownPassword, container, opts = {}) {
 
     /** 板头数值签：第几个信号 + 处置得当几次 */
     function refreshStats() {
-      stats(opts.stats, [
+      opts.stats([
         ['信号', `${Math.min(idx + 1, events.length)}/${events.length}`],
         ['得当', hits],
       ]);
@@ -597,7 +585,7 @@ export function runSentry(knownPassword, container, opts = {}) {
 
 /** 弯针成钩（钓鱼线铺垫，无 AI 调用）
  * @param {HTMLElement} container 玩法区
- * @param {{stats?: HTMLElement}} [opts]
+ * @param {{stats: (items) => object}} [opts]   // opts.stats 由宿主注入（modules/games）
  */
 export function runBendNeedle(container, opts = {}) {
   return new Promise((resolve) => {
@@ -613,7 +601,7 @@ export function runBendNeedle(container, opts = {}) {
     let i = 0;
     function refresh() {
       bar.innerHTML = [0, 1, 2].map((n) => `<span class="dot${n < i ? ' on' : ''}"></span>`).join('');
-      stats(opts.stats, [['进度', `${i}/3`]]);
+      opts.stats([['进度', `${i}/3`]]);
     }
     refresh();
     btn.onclick = () => {
@@ -653,7 +641,7 @@ export function runGomoku(container, opts = {}) {
 
     // 板头数值签：手数 + 当前局面（status 文案的单一来源）
     let note = '你先手';
-    function refreshStats() { stats(opts.stats, [['手数', moves], ['局面', note]]); }
+    function refreshStats() { opts.stats([['手数', moves], ['局面', note]]); }
     function setNote(text) { note = text; refreshStats(); }
 
     const cells = [];
@@ -843,7 +831,7 @@ export function runLuding(container, opts = {}) {
     let note = '按 A / D 开始';
     let S = {};
     function refreshHud() {
-      S = stats(opts.stats, [['时间', `${Math.max(0, TIME_LIMIT - elapsed).toFixed(1)}s`], ['状况', note], ['跌落', falls], ['中弹', hits]]);
+      S = opts.stats([['时间', `${Math.max(0, TIME_LIMIT - elapsed).toFixed(1)}s`], ['状况', note], ['跌落', falls], ['中弹', hits]]);
     }
     refreshHud();
 
@@ -1061,7 +1049,7 @@ export function runGrab(container, opts = {}) {
     // 板头数值签：第几次 + 抓住几次（文案同时是给玩家的即时反馈）。
     // 注意位置：必须在 hits 声明之后——写在前面会踩 TDZ（2026-09-13 体检抓到过）。
     let note = `第 1 / ${TRIES} 次`;
-    function refreshStats() { stats(opts.stats, [['机会', note], ['抓住', hits]]); }
+    function refreshStats() { opts.stats([['机会', note], ['抓住', hits]]); }
     refreshStats();
     let sum = 0;
     let over = false;

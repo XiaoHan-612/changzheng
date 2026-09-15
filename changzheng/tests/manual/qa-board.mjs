@@ -90,6 +90,30 @@ await page.evaluate(() => window.__czScreens.show('screen-camp'));
 await page.waitForTimeout(300);
 check('离开板屏后玩法区已清空', (await page.locator('#board-body').innerHTML()).trim(), '');
 
+// ── 三方对账：玩法清单 ↔ 这张体检表 ↔ 页面上真实的契约 ──
+// 同事插新玩法时，这一节会直接告诉他缺哪一步：没加体检行 / 动作声明与实现不一致 / 表里有已下架的。
+// （口径：清单在 modules/games/manifest.js，动作声明在玩法描述符的 actions 里。）
+const meta = await page.evaluate(() => {
+  const api = window.__czKernel?.api?.('games');
+  if (!api?.list) return null;
+  return Object.fromEntries(api.list().map((id) => [id, api.describe(id)]));
+});
+if (!meta) {
+  check('玩法清单可读（games 模块已挂）', '缺 games 模块', '可读');
+} else {
+  const ids = Object.keys(meta);
+  const specIds = Object.keys(specs);
+  check('体检表覆盖了清单里的每个玩法', ids.filter((id) => !specIds.includes(id)).join('、') || '(无遗漏)', '(无遗漏)');
+  check('体检表里没有已下架的玩法', specIds.filter((id) => !ids.includes(id)).join('、') || '(无)', '(无)');
+  for (const [id, sp] of Object.entries(specs)) {
+    // 这张体检表用到的动作（从 kick/after 选择器里取），必须都在描述符的 actions 里声明过
+    const used = [...`${sp.kick} ${sp.after}`.matchAll(/data-mini-action="([a-z-]+)"/g)].map((m) => m[1]);
+    const declared = meta[id]?.actions || [];
+    const missing = used.filter((a) => !declared.includes(a));
+    check(`${id}：页面用到的动作都在描述符里声明`, missing.join('、') || '(齐全)', '(齐全)');
+  }
+}
+
 console.log('玩法板体检：');
 console.table(rows);
 const failed = rows.filter((r) => r.结果 === '✗');

@@ -6,15 +6,8 @@ import { applyFeatures, setDevTools, isDevToolsOn } from './features.js';
 import { decide, fetchConfig, fetchLogs, fetchFacts, fetchActs, saveConfig, testConfig, clearLogs } from './ai-client.js';
 
 let judgeMode = false;
-const aiFeed = [];
-
-/** 供沙盘等模块上报调用（答辩面板共用） */
-export function pushAiFeed(entry) {
-  aiFeed.unshift(entry);
-  if (aiFeed.length > 30) aiFeed.pop();
-  if (judgeMode) renderInspector();
-}
-if (typeof window !== 'undefined') window.__pushAiFeed = pushAiFeed;
+// 调用流（答辩面板那份"最近 30 次调用摘要"）已经搬进 `modules/ai`：这里只发事件、按需请它渲染。
+// 批 5 之前是 main.js 自己存数组 + 往 window 挂 __pushAiFeed 让沙盘捅进来——全局与双数据源都没了。
 
 async function callAI(payload) {
   const t0 = Date.now();
@@ -43,9 +36,8 @@ async function callAI(payload) {
     model: config?.model || 'glm',
     snippet: (result.narrative || result.reply || result.scene_text || result.title || result.question || '').slice(0, 80),
   };
-  aiFeed.unshift(entry);
-  if (aiFeed.length > 30) aiFeed.pop();
-  if (judgeMode) renderInspector();
+  // 走总线：沙盘、别的入口都发同一条事件，这里只负责收（数据源唯一，见上面的订阅）
+  kernel.emit('ai:feed', { entry });
   const label = $('thinking-label');
   if (label) label.textContent = `${entry.callType} · ${entry.model}`;
   return result;
@@ -93,34 +85,18 @@ function askAiRetry(info, payload) {
   });
 }
 
-function renderInspector() {
-  const box = $('ai-ins-body');
-  if (!box) return;
-  box.innerHTML = aiFeed
-    .map(
-      (e) => `<div class="ai-item">
-        <span class="tag">${escapeHtml(e.callType)}</span>
-        <span class="src-glm">${escapeHtml(e.model || 'GLM')}</span>
-        <span class="muted">${e.ms}ms</span>
-        <div>${escapeHtml(e.snippet || e.scene || '')}</div>
-      </div>`
-    )
-    .join('');
-}
-
 function setJudgeMode(on) {
   judgeMode = !!on;
   const el = $('ai-inspector');
   if (el) el.classList.toggle('hidden', !on);
   if (on) {
-    renderInspector();
+    kernel.api('ai')?.render();          // 调用流由 ai 模块持有，这里只请它重画
     toast('评委演示模式：右侧实时显示每次大模型调用', 3500);
   }
 }
-import { runFishing, runNightSchool, runCandy, runSentry, runGomoku, runBendNeedle, runLuding, runGrab } from './minigames.js';
 import { bindSandbox } from './sandbox.js';
 import * as UI from './ui.js';
-import { setStep, setStepState, waitContinue, askChoice, markAction, markMini, choiceButton, activateChoice } from './step.js';
+import { setStep, setStepState, waitContinue, askChoice, markAction, choiceButton, activateChoice } from './step.js';
 // 内核：模块注册 / 事件总线 / 契约 / 只读快照 / 诊断（架构见 docs/BUS.md）。
 // 批 1 只把地基启动起来，业务模块从批 2 起逐个挂上来（见 wiring.js 的 MODULES 清单）。
 import { kernel, loadModules } from './kernel/index.js';
@@ -137,6 +113,8 @@ const { $, showScreen, setTopbar,
  * 规矩：`S.xxx = ...` 这种写法不允许（`npm run qa:bus` 会拦）——写一律走 `st().…`。
  */
 const st = () => kernel.api('state');
+/** 玩法宿主服务（批 5）：开板屏、题名、数值签、契约声明、清理都归它；这里只按 id 开一局 */
+const gamesApi = () => kernel.api('games');
 
 let S = null;
 let allFacts = {};
@@ -460,22 +438,12 @@ function exposeSheetHooks() {
     logs: () => $('btn-logs').click(),
     defense: () => $('btn-defense').click(),
     // 玩法板同理：四个玩法都在幕深处，截图/体检直接把它们摆到板屏上
+    // 玩法清单只有一份（modules/games/manifest.js）——这里不再抄第二张表
     mini: (name) => {
       if (!S) return false;
-      const games = {
-        fishing: ['金色的鱼钩', (host, o) => runFishing(host, o)],
-        needle: ['弯针成钩', (host, o) => runBendNeedle(host, o)],
-        school: ['夜校识字', (host, o) => runNightSchool(host, o)],
-        candy: ['分糖', (host, o) => runCandy(host, o)],
-        sentry: ['夜岗', (host, o) => runSentry(S.tonightPassword, host, o)],
-        gomoku: ['泥地五子棋', (host, o) => runGomoku(host, o)],
-        luding: ['飞夺泸定桥', (host, o) => runLuding(host, o)],
-        grab: ['陡坡 · 拽住他', (host, o) => runGrab(host, o)],
-      };
-      const spec = games[name];
-      if (!spec) return false;
-      const board = openBoard({ title: spec[0] });
-      spec[1](mountMini(board, name, 'mini-host'), { stats: board.stats });
+      const g = gamesApi();
+      if (!g?.has?.(name)) return false;
+      g.play(name, { params: { password: S.tonightPassword } });
       return true;
     },
   };
@@ -512,8 +480,7 @@ function bindChrome() {
   $('btn-settings2').onclick = () => openSettings();
   // 屏的生命周期归属：这两屏的渲染代码在 main.js 里，清理也写在它们旁边（见 modules/screens）
   const screensApi = kernel.api('screens');
-  screensApi?.own('screen-stage', clearStage);
-  screensApi?.own('screen-board', clearBoard);
+  screensApi?.own('screen-stage', clearStage);      // 板屏的清理由 modules/games 自己登记（批 5）
 
   const muteBtn = $('btn-mute');
   if (muteBtn) {
@@ -1525,8 +1492,7 @@ async function doSchool() {
   showNpc('文化教员', { role: '夜校', mood: '耐心' });
   setStagePanel('');                                  // 玩法不在纸卷里，正文区留空
   await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
-  const board = openBoard({ title: '夜校识字', bg: '/assets/scenes/school_close.jpg' });
-  const op = await runNightSchool(mountMini(board, 'school', 'school-host'), { stats: board.stats });
+  const op = await gamesApi().play('school');
   showScreen('screen-stage');                         // 结算回到对白屏：人物 + 叙事 + 继续
   st().remember('tonightPassword', op.detail?.password || '瑞金');
   markLine('school');
@@ -1559,8 +1525,7 @@ async function doCandy() {
   setPortrait('红小鬼', '16岁小战士', '鬼', '倔强', '/assets/characters/xiaogui.png');
   setStagePanel('');
   await say('红小鬼', '我兜里有三颗糖。你说，给谁？');
-  const board = openBoard({ title: '分糖', bg: sceneImage('/assets/scenes/sugar_close.jpg', '/assets/scenes/camp_pano.jpg') });
-  const op = await runCandy(mountMini(board, 'candy', 'candy-host'), { stats: board.stats });
+  const op = await gamesApi().play('candy');
   showScreen('screen-stage');
   st().remember('sugarPlan', op.detail || null);
   markLine('candy');
@@ -1594,8 +1559,7 @@ async function doSentry() {
   setPortrait('哨兵', '夜哨', '哨', '警觉');
   setStagePanel('');
   await say('哨兵', '后半夜归你。听不清就再听一遍，别急着开枪。');
-  const board = openBoard({ title: '夜岗', bg: sceneImage('/assets/scenes/sentry_night.jpg', '/assets/scenes/camp_pano.jpg') });
-  const op = await runSentry(S.tonightPassword, mountMini(board, 'sentry', 'sentry-host'), { stats: board.stats });
+  const op = await gamesApi().play('sentry', { params: { password: S.tonightPassword } });
   showScreen('screen-stage');
   st().remember('sentryScore', op.score);
   markLine('sentry');
@@ -1630,8 +1594,7 @@ async function doGomoku() {
   setPortrait('两个小鬼', '泥地上的棋', '棋', '专注', '/assets/characters/xiaogui.png');
   setStagePanel('');
   await say('红小鬼', '石子当子，泥地当盘。你要是输了，可不许说没吃饱。');
-  const board = openBoard({ title: '泥地五子棋', bg: '/assets/scenes/camp_pano.jpg' });
-  const op = await runGomoku(mountMini(board, 'gomoku', 'gomoku-host'), { stats: board.stats });
+  const op = await gamesApi().play('gomoku');
   showScreen('screen-stage');
   markLine('gomoku');
   showThinking(true);
@@ -1662,8 +1625,7 @@ async function doGrab() {
   setPortrait('你', '年轻战士', '你', '咬牙');
   setStagePanel('');
   await say('你', '他的手在滑。前面的雪是硬的，下面是空的。');
-  const board = openBoard({ title: '陡坡 · 拽住他', bg: sceneImage('/assets/scenes/snow_climb.jpg', '/assets/scenes/snow_pano.jpg') });
-  const op = await runGrab(mountMini(board, 'grab', 'grab-host'), { stats: board.stats });
+  const op = await gamesApi().play('grab');
   showScreen('screen-stage');
   showThinking(true);
   let result;
@@ -1728,35 +1690,12 @@ async function doRoster() {
  * 玩法自己的状态（鱼篓/咬钩、信号 x/5…）由玩法通过 `{ stats }` 写进板头，
  * 这里只负责把板摆出来 —— 各玩法别再自己拼标题与数值签（2026-09-13 批四）。
  */
-function openBoard({ title = '', bg = '' } = {}) {
-  showScreen('screen-board');
-  const act = currentActDef();
-  $('board-kicker').textContent = act ? `${act.title} · 第 ${S?.day || 1} 日` : '玩法';
-  $('board-title').textContent = title;
-  $('board-bg').style.backgroundImage = bg ? `url('${bg}')` : '';
-  // 玩法板**自己清自己的容器**（不再指望 showScreen 顺手清、也不再 cloneNode 换节点躲它）：
-  // 上一局的残留节点在这里被丢弃，即使还有旧定时器持着它的引用，写入也落在已丢弃的 DOM 上。
-  clearBoard();
-  return { body: $('board-body'), stats: $('board-stats') };
-}
-
-/** 舞台屏与玩法板屏各自的清理（登记给 screens 模块；渲染与清理住在一起，谁也不会忘） */
+/** 舞台屏的清理（登记给 screens 模块；渲染与清理住在一起，谁也不会忘） */
 function clearStage() {
   document.querySelectorAll('#sheet-actions').forEach((n) => { n.innerHTML = ''; });
   const panel = $('stage-panel'); if (panel) panel.innerHTML = '';
   const banner = $('stage-banner'); if (banner) banner.textContent = '';
   const dlg = $('dlg-body'); if (dlg) dlg.textContent = '';
-}
-
-function clearBoard() {
-  const body = $('board-body'); if (body) body.innerHTML = '';
-  const stats = $('board-stats'); if (stats) stats.innerHTML = '';
-}
-
-/** 装一个玩法：板屏开好、host 就位、契约声明齐，交给 minigames.js 的 runXxx */
-function mountMini(board, name, id) {
-  board.body.innerHTML = `<div id="${id}"></div>`;
-  return markMini($(id), name);
 }
 
 async function doFishing(act, forced) {
@@ -1767,14 +1706,12 @@ async function doFishing(act, forced) {
   setPortrait('老班长', '炊事班长', '班', '专注', '/assets/characters/laoban.png');
   setStagePanel('');
   await say('老班长', '鱼钩是缝衣针弯的。手上稳着点，别掰断。');
-  let board = openBoard({ title: '弯针成钩', bg: '/assets/scenes/pond_close.jpg' });
-  await runBendNeedle(mountMini(board, 'needle', 'needle-host'), { stats: board.stats });
+  await gamesApi().play('needle');
   showScreen('screen-stage');
 
   setStageBanner('金色的鱼钩 · 起竿', '/assets/scenes/pond_close.jpg');
   await say('老班长', '漂相看真了再起竿。晃是假的，沉才是口。', 'laoban_hook');
-  board = openBoard({ title: '金色的鱼钩', bg: '/assets/scenes/pond_close.jpg' });
-  const op = await runFishing(mountMini(board, 'fishing', 'fish-host'), { stats: board.stats });
+  const op = await gamesApi().play('fishing');
   showScreen('screen-stage');
   st().remember('fishingBest', Math.max(S.fishingBest || 0, op.score));
   markLine('fishing');
@@ -1918,8 +1855,7 @@ async function doLuding(act) {
   showNpc('突击队长', { role: '红四团', mood: '决绝' });
   setStagePanel('');
   await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
-  const board = openBoard({ title: '飞夺泸定桥', bg: sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg') });
-  const op = await runLuding(mountMini(board, 'luding', 'luding-host'), { stats: board.stats });
+  const op = await gamesApi().play('luding');
   showScreen('screen-stage');
   st().remember('ludingResult', op.detail || null);
   // 战友拉住的那一下，先落到状态里再交给模型写后果

@@ -34,6 +34,9 @@ export const EVENTS = {
   // ── 声音（audio 模块订阅：业务只发事件，不直接调音频门面）──
   'scene:enter': { note: '进入一个独立场景（title / sandbox / luding / ending —— 幕轴上的场景走 flow:act-enter）', fields: ['name'] },
   'sfx:play': { note: '播一个音效（名字见 audio/sfx-table.js）', fields: ['name'] },
+  'game:start': { note: '玩法板开了一局（games 模块广播；要挂成就/统计/彩蛋的模块听它，不必改玩法）', fields: ['id'], optional: ['title'] },
+  'game:end': { note: '玩法结束（带结果分；玩法内部规则仍归玩法自己）', fields: ['id'], optional: ['score', 'ms'] },
+  'ai:feed': { note: '一条调用摘要（答辩面板的调用流）：谁发起调用谁发它，列表与渲染在别处——数据源唯一，别再往 window 上挂 __pushAiFeed', fields: ['entry'] },
   'voice:say': { note: '播一句台词；text 与 file 至少给一个（file 直给时跳过目录与 TTS 解析，沙盘同伴反应音就是这种）', fields: [], optional: ['text', 'actorId', 'voiceId', 'file'] },
   'audio:toggle-mute': { note: '请求切换静音（状态由 audio 模块持有，UI 不自己记）', fields: [] },
   'audio:muted': { note: '静音状态变了（audio 模块回执；UI 据此更新图标与提示）', fields: ['on'] },
