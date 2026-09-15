@@ -194,7 +194,23 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
   max-width: 640px; padding: var(--sp-5) var(--sp-6);
   border-radius: var(--radius);
 }
+/* 字幕的"落脚"：与 .title-card::before 同一手笔——字与路线压在自己的暗场上。
+   浅色空镜（路线图是纸色）上尤其必要：不加这层，白字直接落在浅纸面上读不出来
+   （2026-09-15 联系表实拍发现，见 docs/BUS.md 批 C）。 */
+.cut-caption-wrap::before {
+  content: ""; position: absolute; inset: -10% -16%;
+  z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse at center, var(--scrim) 0%, transparent 72%);
+}
+/* 路线图那一拍（拍子声明 stageClass='is-map'）：地图是纸色的，满屏会把这一屏的调子拉亮。
+   压暗一档并加重上下的暗场——"油灯下看地图"的暗调，而不是一张贴上去的扫描图。 */
+.cut-stage.is-map { filter: brightness(0.55) saturate(0.86); }
+.cut-stage.is-map::after {
+  background: linear-gradient(180deg, var(--scrim) 0%, var(--scrim-soft) 36%, var(--scrim-soft) 64%, var(--scrim) 100%);
+}
 .cut-caption { font-family: var(--font); font-size: 18px; line-height: var(--lh-loose); letter-spacing: 0.08em; min-height: 5.5em; }
+/* 路线缎带（map 拍子）：与字幕留一点呼吸，别贴在一起 */
+.cut-caption-wrap .journey { margin-bottom: var(--sp-3); }
 .cut-actions { display: flex; gap: var(--sp-3); justify-content: center; margin-top: var(--sp-4); }
 
 /* 会话与提示 */

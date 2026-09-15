@@ -54,18 +54,35 @@ const waitForAnim = async (sel, want, timeout = 8000) => {
 // ① 封面入场（tpl-title → anim-fade）
 check('封面入场', await animOf('#screen-title .title-card'), 'fade-in 0s');
 
-// ② 进行中：过场那一刻的"换幕抹擦"
+// ② 序章（电影化的拍子）：黑场题字入场 → 路线图逐节点亮 + 换幕抹擦
 await page.click('#btn-mode-study');
-await page.waitForTimeout(250);
-await passOrigin(page);
+check('序章题字卡入场', await waitForAnim('#screen-cutscene .title-card', 'fade-in 0s'), 'fade-in 0s');
 let wipeSeen = '否';
 for (let i = 0; i < 20; i++) {                       // 抹擦层只存活 ~0.6s，边等边看
   if (await page.locator('.scene-wipe').count()) { wipeSeen = '是'; break; }
   await page.waitForTimeout(60);
 }
 check('换幕抹擦出现', wipeSeen, '是');
-await page.click('#btn-cut-skip').catch(() => {});
-await page.waitForTimeout(1200);
+// 第二拍是路线图：等拍子自己走过去（题字停 3.8s），然后核对"节点数"与"全程点亮"
+let nodes = 0;
+let lit = 0;
+for (let i = 0; i < 80; i++) {
+  const r = await page.evaluate(() => ({
+    n: document.querySelectorAll('#cut-journey .j-node').length,
+    lit: document.querySelectorAll('#cut-journey .j-node.done, #cut-journey .j-node.now').length,
+  }));
+  nodes = r.n; lit = r.lit;
+  if (nodes >= 5 && lit === nodes) break;
+  await page.waitForTimeout(150);
+}
+check('序章路线图节点数', nodes >= 5 ? '≥5' : String(nodes), '≥5');
+check('路线图全程点亮', lit === nodes && nodes > 0 ? '是' : `否（${lit}/${nodes}）`, '是');
+// 序章、告别与幕间过场都由同一条契约驱动：passOrigin 会一并清掉（见 tests/e2e/lib/driver.mjs）
+await passOrigin(page);
+for (let i = 0; i < 40; i++) {                       // 等进营地（别用固定 sleep：并行验收会抢 CPU）
+  if (await page.locator('#hotspots .hotspot').count()) break;
+  await page.waitForTimeout(200);
+}
 
 // ③ 营地：热点余烬 + 侧栏入场（tpl-side → anim-fade）
 check('营地余烬', await animOf('#hotspots .hotspot .ember'), 'ember 0s');
@@ -131,6 +148,29 @@ const calm = await page.evaluate(() => {
 });
 check('减动效：位移类被关掉', calm.riseName, 'none');
 check('减动效：淡入仍保留', calm.fadeName, 'fade-in');
+
+// ⑥b 减动效下的**拍子**：判得出自己在减动效、题字卡不上动画、字幕整段直显（音频照播，听感另有人耳那关）
+await page.click('#btn-mode-study');
+await page.waitForTimeout(500);
+const calmBeat = await page.evaluate(() => {
+  const card = document.querySelector('#screen-cutscene .title-card');
+  return {
+    reduced: document.getElementById('screen-cutscene')?.dataset.reduced || '',
+    cardAnim: card ? getComputedStyle(card).animationName : '(缺题字卡)',
+  };
+});
+check('减动效：播放器知道自己在减动效', calmBeat.reduced, '1');
+check('减动效：题字卡不上动画', calmBeat.cardAnim, 'none');
+let calmCap = '';
+for (let i = 0; i < 80; i++) {                       // 等第二拍（有字幕的那一拍）
+  calmCap = await page.evaluate(() => {
+    const c = document.getElementById('cut-caption');
+    return c && c.textContent ? `${c.textContent}|${c.classList.contains('typing')}` : '';
+  });
+  if (calmCap) break;
+  await page.waitForTimeout(150);
+}
+check('减动效：字幕整段直显', calmCap.split('|')[1] || '(没等到字幕)', 'false');
 
 // 循环/装饰动画（余烬、钤印）必须在**组件层**关掉：写在 framework.css 里会被后加载的组件层盖掉，
 // 曾因此"写了不生效"（2026-09-13 修）。这里造两个临时节点量计算样式——比翻样式表可靠。

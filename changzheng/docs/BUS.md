@@ -104,7 +104,7 @@ const s = kernel.snapshot.get(); if (s.体力 <= 20) // ② 只读取数
 kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调用，慎用）
 ```
 
-事件清单见 `kernel/contracts.js`（那张表本身就是文档）；当前 21 条，分五组：
+事件清单见 `kernel/contracts.js`（那张表本身就是文档）；当前 30 条，分五组：
 `boot:*` · `screen:*`/`scene:*`/`flow:*` · `state:*`/`hotspot:*`/`choice:*`/`line:*` · `ai:*` · `sfx:*`/`voice:*`/`audio:*` · `resource:*`。
 
 ### 已挂上总线的模块（批 2–3）
@@ -117,6 +117,7 @@ kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调�
 | `modules/hud` | `state:change` | **状态读数渲染**：顶栏五维 / 行动点 / 同伴好感 / 营地手记 / AI 计数。以前这些靠调用方手工配对（`renderStats` 18 次、`renderCompanions` 8 次、`renderAp` 6 次），漏一处就是"数字没更新" |
 | `modules/screens` | `screen:show` · `screen:hide` | **屏的生命周期归属**：各屏宿主用 `own(screenId, onHide)` 登记自己的清理；离开时只调那一屏自己登记的清理函数（取代 `showScreen` 越界清别人容器的做法，见 §三点五） |
 | `modules/games` | （不订阅；发 `game:start` / `game:end`） | **玩法宿主服务**：开板屏、写题名与背景、写数值签、建 `[data-mini]` host、声明契约、收尾清理；玩法是 `manifest.js` 里的一行插件。流程层只写 `games.play(id, {params})`，不碰板屏 DOM |
+| `modules/cinema` | `voice:start` · `voice:ended` | **电影化三处的播放器**（批 C 起）：`api.play(id)` 演一条编排（序章 / 幕间 / 终章升华共用一套拍子：题字·路线图·空镜·诗·钤印）。它只写 `#screen-cutscene`（屏归它自清），配音只发 `voice:say`/`voice:stop`，字幕逐字与"等这句念完"都基于语音通道的回声事件 |
 | `modules/ai` | `ai:feed` · `ai:verdict` | **模型的唯一入口与唯一账目**：`api.ask(payload)` 是业务侧唯一的调用方式；广播 `ai:request/start/done/fail`，等 UI 用 `ai:verdict` 裁决重试；每类预算在 `registry.js`（改行为只改那张表），请求怎么发在 `run.js`，计数与 `metrics()` 在这里 |
 
 **发声音就发事件**（别再调音频门面——`qa:audio` 会拦）：
@@ -199,9 +200,9 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 
 | 批 | 内容 | 状态 |
 |---|---|---|
-| A | **地基：语音通道事件-控制**（无可见变化）：契约登记 `voice:start/progress/ended/stop`；语音通道重写成带时长/进度/语速的通道；门面补 `voiceStop()/voiceState()/voiceRates()`；修默认音色分岔 | ✅ 已完成（2026-09-15） |
-| B | **诗与素材**：`data/poem.json`（8 句 + 出处 + 落款 + 无声节奏；**诗的唯一真源**）+ `poem:manifest` → `docs/POEM-TTS.md` + 两条音频路线（逐句 TTS / 整段录音，后者不入库）+ 字体缺字补齐（`逶/迤/礴` 重跑 `fonts:build`）+ 单位守卫 `tests/unit/poem.test.js` | ✅ 已完成（2026-09-15） |
-| C | **完整序章**：黑场题字 → 路线图 → 出身 → 告别空镜（接在 `flow/act.js` 的 `runOrigin()` 之前）；`quick` 只留题字一拍 | ⏳ 待做 |
+| A | **地基：语音通道事件-控制**（无可见变化）：契约登记 `voice:start/progress/ended/stop`；语音通道重写成带时长/进度/语速的通道；门面补 `voiceStop()/voiceState()/voiceRates()`；修默认音色分岔 | ✅ 已完成（2026-09-15，提交 `ac644bc`） |
+| B | **诗与素材**：`data/poem.json`（8 句 + 出处 + 落款 + 无声节奏；**诗的唯一真源**）+ `poem:manifest` → `docs/POEM-TTS.md` + 两条音频路线（逐句 TTS / 整段录音，后者不入库）+ 字体缺字补齐（`逶/迤/礴` 重跑 `fonts:build`）+ 单位守卫 `tests/unit/poem.test.js` | ✅ 已完成（2026-09-15，提交 `b60454c`） |
+| C | **完整序章**：`modules/cinema`（描述符 + `player.js` 播放器 + `beats.js` 拍子 + `sequences.js` 编排）+ 序章三段编排（题字 → 路线图 → 出身 → 告别）；`quick` 只留题字一拍；联系表加三页、`qa:motion` 加五条拍子断言；顺手**修好自批 7 起被切成半截的 layout-audit**（它一直在报绿但只体检了标题一屏） | ✅ 已完成（2026-09-15） |
 | D | **幕间过渡**：`flow/act.js` 的 `runCutscene` 退位给 `cinema.play('act-break')`，`marchTransition` 降级为拍子间的连接件 | ⏳ 待做 |
 | E | **终局结算 + 升华**：结算面板照旧，升华为独立整屏（空镜 → 8 句逐字跟音频 → 钤印）；自动播 + 可跳过 + 1x/1.5x；**失败分支不演** | ⏳ 待做 |
 

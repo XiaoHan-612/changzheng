@@ -19,15 +19,17 @@ changzheng/
     balance.js          # 数值护栏（钳制表）
     config.js           # 双层配置 + 损坏容错
   public/               # 客户端（无构建，原生 ES Module）
-    index.html          # 18 个屏；每屏一个 tpl-* 模板（由 qa:frames 强制）
+    index.html          # 17 个屏；每屏一个 tpl-* 模板（由 qa:frames 强制；过场屏 #screen-cutscene 由序章/幕间/终章升华共用）
     css/                # fonts → tokens（唯一值源）→ base → framework（模板+区块+动效）→ components
     js/
       kernel/           # 【新】内核：bus / contracts(事件契约) / plugins / kernel / wiring(模块清单)
                         #        / resources(显式锁) / snapshot(只读快照) / diag(事件流黑匣子)
                         #        架构与新模块怎么加见 docs/BUS.md
-      modules/          # 【新】IP 模块：audio（声音总入口）/ shell（外壳反应）/ screens（屏生命周期归属）
+      modules/          # IP 模块：audio（声音总入口）/ shell（外壳反应）/ screens（屏生命周期归属）
                         #        state（状态唯一持有者）/ hud（订阅 state:change 渲染读数）/ games/（玩法插件）
-      main.js           # 流程状态机（批 7 会拆成 modules/flow/*）（幕、营地、强制链、锁、篝火夜、玩法宿主 openBoard/mountMini）
+                        #        ai（模型调用与账目）/ cinema（电影化：拍子播放器，序章 / 幕间 / 终章升华）
+      main.js           # 组合根：boot + chrome 绑定 + 设置/手记/答辩面板 + 把流程入口接到按钮（535 行）
+      flow/             # 流程层（批 7 从 main.js 拆出）：kit / view / echo / tables / games-flow / quiz / night / act / end
       step.js           # 交互契约（setStep / askChoice / choiceButton / waitContinue / markMini）
       minigames.js      # 8 个玩法（本地判手感，结算走 /api/decide）
       state.js          # 资源/好感/附身线/行动点/失败判定（可单测）

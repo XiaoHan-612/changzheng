@@ -23,6 +23,7 @@ export const MODULES = [
   { name: 'screens', path: './modules/screens/index.js', note: '屏的生命周期归属：宿主登记自己的清理，离开只清自己的容器' },
   { name: 'games', path: './modules/games/index.js', note: '玩法宿主服务：开板屏/题名/数值签/契约声明/清理；玩法只是清单里的插件' },
   { name: 'ai', path: './modules/ai/index.js', note: '大模型调用的观测与账目：收 ai:feed、渲染答辩面板调用流（批 6 再长 registry/run）' },
+  { name: 'cinema', path: './modules/cinema/index.js', note: '电影化：拍子播放器（序章 / 幕间过渡 / 终局升华），过场屏归它自清' },
 ];
 
 /** 内核启动阶段（boot 编排）：需要插在某个阶段之间的模块，用 stage 字段声明 */

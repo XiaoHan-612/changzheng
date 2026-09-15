@@ -196,8 +196,10 @@ await step('开局到营地', async () => {
   const before = errs.length;
   await page.click('#btn-mode-study');
   await page.waitForTimeout(150);
+  // passOrigin 现在连过场一起清（序章/幕间都是过场屏，见 tests/e2e/lib/driver.mjs）——
+  // 这里**不要**再补一次 `click('#btn-cut-skip')`：按钮此时已经不可见，
+  // Playwright 会按默认 30s 死等超时才抛错，白白把 8 秒的快检拖成 38 秒（2026-09-15 实测）。
   await passOrigin(page);
-  await page.click('#btn-cut-skip').catch(() => { /* 过场可能已经自己走完 */ });
   await page.waitForTimeout(300);
 
   const camp = await page.evaluate(() => ({

@@ -26,7 +26,7 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
 |---|---|---|
 | `public/js/main.js` | 主线状态机：五幕、营地日、强制链、对决、失败/终局、篝火夜；**玩法宿主** `openBoard()` + `mountMini()` | 最大的文件；热点用 `HOTSPOT_HANDLERS` 映射表分发，**加玩法只加一行**；玩法一律挂板屏（见第 27 条） |
 | `public/js/kernel/` | **内核**（新）：`bus`（事件总线）/ `contracts`（事件契约唯一真源）/ `plugins`（模块描述符）/ `kernel`（注册·接线·ready·诊断）/ `wiring`（模块清单）/ `resources`（显式锁）/ `snapshot`（只读快照）/ `diag`（事件流黑匣子） | 架构与规矩见 [`BUS.md`](BUS.md)；**模块集合不写死**——加模块只动 `wiring.js` 清单与模块自己的文件 |
-| `public/js/modules/` | **IP 模块**（新）：已挂 `audio`（声音总入口）/ `shell`（外壳反应）/ `screens`（屏生命周期归属）/ **`state`（状态唯一持有者：写走动作并广播）/ `hud`（订阅 state:change 渲染读数）**；`games/` 是交互游戏插件契约 + 模板 | 批 2 起逐个迁入；**业务发声音只发事件**（`sfx:play`/`voice:say`/`scene:enter`/`flow:act-enter`），`qa:audio` 会拦直接 import 音频门面的写法 |
+| `public/js/modules/` | **IP 模块**（新）：已挂 `audio`（声音总入口）/ `shell`（外壳反应）/ `screens`（屏生命周期归属）/ **`state`（状态唯一持有者：写走动作并广播）/ `hud`（订阅 state:change 渲染读数）**；`games/` 是交互游戏插件契约 + 模板；`cinema/` 是**电影化三处的播放器**（拍子 `beats.js` + 编排 `sequences.js` + 播放 `player.js`，见坑 52 与 [`BUS.md`](BUS.md) §八） | 批 2 起逐个迁入；**业务发声音只发事件**（`sfx:play`/`voice:say`/`scene:enter`/`flow:act-enter`），`qa:audio` 会拦直接 import 音频门面的写法 |
 | `public/js/step.js` | **交互契约**：`step()` / `askChoice()` / **`choiceButton()`（选项唯一构建处）** / `waitContinue()` / `markMini()` | 新增玩法只要声明契约，测试与自动化无需改动；详见 ARCHITECTURE 的「交互契约」 |
 | `public/js/minigames.js` | **8 个玩法**：钓鱼/弯针/夜校识字/分糖/夜岗/五子棋/泸定桥/陡坡 | 统一返回 `{score, detail, summary?}`，本地只判手感，结算走 `/api/decide`；状态经 `stats(host, [...])` 写进板头数值签 |
 | `public/js/state.js` | 资源/好感/附身线/行动点/每日场景/失败判定 | 纯函数、可单测；新增资源维度要同时改 `applyEffects` 的钳制表 |
@@ -285,7 +285,15 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
     - **别写成 `node --test tests/unit/`**：Node 24 在 Windows 上会把目录当测试文件，报 `MODULE_NOT_FOUND`（试过）。通配符形式两个平台都稳。
     - 同类自查：凡"新加东西要记得登记进某个列表"的地方（测试文件、扫描脚本的目录清单、允许的事件名），一律改成按目录/模式发现；确实必须手列时，就加一条断言"清单里的文件都存在"，让漏登记当场变红。
 
+52. **"报告成功但没干活"的守卫最坏：它让你以为有防护**（批 C 挖出来的，已静静绿了三个提交） —— `tests/e2e/layout-audit.mjs` 原本会把标题/序章/营地/抉择/回响/手记/玩法板逐屏摆出来体检；**批 7 的一次机械改动把它从 241 行切成 110 行**，`main()` 里只剩"打开标题页 → 关浏览器"，而 `shot()`/`probe()` 都还在文件里（所以读代码不觉得少东西）。它照样打印 `✓ 1280px 宽逐屏无横向溢出/控件出界/点按区过小`，`docs/QA.md` 也照着这句话宣传"逐屏 0 处问题"。
+    - **怎么发现的**：把它的输出当证据读——只有一行 `shot 01-title`，而文档说它巡屏。**退出码 0 什么都没证明**（那是这批的第二重问题：有 defects 时它也不带非零码返回）。
+    - 现在的三道自保：① 页数打印出来（`共 17 屏`）；② 脚本里写死一张"**必到的屏**"清单（`REQUIRED`）并对账，少跑一屏就计入问题、非零退出；③ 有 defects 就 `process.exitCode = 1`。
+    - 更一般的教训：**机械重构之后，验收脚本要"跑一次并读它的输出形状"**，不能只看绿不绿。同类信号：条数从 N 变成 M、少了一屏、少了一个"检查了 x 个文件"的计数——本项目已经吃过三次（坑 47 的"空切片换绿"、坑 51 的"手列清单漏文件"、这一条）。所以凡体检脚本，**必须打印它体检了几样东西**，并对自己有个下限断言。
+53. **对"可能不在的元素"用默认超时的 `page.click` 会让快检慢 4 倍**（批 C 顺手修掉） —— 序章上线后，`dev:check` 的"开局到营地"从 1.4s 变成 31.9s。原因不是序章慢，而是那一步里有一句历史遗留的 `page.click('#btn-cut-skip')`：`passOrigin` 已经把过场都清掉了，按钮此时**不可见**，Playwright 会按默认 **30s** 死等可交互性，超时抛错后被 `.catch(() => {})` 吞掉——于是"什么都没做，但花了 30 秒"。
+    - 规矩：**对"可能不存在/可能不可见"的元素，要么先判 `count()/isVisible()`，要么显式给 `{ timeout: 1500 }`**。快检的每一秒都是开发者耐心，别把它花在等一个注定超时的点击上。
+
 ## 六、下一步建议（按价值排序）
+0. **电影化三处还剩两批**（2026-09-15）：序章已完成（批 C，`modules/cinema`）。**批 D** = 幕间过渡把 `flow/act.js` 的 `runCutscene` 换成 `cinema.play('act-break', {act})`（旧实现删除，`marchTransition` 降级为拍子之间的连接件）；**批 E** = 终局升华（`poem` 逐字跟 `voice:progress` 的已播毫秒 + `seal` 钤印，自动播/可跳过/1x·1.5x，失败分支不演）。诗的音频两条路都还没素材（逐句配音清单在 `docs/POEM-TTS.md`，整段录音放 `public/audio/poem/` 并在 `data/poem.json` 填 `audio.full`）——**没有音频也能演**（按 `pace` 逐字）。
 1. **真调验证已全覆盖**（2026-09-13）：标准模式一局 76 次调用全 `source=GLM`、无 ERROR；`failure_review` 由 `npm run qa:failure` 单独覆盖（注入"断粮+体力见底"走失败线，断言真调 1 次且渲染出标题/段落/史实要点）。15 类 callType 全部有真调记录。
 2. **契约扩散（部分完成）**：夜校小游戏的内层选项已补 `data-mini-action="answer"`（2026-09-13，此前那一屏没有任何 `data-*` 标记，自动化只能干等）。仍待办：`runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职，建议走 `askChoice`；`runRest` 只有一个「继续」，可直接 `waitContinue`。
 3. **数值平衡（进行中）**：测量口径已建好 —— `npm run qa:playtest` 按人类节奏跑局，输出时长/分幕耗时/五维终值/AI 调用数，结果表落 `docs/PLAYTEST.md`。热点已是一次性（第 20 条）；行军模式失败条件是「体力≤0」或「粮食=0 且体力≤30」，调参待做。

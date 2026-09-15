@@ -134,15 +134,27 @@ export function readingDelay(chars, speed = 'human') {
 }
 
 /**
- * 跳过开场设定（出身三选一 + 出发前一问）。
+ * 跳过开场（序章过场 + 出身三选一 + 出发前一问 + 告别过场）。
  *
  * 开场是标准/行军模式的必经步骤：不专门测它的脚本（冒烟、布局、素材落盘）都要先过这一段，
- * 否则会在"等营地热点"的地方空等到超时。快速模式没有这一步，函数会直接返回。
+ * 否则会在"等营地热点"的地方空等到超时。快速模式只剩一拍题字，函数也会顺手跳过去。
+ *
+ * 2026-09-15（批 C）起，开场里多了几屏**过场**（题字/路线图/告别，见 modules/cinema）。
+ * 它们由同一条契约驱动：`data-step-kind="cutscene"` + `#btn-cut-skip` 一跳到底，
+ * 所以这里一并处理——不这么做，每个调用点都要自己数"现在该点几次跳过"（迟早数错）。
  * @returns {Promise<boolean>} 调用后是否已不在开场步骤里
  */
 export async function passOrigin(page) {
-  for (let i = 0; i < 6; i++) {
-    const stepId = await page.evaluate(() => document.body.dataset.step || '');
+  for (let i = 0; i < 14; i++) {
+    const { stepId, kind } = await page.evaluate(() => ({
+      stepId: document.body.dataset.step || '',
+      kind: document.body.dataset.stepKind || '',
+    }));
+    if (kind === 'cutscene') {
+      await page.click('#btn-cut-skip').catch(() => {});
+      await page.waitForTimeout(150);
+      continue;
+    }
     if (!stepId.startsWith('origin')) return true;
     const opt = page.locator('[data-choice-index]').first();
     if (await opt.count().catch(() => 0)) {

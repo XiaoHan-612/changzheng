@@ -136,14 +136,32 @@ const BATCHES = {
       },
     },
     {
-      name: '04-cutscene',
+      // 序章第一拍（题字）：点完模式就停在它上面，约 3.8s 后自己转下一拍
+      name: '04-prologue-title',
       setup: async (p) => {
         await p.click('#btn-settings-close').catch(() => {});
         await p.waitForTimeout(150);
         await p.click('#btn-mode-study');
-        await p.waitForTimeout(200);
+        await p.waitForTimeout(900);
+      },
+    },
+    {
+      // 序章第二拍（路线图）：等拍子自己走过去（不给点按，拍子本来就会自动播）
+      name: '05-prologue-map',
+      setup: async (p) => {
+        await p.waitForTimeout(4200);        // 题字 3.8s + 一拍之隔
+      },
+    },
+    {
+      // 幕间过场：跳过序章与出身，停在第一幕的过场帧上（这一拍批 D 起也由 cinema 播）
+      name: '06-act-cutscene',
+      setup: async (p) => {
         await passOrigin(p);
-        await p.waitForTimeout(900);        // 停在过场第一帧
+        await p.waitForTimeout(700);
+        await p.click('#btn-cut-next').catch(() => {});
+        await p.waitForTimeout(400);
+        await p.click('#btn-cut-next').catch(() => {});
+        await p.waitForTimeout(300);
       },
     },
   ],

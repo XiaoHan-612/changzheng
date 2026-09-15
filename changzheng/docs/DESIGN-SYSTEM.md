@@ -112,6 +112,19 @@
 
 旋钮都在 `tokens.css` 顶部注释里标了【旋钮】：纸色三档、`--paper-veil` 透度、`--panel-w/--panel-h` 面积、`--tex-opacity` 纸纹、`--motion-scale` 动效强度。
 
+### 二点七、过场的"落脚"（批 C 加）
+
+过场屏（`#screen-cutscene`）上的一切文字与路线都压在**自己的一块暗场**上，不直接浮在画上：
+
+- `.cut-caption-wrap::before` 是与 `.title-card::before` 同一手法（`radial-gradient(ellipse, var(--scrim), transparent 72%)`），
+  给字幕与路线一条可读的地面。**浅色空镜上尤其必要**——路线图是纸色的，不加这层白字读不出来
+  （2026-09-15 联系表实拍发现）；
+- 底片的"处理档"由拍子声明、播放器执行：路线图那一拍声明 `stageClass: 'is-map'`，
+  样式是 `.cut-stage.is-map { filter: brightness(0.55) saturate(0.86) }` + 加重上下暗场——
+  纸色地图满屏会把整屏的调子拉亮，压一档才是"油灯下看地图"；
+- 拍子**只复用**现成类（`.title-card` / `.eyebrow` / `.subtitle` / `.foot-note` / `.journey` 那一套），
+  不另造视觉语言；`qa:tokens`（只许用 token）与 `qa:tone`（纸面预算）照旧拦着。
+
 ## 三、组件规范（同一语义必须复用同一类）
 
 | 类 | 用途 | 规则 |
@@ -138,6 +151,9 @@
 - **一致性由 lint 强制**：颜色/字体/圆角不许写死；债务只减不增（`tools/token-baseline.json`）。
 
 ## 五、逐页打磨进度（25 页 · 6 批）
+
+> 批 C 后新增三页在批次 1 的联系表里：`04-prologue-title`（黑场题字）、`05-prologue-map`（路线图）、
+> `06-act-cutscene`（幕间过场）。序章与幕间共用过场屏，不新增屏。
 
 | 批 | 页面 | 状态 |
 |---|---|---|

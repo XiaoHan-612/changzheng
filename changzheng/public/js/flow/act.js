@@ -18,7 +18,7 @@ import { dayScene, apPerDay } from '../state.js';
 import { ORIGINS, ORIGIN_QUIZ, applyOrigin, applyOriginQuiz, findOrigin } from '../origin.js';
 import { PATH_ZONES, COMPANIONS } from '../data.js';
 import {
-  S, hasS, st, callAI, step, waitBtn, publicState, currentActDef,
+  S, hasS, st, callAI, step, waitBtn, publicState, currentActDef, cinemaApi,
   logChoice, logShare, markLine, markDone, isDone, LINE_NAMES, LINES_TOTAL,
   getActsData, withLock,
 } from './kit.js';
@@ -39,8 +39,15 @@ export async function startRun(mode = 'study') {
   setTopbar(true);
   toast(mode === 'march' ? '行军模式：资源与抉择都可能真的带不走一些人' : '研学模式：不会失去战友', 3200);
   if (mode === 'quick') toast('快速演示：每幕只跑主玩法与对决', 3200);
+  // 序章（电影化，见 modules/cinema）：黑场题字 → 路线图。快速模式只留题字一拍——
+  // 它按定义要在 18 分钟内走完五幕，不能被序章吃掉时间。
+  await cinemaApi()?.play(mode === 'quick' ? 'prologue-quick' : 'prologue-open');
   // 快速模式按定义要短，跳过开场设定；标准/行军模式走一次出身与出发前一问
-  if (mode !== 'quick') await runOrigin();
+  if (mode !== 'quick') {
+    await runOrigin();
+    // 告别：出身与出发前一问之后、进营地之前（序章下半场，两拍空镜 + 母亲/旁白各一句预录）
+    await cinemaApi()?.play('prologue-farewell');
+  }
   await runActIntro();
 }
 
