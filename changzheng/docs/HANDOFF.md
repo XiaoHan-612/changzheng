@@ -105,7 +105,7 @@ npm run qa:bus       # 总线守卫（模块化规则 + 内核运行时体检）
 ```
 
 当前结果：unit 53/53 · smoke PASS · board 66/66 · motion 15/15 · e2e FULL PASS ·
-sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 全绿 ·
+failure / loss / smoke PASS · av AUDIT PASS · tokens/frames/tone/handoff 全绿 ·
 `dev:check` 9/9（≈7s，含"调用流链通"）· `layout-audit --width 820` 与 1280 均零布局缺陷
 
 ## 三、还没做 / 已知缺口（按优先级）

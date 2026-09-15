@@ -58,6 +58,45 @@ export const SEQUENCES = {
     },
   ],
 
+  /**
+   * 幕间过渡：**回望上一幕 → 本幕空镜 → 本幕题字**，接营地。
+   *
+   * 一条编排管两件事，靠 ctx 区分（`flow/act.js` 的 `runActIntro` 是唯一调用点）：
+   *   · 第一幕（`idx = 0`）**不演**——序章已经演过题字与全程路线图，再来一遍就是重复；
+   *   · 第二幕起：`review` 是上一幕的幕间总评（模型给的 1–2 句，失败时为 null，那就只留空镜与题字）。
+   * 原先这两处是 `marchTransition` 的一层闪白 + 一段 `runCutscene`，现在都归这里（批 D）。
+   */
+  'act-intro': ({ act, idx = 0, prev = null, review = null }) => {
+    if (!act || !idx) return [];
+    const beats = [{
+      kind: 'map',
+      img: '/assets/scenes/map_route.jpg',
+      stageClass: 'is-map',
+      sfx: 'march',
+      lit: idx,                                  // 走过的每一段常亮，本幕还暗着
+      text: review?.lines?.length
+        ? review.lines.join('')
+        : `走出${prev?.title || '上一幕'}，队伍没有停。`,
+      revealMs: 200,
+      holdMs: 1400,
+    }];
+    beats.push({
+      kind: 'photo',
+      img: prev?.cutAlt || prev?.pano || act.pano,
+      text: `${act.date}。${act.subtitle}——${act.theme}。`,
+      holdMs: 1500,
+    });
+    beats.push({
+      kind: 'title',
+      eyebrow: `${act.date} · 第 ${idx + 1} 幕`,
+      title: act.title,
+      sub: act.subtitle,
+      note: act.theme,
+      holdMs: 2800,
+    });
+    return beats;
+  },
+
   /** 快速演示：只留题字一拍（约 18 分钟走完五幕，不能被序章吃掉时间） */
   'prologue-quick': [
     {

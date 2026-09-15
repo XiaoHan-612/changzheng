@@ -129,7 +129,7 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
    - **心脏**：分清楚「该响什么」`desired` 与「现在在响什么」`actual`，所有入口（进屏/换幕、静音、
      用户手势、标签页可见性、元素被外部暂停）只改 desired 或调 `reconcile()`。
      老实现"静音后环境床再也不回来"就是因为没有这一层（2026-09-14 玩家反馈，当天重写收口）。
-   - **切场景只走声明表**：`audio.scene({ act, label })` 或 `audio.scene('sandbox'|'title'|'luding'|'ending')`；
+   - **切场景只走声明表**：`audio.scene({ act, label })` 或 `audio.scene('title'|'luding'|'ending')`；
      新增场景 = `scene-table.js` 加一行。守卫核对「场景表 kind ↔ 文件映射 ↔ 磁盘文件」三层，
      **写错 kind 当场报错**（不然就是静默无声）；app 代码直调 `audio.ambient/bgm.play` 会被拦。
    - **加内容都不用改调用代码**：环境床 `public/audio/ambient/<kind>.ogg`、BGM `public/audio/bgm/<kind>_bgm.ogg`、
@@ -293,7 +293,7 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
     - 规矩：**对"可能不存在/可能不可见"的元素，要么先判 `count()/isVisible()`，要么显式给 `{ timeout: 1500 }`**。快检的每一秒都是开发者耐心，别把它花在等一个注定超时的点击上。
 
 ## 六、下一步建议（按价值排序）
-0. **电影化三处还剩两批**（2026-09-15）：序章已完成（批 C，`modules/cinema`）。**批 D** = 幕间过渡把 `flow/act.js` 的 `runCutscene` 换成 `cinema.play('act-break', {act})`（旧实现删除，`marchTransition` 降级为拍子之间的连接件）；**批 E** = 终局升华（`poem` 逐字跟 `voice:progress` 的已播毫秒 + `seal` 钤印，自动播/可跳过/1x·1.5x，失败分支不演）。诗的音频两条路都还没素材（逐句配音清单在 `docs/POEM-TTS.md`，整段录音放 `public/audio/poem/` 并在 `data/poem.json` 填 `audio.full`）——**没有音频也能演**（按 `pace` 逐字）。
+0. **电影化三处只剩一批**（2026-09-15）：序章（批 C）与幕间过渡（批 D）已完成，演出统一走 `modules/cinema` 的 `api.play(id)`（`flow/act.js` 里旧的 `runCutscene` 已删除）。**批 E** = 终局升华（`poem` 逐字跟 `voice:progress` 的已播毫秒 + `seal` 钤印，自动播/可跳过/1x·1.5x，失败分支不演）。诗的音频两条路都还没素材（逐句配音清单在 `docs/POEM-TTS.md`，整段录音放 `public/audio/poem/` 并在 `data/poem.json` 填 `audio.full`）——**没有音频也能演**（按 `pace` 逐字）。
 1. **真调验证已全覆盖**（2026-09-13）：标准模式一局 76 次调用全 `source=GLM`、无 ERROR；`failure_review` 由 `npm run qa:failure` 单独覆盖（注入"断粮+体力见底"走失败线，断言真调 1 次且渲染出标题/段落/史实要点）。15 类 callType 全部有真调记录。
 2. **契约扩散（部分完成）**：夜校小游戏的内层选项已补 `data-mini-action="answer"`（2026-09-13，此前那一屏没有任何 `data-*` 标记，自动化只能干等）。仍待办：`runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职，建议走 `askChoice`；`runRest` 只有一个「继续」，可直接 `waitContinue`。
 3. **数值平衡（进行中）**：测量口径已建好 —— `npm run qa:playtest` 按人类节奏跑局，输出时长/分幕耗时/五维终值/AI 调用数，结果表落 `docs/PLAYTEST.md`。热点已是一次性（第 20 条）；行军模式失败条件是「体力≤0」或「粮食=0 且体力≤30」，调参待做。

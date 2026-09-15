@@ -10,7 +10,7 @@
  */
 import {
   $, showScreen, setTopbar, setStageBanner, setStagePanel, say, setPortrait, flashEffects,
-  toast, escapeHtml, typeText, showOverlay, hideOverlay, wipe,
+  toast, escapeHtml, showOverlay, hideOverlay,
 } from '../ui.js';
 import { askChoice, choiceButton, markAction, waitContinue, setStepState } from '../step.js';
 import { kernel } from '../kernel/index.js';
@@ -108,65 +108,22 @@ export async function runOrigin() {
   await waitContinue('进入于都河');
 }
 
-export async function runActIntro() {
+/**
+ * 进入一幕：幕间过场（电影化，`modules/cinema`）→ 幕前引子 → 营地。
+ * @param {{review?: object, prev?: object}} [incoming] 上一幕的幕间总评与那一幕本身
+ *   （`finishAct` 传进来；第一幕没有"上一幕"，`act-intro` 编排会自己空转——序章已经演过题字与全程路线图）
+ */
+export async function runActIntro(incoming = {}) {
   const act = currentActDef();
   if (!act) return runEnding();
   if ($('act-tag')) $('act-tag').textContent = `${act.title} · ${act.subtitle}`;
-  await runCutscene([
-    { img: act.pano, text: `${act.date}。${act.subtitle}——${act.theme}。` },
-    { img: sceneImage(act.cutAlt, act.pano), text: '营地在暮色里安顿下来。光点在呼吸，走近一处，把事做完。' },
-  ]);
+  const order = getActsData()?.order || [];
+  await cinemaApi()?.play('act-intro', {
+    ctx: { act, idx: order.indexOf(act.id), prev: incoming.prev || null, review: incoming.review || null },
+  });
   if (act.prelude) await runPrelude(act);
   if (S.mode === 'quick') return runQuickAct(act);
   enterCampDay(act, 1);
-}
-
-export async function runCutscene(frames) {
-  step('cutscene', 'cutscene');
-  showScreen('screen-cutscene');
-  wipe($('screen-cutscene'));     // 换幕抹擦：一层墨色横扫而过，动画结束自删
-  const stage = $('cut-stage');
-  const cap = $('cut-caption');
-  const nextBtn = $('btn-cut-next');
-  const skipBtn = $('btn-cut-skip');
-  const screen = $('screen-cutscene');
-  let skipped = false;
-  let waitClick = null;
-  const onClick = (e) => {
-    if (e && e.target === skipBtn) return;
-    if (waitClick) {
-      const r = waitClick;
-      waitClick = null;
-      r();
-    }
-  };
-  const waitUser = () => new Promise((r) => { waitClick = r; });
-  nextBtn.onclick = onClick;
-  skipBtn.onclick = () => { skipped = true; onClick(); };
-  markAction(nextBtn, 'continue');
-  markAction(skipBtn, 'skip');
-  screen.onclick = onClick;
-
-  for (let i = 0; i < frames.length && !skipped; i++) {
-    const step = frames[i];
-    stage.style.backgroundImage = `url('${step.img}')`;
-    cap.textContent = '';
-    nextBtn.textContent = i < frames.length - 1 ? '下一句 ▸' : '进入 ▸';
-    let finishedTyping = false;
-    typeText(cap, step.text, 24).then(() => { finishedTyping = true; });
-    await waitUser();
-    if (skipped) break;
-    if (!finishedTyping) {
-      cap.textContent = step.text;
-      await waitUser();
-    }
-  }
-  nextBtn.onclick = null;
-  skipBtn.onclick = null;
-  screen.onclick = null;
-  // 过场结束必须摘掉契约标记：这些按钮是静态 DOM，留着会让"当前可交互项"判断出错
-  delete nextBtn.dataset.action;
-  delete skipBtn.dataset.action;
 }
 
 export async function runPrelude(act) {
@@ -237,7 +194,8 @@ export async function runForcedChain(act) {
 
 export async function finishAct(act) {
   st().pushLog(act.id, act.title);
-  // 幕间 AI 总评
+  // 幕间 AI 总评（下面的幕间过场要拿它当回望字幕，所以提到 try 外面）
+  let reviewNow = null;
   try {
     const review = await callAI({
       scene: `幕间总评·${act.title}`,
@@ -246,9 +204,11 @@ export async function finishAct(act) {
       state: publicState(),
       extraContext: `幕记录：${JSON.stringify(S.actLog)}`,
     });
+    reviewNow = review || null;
     if (review?.lines?.length) {
-      toast(review.title || '本幕小结', 2800);
       st().pushCampLog('总评', review.lines[0]);
+      // 不再弹 toast：这两句会写进下一幕的幕间过场字幕（见 runActIntro 的 review 参数）——
+      // 幕间的收束归电影化那一处管，别在营地屏上再飘一条气泡。
     }
   } catch { /* 非阻塞 */ }
 
@@ -263,9 +223,9 @@ export async function finishAct(act) {
   if (S.actIndex >= order.length) {
     await runEnding();
   } else {
-    const next = getActsData().acts[order[S.actIndex]];
-    await marchTransition('前往 ' + next.title);
-    await runActIntro();
+    // 幕间过场由 cinema 演（回望上一幕 → 本幕空镜 → 本幕题字），
+    // 原来那层 marchTransition 闪白交给拍子自己的 sfx 与题字，别两处各演一遍"下一幕到了"
+    await runActIntro({ review: reviewNow, prev: act });
   }
 }
 

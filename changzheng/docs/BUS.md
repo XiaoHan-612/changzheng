@@ -125,7 +125,7 @@ kernel.api('audio')?.sfx?.('click');               // ③ 取接口（同步调�
 ```js
 kernel.emit('sfx:play', { name: 'click' });                       // 音效（名字见 audio/sfx-table.js）
 kernel.emit('voice:say', { text, actorId: '老班长' });             // 台词（预置 → TTS 缓存 → 静默）
-kernel.emit('scene:enter', { name: 'sandbox' });                  // 独立场景：title/sandbox/luding/ending
+kernel.emit('scene:enter', { name: 'luding' });                   // 独立场景：title/luding/ending（见 audio/scene-table.js）
 kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // 幕轴上的场景（含第四幕分日）
 ```
 
@@ -160,7 +160,7 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | `flow/tables.js` | 数据表：`CHOICE_SETS` / `REPEATABLE_HOTSPOTS` | 不放函数 |
 | `flow/games-flow.js` | 玩法流程：开一局 → 模型复盘 → 走回响（含分汤/分粮这类 AI 裁决的小流程） | 不碰板屏 DOM（那是 `modules/games` 宿主的事） |
 | `flow/quiz.js` · `flow/night.js` | 知识对决 / 篝火夜 | — |
-| `flow/act.js` | **一幕的推进**：营地日 → 热点派发 → 抉择/玩法 → 启程 → 幕间结算 → 下一幕（营地与幕推进合在一个文件：它们本来互相咬，拆开必成环） | 不反向 import end/sandbox |
+| `flow/act.js` | **一幕的推进**：营地日 → 热点派发 → 抉择/玩法 → 启程 → 幕间结算（走 `cinema.play('act-intro')`）→ 下一幕（营地与幕推进合在一个文件：它们本来互相咬，拆开必成环） | 不反向 import `flow/end.js`（会成环）；过场演出不自己写（走 cinema） |
 | `flow/end.js` | 收尾：失败结算 / 终局总评 / 关系面板 / 终局两个按钮 | 不反向 import act（会成环） |
 | `main.js`（组合根） | boot、chrome 绑定、设置面板、答辩面板、手记、dev 钩子、入口按钮接线 | 不写流程逻辑——只把 act/end 的入口接到按钮与钩子上 |
 
@@ -203,11 +203,14 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | A | **地基：语音通道事件-控制**（无可见变化）：契约登记 `voice:start/progress/ended/stop`；语音通道重写成带时长/进度/语速的通道；门面补 `voiceStop()/voiceState()/voiceRates()`；修默认音色分岔 | ✅ 已完成（2026-09-15，提交 `ac644bc`） |
 | B | **诗与素材**：`data/poem.json`（8 句 + 出处 + 落款 + 无声节奏；**诗的唯一真源**）+ `poem:manifest` → `docs/POEM-TTS.md` + 两条音频路线（逐句 TTS / 整段录音，后者不入库）+ 字体缺字补齐（`逶/迤/礴` 重跑 `fonts:build`）+ 单位守卫 `tests/unit/poem.test.js` | ✅ 已完成（2026-09-15，提交 `b60454c`） |
 | C | **完整序章**：`modules/cinema`（描述符 + `player.js` 播放器 + `beats.js` 拍子 + `sequences.js` 编排）+ 序章三段编排（题字 → 路线图 → 出身 → 告别）；`quick` 只留题字一拍；联系表加三页、`qa:motion` 加五条拍子断言；顺手**修好自批 7 起被切成半截的 layout-audit**（它一直在报绿但只体检了标题一屏） | ✅ 已完成（2026-09-15） |
-| D | **幕间过渡**：`flow/act.js` 的 `runCutscene` 退位给 `cinema.play('act-break')`，`marchTransition` 降级为拍子间的连接件 | ⏳ 待做 |
+| D | **幕间过渡**：`flow/act.js` 的 `runCutscene` **已删除**，幕间走 `cinema.play('act-intro', {act, idx, prev, review})`（回望地图 → 本幕空镜 → 本幕题字；上一幕总评两句从原来的 toast 升为字幕）；`marchTransition` 降级为日间/启程的连接件；第一幕不演（序章已演过） | ✅ 已完成（2026-09-15） |
 | E | **终局结算 + 升华**：结算面板照旧，升华为独立整屏（空镜 → 8 句逐字跟音频 → 钤印）；自动播 + 可跳过 + 1x/1.5x；**失败分支不演** | ⏳ 待做 |
 
 拍子词汇**封闭**（风格一致靠它）：`title` 题字 · `map` 路线图点亮 · `photo` 空镜+字幕逐字 ·
 `poem` 逐句逐字跟音频 · `seal` 钤印收束；每种都有减动效降级。
+
+编排有两种写法（都在 `sequences.js`，都是纯数据）：静态数组，或 `(ctx) => 拍子[]`——
+后者给“内容随幕次变”的幕间过渡用（拿本幕的图、幕名与上一幕总评）。
 
 批 A 之后，语音的"回声"是**事件**而不是"回头问门面"：`voice:start {durationMs}` /
 `voice:progress {t,duration}`（~10Hz）/ `voice:ended {interrupted}` / `voice:stop`（反向请求）。

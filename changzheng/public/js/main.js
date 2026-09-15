@@ -45,7 +45,7 @@ import { runQuiz } from './flow/quiz.js';
 import { runNightChoice, nightContext } from './flow/night.js';
 // 一幕的推进（含营地）与收尾（批 7 二·5；main.js 从此只剩组合根）
 import {
-  startRun, resumeRun, runActIntro, enterCampDay, updateMarchButton,
+  startRun, resumeRun, enterCampDay, updateMarchButton,
   renderFireMenu, renderPathZones,
 } from './flow/act.js';
 import { runEnding } from './flow/end.js';

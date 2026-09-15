@@ -8,7 +8,7 @@
 |---|---|---|---|
 | 开发快检 | `npm run dev:check` | 改完一处就扫一眼；批次中间随手跑 | **9 步 / ~7s / 0 次真调**。静态三关（总线规矩、单元测试、文档与代码一致）+ 一个浏览器一次走完（内核启动 → 开局到营地且 HUD 与存档一致 → 玩法板挂得上 → 输入框不吃快捷键 → 终局失败也不空屏 → 全程无报错）。`--headed` 开窗口看着跑 |
 | 快档验收 | `npm run verify:fast` | 提交前 | 11 项并行（unit/设计系统守卫/总线/动效/玩法板/音频/素材/**AI 体检**/一致性），~30s；**会真调**（动效那一项要点一次抉择） |
-| 全量验收 | `npm run verify:full` | 推送与交付前 | 真调那一档 7 项（e2e/av/sandbox/regress/failure/loss/smoke），串行跑避免挤网关，逐项报耗时与调用次数 |
+| 全量验收 | `npm run verify:full` | 推送与交付前 | 真调那一档 5 项（e2e / av / failure / loss / smoke），串行跑避免挤网关，逐项报耗时与调用次数 |
 
 三档都能挑单项跑：`node scripts/verify.mjs motion board`、`npm run verify:full -- av`。
 **顺手改坏没被抓到**这件事本身就是 bug：快检的两个故意破坏用例（模块间 import、页面里塞语法错）都会红，见 `HANDOFF-CODE.md` 坑位 36。

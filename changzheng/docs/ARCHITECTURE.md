@@ -51,7 +51,7 @@ changzheng/
     poem.json           # 终局升华的诗与落款（**诗的唯一真源**：屏幕/逐字/配音都读它；改文本要重跑 poem:manifest）
   tests/
     unit/               # node --test：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制
-    e2e/                # full-run（五幕真调）/ smoke / sandbox / regressions / failure
+    e2e/                # full-run（五幕真调）/ smoke / failure / loss-check / av-audit / layout-audit
                         # av-audit（影音）/ layout-audit（逐屏布局）/ asset-drop
     manual/             # 体检与一次性排查：qa-board / qa-motion / qa-hud / screen-sheet …
   scripts/              # audit-logs · lint-tokens · lint-frames · check-tone · check-fonts

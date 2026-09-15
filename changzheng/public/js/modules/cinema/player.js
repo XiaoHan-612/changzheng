@@ -61,7 +61,11 @@ function frame() {
  * @returns {Promise<{id: string, beats: number, skipped: boolean}>}
  */
 export async function play(id, opts = {}) {
-  const seq = SEQUENCES[id];
+  // 编排有两种写法（`sequences.js` 里混用）：静态数组，或 `(ctx) => 拍子[]`。
+  // 后者给"内容随幕次变"的编排用（幕间过渡要拿本幕的图、幕名与一句总评），
+  // 但它仍然是**纯数据**：只挑拍子与文案，不做任何流程判断。
+  const raw = SEQUENCES[id];
+  const seq = typeof raw === 'function' ? raw(opts.ctx || {}) : raw;
   if (!seq || !seq.length) {
     // 编排 id 写错就明说：静默演一段空白，会让"序章没了"变成很晚才发现的怪事
     console.error(`[cinema] 没有编排「${id}」，可用：${Object.keys(SEQUENCES).join('、')}`);
@@ -127,6 +131,8 @@ export async function play(id, opts = {}) {
     // 换底片的处理档（如路线图要压暗一档）：由拍子声明、播放器执行——拍子不直接改 class，
     // 免得上一拍加的类留在下一拍身上（"谁加谁清"在这里容易漏）。
     f.stage.className = `cut-stage${beat.stageClass ? ' ' + beat.stageClass : ''}`;
+    // 拍子可以声明一个音效（如幕间启程的鼓点）：走事件，交给音频模块放
+    if (beat.sfx) kernel.emit('sfx:play', { name: beat.sfx });
     impl.render?.(ctx, beat, opts.ctx || {});
 
     // 字幕：减动效直接给全文；点按先把剩下的一次性显示完，再一次点按才走（老行为，别改）
