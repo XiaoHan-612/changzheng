@@ -1,6 +1,6 @@
 // 音频体检：确认**每一个已经生成的音频文件都能被播出去**，而不只是"文件存在"。
 //
-// 为什么要有它：素材体检只覆盖了环境床与 TTS 缓存的一部分；voices/ 与 reactions/ 从没验过，
+// 为什么要有它：素材体检只覆盖了环境床与 TTS 缓存的一部分；voices/ 从没验过，
 // 也没人核对"文件能不能被某条代码路径真的请求到"。音频最容易出的三种事故：
 //   ① 扩展名与容器不一致（.wav 里装的是 Ogg）→ 服务器发的 MIME 错，浏览器拒播；
 //   ② 文件在，但没有任何映射指向它 → 永远播不到（曾出现 24 条 TTS 里 21 条不可达）；
@@ -31,7 +31,7 @@ const TTS_HASH = (voice, text) => crypto.createHash('sha1').update(`${voice}|${t
 /** 收集所有音频文件（按目录分类） */
 function listAudio() {
   const out = [];
-  for (const dir of ['ambient', 'bgm', 'cache', 'voices', 'reactions']) {
+  for (const dir of ['ambient', 'bgm', 'cache', 'voices']) {
     const abs = path.join(AUDIO, dir);
     if (!fs.existsSync(abs)) continue;
     for (const f of fs.readdirSync(abs).filter((x) => /\.(wav|ogg|mp3)$/i.test(x)).sort()) {
@@ -59,13 +59,10 @@ function references() {
   const voices = new Set();
   const voiceLines = JSON.parse(read('public/audio/voice-lines.json')).lines || [];
   for (const l of voiceLines) voices.add(path.basename(l.file));
-  const reactions = new Set();
-  const visuals = JSON.parse(read('data/sim-visuals.json'));
-  for (const v of Object.values(visuals.reactions || {})) reactions.add(path.basename(v));
   const cache = new Set();
   const ttsLines = JSON.parse(read('data/tts-lines.json')).lines || [];
   for (const l of ttsLines) cache.add(`${TTS_HASH(l.voiceId || 'narr', l.text)}_${l.voiceId || 'narr'}.wav`);
-  return { ambient: new Set([...ambient, ...ambientAlt]), bgm, voices, reactions, cache, voiceLines, ttsLines };
+  return { ambient: new Set([...ambient, ...ambientAlt]), bgm, voices, cache, voiceLines, ttsLines };
 }
 
 async function main() {
@@ -145,9 +142,6 @@ async function main() {
   for (const r of byDir('voices')) {
     if (!referenced(r.file, refs.voices)) problems.push(`${r.url} 没有任何 voice-lines 指向它 → 永远播不到`);
   }
-  for (const r of byDir('reactions')) {
-    if (!referenced(r.file, refs.reactions)) problems.push(`${r.url} 没有被沙盘 REACTION_FILE 引用 → 永远播不到`);
-  }
   for (const r of byDir('cache')) {
     if (!referenced(r.file, refs.cache)) problems.push(`${r.url} 的哈希与 data/tts-lines.json 对不上 → /api/tts 永远取不到它`);
   }
@@ -157,7 +151,6 @@ async function main() {
     const b = path.basename(l.file);
     if (!have.has(b)) problems.push(`voice-lines.json 指向不存在的文件：${b}`);
   }
-  for (const name of refs.reactions) if (!have.has(name)) problems.push(`sim-visuals.json 指向不存在的反应音：${name}`);
   for (const name of refs.cache) if (!have.has(name)) problems.push(`data/tts-lines.json 对应的缓存缺失：${name}（重跑 npm run tts:manifest 对照）`);
   for (const r of byDir('bgm')) {
     if (!Object.values(mapOf(read('public/js/audio/channels/bgm.js'), BGM_ENTRY)).some((u) => path.basename(u) === r.file)) {
@@ -169,7 +162,7 @@ async function main() {
   const lines = [
     '# 音频体检报告',
     '',
-    `> 由 \`npm run qa:audio\` 生成 · 共 ${rows.length} 个文件（ambient ${byDir('ambient').length} · bgm ${byDir('bgm').length} · cache ${byDir('cache').length} · voices ${byDir('voices').length} · reactions ${byDir('reactions').length}）`,
+    `> 由 \`npm run qa:audio\` 生成 · 共 ${rows.length} 个文件（ambient ${byDir('ambient').length} · bgm ${byDir('bgm').length} · cache ${byDir('cache').length} · voices ${byDir('voices').length}）`,
     '',
     '| 文件 | 容器 | 采样 | 声道 | 时长 | 体积 | HTTP | MIME | 可解码 |',
     '|---|---|---|---|---|---|---|---|---|',

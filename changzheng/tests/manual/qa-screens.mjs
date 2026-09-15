@@ -127,16 +127,5 @@ await page.evaluate(() => {
 await page.waitForTimeout(150);
 await measure('PATH', 'screen-path');
 
-// SANDBOX
-await show('screen-sandbox');
-await page.evaluate(() => {
-  document.getElementById('sb-day').textContent = '2';
-  document.getElementById('sb-place').textContent = '草地边缘';
-  document.getElementById('sb-people').innerHTML = '<div class="sb-person"><span>老班长</span><span class="st">正常</span></div><div class="sb-goal">目标 · 把队伍完整带出去</div>';
-  document.getElementById('sb-feed').innerHTML = '<div class="turn"><div class="ev-card" style="background-image:url(/assets/events/ev_night_march.jpg)"><span class="ev-tag">夜行</span></div><div class="act-line">▸ 用绳子把队伍串起来走<span class="verdict">可行</span></div><div class="narr">你按自己的判断往前走了一段。</div></div>';
-});
-await page.waitForTimeout(150);
-await measure('SANDBOX', 'screen-sandbox');
-
 await browser.close();
 console.log('AUDIT DONE');

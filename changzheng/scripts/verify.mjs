@@ -47,8 +47,6 @@ const FAST = [
 const FULL = [
   { name: 'e2e', cmd: 'npm', args: ['run', 'test:e2e'], calls: true },
   { name: 'av', cmd: 'npm', args: ['run', 'qa:av'], calls: true },
-  { name: 'sandbox', cmd: 'npm', args: ['run', 'qa:sandbox'], calls: true },
-  { name: 'regress', cmd: 'npm', args: ['run', 'qa:regress'], calls: true },
   { name: 'failure', cmd: 'npm', args: ['run', 'qa:failure'], calls: true },
   { name: 'loss', cmd: 'npm', args: ['run', 'qa:loss'], calls: true },
   { name: 'smoke', cmd: 'npm', args: ['run', 'qa:smoke'], calls: true },

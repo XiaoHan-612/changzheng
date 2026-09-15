@@ -32,7 +32,7 @@ fs.mkdirSync(ART, { recursive: true });
 
 const acts = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/acts.json'), 'utf8'));
 // 批 7：main.js 在往 flow/* 拆——期望值从**整个流程层**静态解析，搬文件不必改这里
-const flowFiles = ['main.js', 'minigames.js', 'sandbox.js']
+const flowFiles = ['main.js', 'minigames.js']
   .concat(fs.existsSync(path.join(ROOT, 'public/js/flow'))
     ? fs.readdirSync(path.join(ROOT, 'public/js/flow')).filter((f) => f.endsWith('.js')).map((f) => `flow/${f}`)
     : []);

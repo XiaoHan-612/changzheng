@@ -233,25 +233,10 @@ const BATCHES = {
     { name: '05-sentry', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'sentry'); } },
   ],
   5: [
-    // 玩法板三屏（同一块板）+ 自由行军沙盘（tpl-world，走真实入口跑一回合）
+    // 玩法板三屏（同一块板）
     { name: '01-gomoku', setup: async (p) => { await intoCamp(p); await jump(p, 'screen-board', 'mini', 'gomoku'); } },
     { name: '02-luding', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'luding'); } },
     { name: '03-grab', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'grab'); } },
-    {
-      name: '04-sandbox',
-      fresh: true,
-      setup: async (p) => {
-        await p.click('#btn-mode-sandbox');
-        await p.waitForTimeout(800);
-        await p.fill('#sb-input', '派两个人去打探前面的路');
-        await p.click('#sb-send');
-        for (let i = 0; i < 40; i++) {                 // 等模型裁决 + 世界更新
-          if (await p.locator('#sb-feed .turn').count()) break;
-          await p.waitForTimeout(400);
-        }
-        await p.waitForTimeout(600);
-      },
-    },
   ],
   6: [
     // 答题：同一次真实流程里取「出题」与「判分」两态（选项现在是 blk-choice，判分态 .correct/.wrong）

@@ -3,7 +3,6 @@
    小片纸（按钮/选项/纸签/卡片）：只上色与描边，省性能。 */
 /* 大片纸：纸纹 + 折痕 + 纸边收口（一处定义，容器类共享） */
 .panel, .sheet, .journal, .echo-cinema, .cut-caption-wrap,
-.sb-feed, .quiz-panel, .night-panel, .end-panel, .ai-inspector {
   background-color: var(--paper-veil);
   background-image: linear-gradient(180deg, var(--paper-hi), var(--paper-lo)), var(--paper-tex), var(--crease);
   background-size: auto, cover, auto;
@@ -16,8 +15,8 @@
 
 /* 小片纸：只上色与描边，省性能（一处定义） */
 .jr-chip, .mood-chip, .fact-card, .log-item,
-.def-card, .ev-card, .target-card, .sentry-box, .sb-scene-tag, .echo-col, .hs-card,
-.set-input, .sb-form input, .chat-row input {
+.def-card, .ev-card, .target-card, .sentry-box, .echo-col, .hs-card,
+.set-input, .chat-row input {
   background-color: var(--paper-0);
   border: 1px solid var(--rule-strong);
   color: var(--ink-0);
@@ -58,7 +57,7 @@
   overflow: hidden;
 }
 .screen.overlay { background: var(--scrim); z-index: var(--z-overlay); }
-.pano-img, .title-bg, .cut-stage, .quiz-bg, .night-bg, .end-bg, .path-bg, .sandbox-bg, .board-bg {
+.pano-img, .title-bg, .cut-stage, .quiz-bg, .night-bg, .end-bg, .path-bg, .board-bg {
   position: absolute; inset: 0; background-size: cover; background-position: center;
 }
 .pano-img { transition: background-image var(--dur-scene) var(--ease-out), transform var(--dur-base) var(--ease-out); }
@@ -438,48 +437,10 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .ai-item { padding: 6px 8px; border-radius: var(--radius-inset); background: var(--ink-veil); font-size: var(--fs-micro); color: var(--ink-1); }
 .deltas { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 
-/* ───────── 自由行军沙盘（tpl-world）───────── */
-.sandbox-grade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, var(--scrim-soft), transparent 30%, transparent 60%, var(--scrim)); }
-.sb-place { display: flex; align-items: baseline; gap: var(--sp-2); margin-bottom: var(--sp-3); }
-.sb-place-name { font-family: var(--font-display); font-size: var(--fs-h3); letter-spacing: var(--ls-label); }
-.sb-day { font-family: var(--font-num); font-size: 12px; color: var(--ink-2); }
-.sb-goal { font-size: var(--fs-micro); color: var(--ink-2); margin-bottom: var(--sp-2); letter-spacing: var(--ls-label); }
-.sb-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--sp-3); }
-.sb-bar { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-micro); color: var(--ink-1); }
-.sb-bar .track { flex: 1; height: 6px; border-radius: var(--radius-pill); background: var(--ink-veil); overflow: hidden; }
-.sb-bar .track i { display: block; height: 100%; background: var(--seal); }
-.sb-people, .sb-mem { font-size: var(--fs-micro); line-height: var(--lh-normal); color: var(--ink-1); }
-.sb-people .row, .sb-mem .row { display: flex; justify-content: space-between; gap: var(--sp-2); }
-.sb-intel { margin-top: var(--sp-3); padding: var(--sp-2); border-radius: var(--radius-inset); background: var(--ink-veil); font-size: var(--fs-micro); color: var(--ink-1); }
-.sb-main { position: absolute; left: 272px; right: var(--sp-4); top: 64px; bottom: var(--sp-5); z-index: var(--z-hud); display: flex; flex-direction: column; gap: var(--sp-3); }
 /* 纸面读区：随内容伸缩，上限按"一屏纸面 ≤35%"倒推（1280×800 下 64vh ≈ 512px）。
    这样空局不会撑出一大张白纸，长回合也能滚动读完。 */
-.sb-feed { flex: 1; min-height: 0; max-height: 64vh; overflow: auto; padding: var(--sp-5); border-radius: var(--radius); }
-.sb-feed .say { margin-bottom: var(--sp-3); font-family: var(--font); font-size: 15px; line-height: var(--lh-loose); color: var(--ink-0); }
-.sb-feed .npc .who { font-family: var(--font-kai); color: var(--seal); }
-.sb-feed .npc { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-2); }
-.sb-feed .turn { font-family: var(--font-num); font-size: var(--fs-micro); color: var(--ink-2); letter-spacing: 0.1em; margin-bottom: 4px; }
-.sb-form { display: flex; gap: var(--sp-2); }
-.sb-form input { flex: 1; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--rule-strong); background: var(--paper-0); color: var(--ink-0); font-family: var(--font); font-size: var(--fs-label); outline: none; }
-.sb-suggest { display: flex; gap: 6px; flex-wrap: wrap; }
-.sb-suggest .sug { padding: 3px 10px; border-radius: var(--radius-pill); border: 1px solid var(--rule-strong); background: var(--paper-0); font-size: var(--fs-micro); color: var(--ink-1); cursor: pointer; }
 /* 叙述正文：沙盘的回合叙事与行军记录里的响应摘要都用它（此前没有样式，一直是裸段落） */
 .narr { font-family: var(--font); font-size: 15px; line-height: var(--lh-loose); color: var(--ink-0); }
-/* 可行性裁定签：yes / hard / no 三档只改描边与色，不换字号（同 blk-stat 的状态口径） */
-.verdict { display: inline-block; margin-left: var(--sp-2); padding: 0 8px; border-radius: var(--radius-inset); border: 1px solid var(--rule-strong); font-size: var(--fs-micro); color: var(--ink-2); }
-.verdict.yes { color: var(--ok); border-color: var(--ok); }
-.verdict.hard { color: var(--gold); border-color: var(--gold); }
-.verdict.no { color: var(--bad); border-color: var(--bad); }
-/* 队伍行：姓名 + 状态；受伤/掉队只改颜色，不加图标（sandbox.js 给的是 .hurt / .down） */
-.sb-person { display: flex; justify-content: space-between; gap: var(--sp-2); }
-.sb-person .st { color: var(--ink-2); }
-.sb-person.hurt .st { color: var(--gold); }
-.sb-person.down .st { color: var(--bad); }
-.sb-person.down > span:first-child { text-decoration: line-through; text-decoration-thickness: 1px; }
-/* 语音输入进行中：麦克风键换成告警色（此前 .rec 也没有样式） */
-.sb-form.rec #sb-mic { border-color: var(--seal); color: var(--seal-bright); }
-.sb-hint { font-size: var(--fs-micro); color: var(--ink-2); }
-.sb-scene-tag { position: absolute; right: var(--sp-5); top: 64px; z-index: var(--z-hud); padding: 6px 14px; border-radius: var(--radius-pill); border: 1px solid var(--rule-strong); background: var(--paper-0); font-family: var(--font-kai); font-size: var(--fs-label); letter-spacing: 0.2em; color: var(--ink-1); pointer-events: none; }
 .ev-card { position: relative; padding: var(--sp-3); border-radius: var(--radius-inset); border: 1px solid var(--rule); background-color: var(--paper-0); background-size: cover; min-height: 96px; animation: fade-in var(--dur-slow) var(--ease-out) both; }
 .ev-tag { position: absolute; left: var(--sp-3); bottom: 10px; padding: 3px 10px; border-radius: var(--radius-pill); background: var(--scrim); border: 1px solid var(--rule-strong); font-family: var(--font-kai); font-size: var(--fs-micro); color: var(--paper); }
 

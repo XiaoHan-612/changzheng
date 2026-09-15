@@ -5,7 +5,7 @@
  *
  *   audio.boot();                            // 首次手势解锁 + 挂自愈触发点（import 时已自动挂，可再调）
  *   audio.scene({ act, label });             // 关键时机①：进屏/换幕（按声明表起停环境床与 BGM）
- *   audio.scene('sandbox' | 'title' | 'luding' | 'ending')   // 不在幕轴上的独立场景
+ *   audio.scene('title' | 'luding' | 'ending')   // 不在幕轴上的独立场景
  *   audio.sfx('click');                      // 关键时机②：交互（名字见 sfx-table.js；同名文件落盘即覆盖合成音）
  *   await audio.speak({ text, actorId });    // 关键时机③：台词（预置 → TTS 缓存 → 静默）
  *   audio.setMuted(true);                    // 关键时机④：静音开关（取消即按意图恢复）

@@ -172,9 +172,13 @@ export default {
     },
 
     /** AI 调用计数（原来是 ui.bumpAiCount 顺手改了 state） */
+    /** AI 调用计数（原来是 ui.bumpAiCount 顺手改了 state）
+     *  注意：**没有开局时也要能安全调用**——沙盘（自由行军）没有局状态，
+     *  而 ai 模块会给每次成功调用记一笔；以前这里直接 ，
+     *  在沙盘里就抛 ，整轮推演跟着失败（2026-09-15 全量档抓到的）。*/
     bumpAiCount() {
       apply('AI 计数', (s) => { s.aiCount = (s.aiCount || 0) + 1; }, ['aiCount']);
-      return S.aiCount;
+      return S ? S.aiCount : 0;
     },
   },
 

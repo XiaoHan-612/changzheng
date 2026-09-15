@@ -14,7 +14,6 @@ changzheng/
   server/               # 服务端：静态托管 + AI 代理 + 契约 + 日志
     index.js            # 路由 /api/decide /api/sim /api/tts /api/config /api/logs /api/data/*
     ai.js               # VN 侧：提示词 + 真调 + 重试 + 响应契约校验
-    sim.js              # 沙盘世界裁判（sim_turn）+ 同一张契约表校验
     schema.js           # 响应契约唯一真源（REQUIRED / missingFields / contractStamp）
     logger.js           # JSONL 落库（按日文件 + 会话镜像 + 契约戳记 + 8MB 轮转）
     balance.js          # 数值护栏（钳制表）
@@ -31,7 +30,6 @@ changzheng/
       main.js           # 流程状态机（批 7 会拆成 modules/flow/*）（幕、营地、强制链、锁、篝火夜、玩法宿主 openBoard/mountMini）
       step.js           # 交互契约（setStep / askChoice / choiceButton / waitContinue / markMini）
       minigames.js      # 8 个玩法（本地判手感，结算走 /api/decide）
-      sandbox.js        # 沙盘循环 v2（事件图卡、语音、存档、目标/记忆、模型收尾）
       state.js          # 资源/好感/附身线/行动点/失败判定（可单测）
       origin.js         # 开场出身三选一 + 出发前一问（纯本地）
       audio/            # 音频框架：index（门面）/ mix（混音表）/ fade（音量斜坡）
@@ -46,7 +44,6 @@ changzheng/
   data/
     acts.json           # 五幕定义（热点、dayScenes、强制链、对决）
     facts.json          # 史实卡 14 张 real/fiction
-    sim-visuals.json    # 沙盘事件图与标签映射
     tts-lines.json      # 固定台词清单（改文本要重跑 tts:manifest）
   tests/
     unit/               # node --test：状态层 / 契约 / 配置层 / 减员 / 数值护栏
@@ -120,7 +117,6 @@ UI 事件 ─┤ kernel.emit('ai:request', …)                                 
 ```powershell
 # 全流程（真调，需配好 Key）
 npm run test:e2e      # 五幕真调通关（~76 次调用）+ 不重复结算等断言
-npm run qa:sandbox    # 沙盘两回合 + 存档恢复 · qa:regress 沙盘回归 · qa:failure 失败线
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
 # 局部（多数不烧 AI）
 npm run test:unit     # 53 项：资源钳制 / 史实解锁 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致

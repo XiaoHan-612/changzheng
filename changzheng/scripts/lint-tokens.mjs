@@ -1,7 +1,7 @@
 // 一致性 lint：组件 CSS 里不允许出现颜色字面量，字体/圆角必须走变量。
 //
 // 为什么要它：视觉"不统一"的物理来源就是各处随手写死颜色——上一轮统计到 258 处
-// （cinema 115 / style 88 / sandbox 27 / minigames 28）。人眼记不住，脚本能记住。
+// （历史：cinema 115 / style 88 / minigames 28）。人眼记不住，脚本能记住。
 //
 // 规则：除 tokens.css 外的所有 CSS：
 //   · 不许出现 #hex 或 rgb()/rgba()/hsl() 字面量（transparent / currentColor / inherit 除外）

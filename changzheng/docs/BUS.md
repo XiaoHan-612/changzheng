@@ -12,7 +12,7 @@
 
 | 现象（重构前） | 后果 |
 |---|---|
-| `main.js` 2411 行、26 个职责块，是所有模块的唯一调用者 | 改一处要看整文件；新人无从下手 |
+| ~~`main.js` 2411 行、26 个职责块，是所有模块的唯一调用者~~（批 7 已拆：main.js 535 行只剩组合根 + flow/* 九个文件） | ~~改一处要看整文件；新人无从下手~~ 已解决 |
 | `ui.showScreen()` 会去清**别人**的 DOM（舞台正文 / 玩法区 / 对白区） | 越界清理；`openBoard` 甚至得用 `cloneNode` 换节点来躲它 |
 | `S.busy` + `withLock` 忙时**静默 return**；另有一套 `body[data-step-state]` | 两套状态机语义重叠；两处"手工置 false 解锁"靠注释维持 |
 | HUD 靠"`applyEffects` 之后必须紧跟 `renderStats`"的调用顺序维持正确 | 顺序就是正确性，十几处手工配对 |
@@ -147,7 +147,21 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | 4 | **state 挂总线** + 只读快照 + HUD 订阅渲染（消掉"绕纯函数直改字段"与"手工 render 配对"） | ✅ 已完成 |
 | 5 | **games 宿主变服务**（8 个玩法改成插件、清单一行可插）+ **sandbox 去 window 全局**（`ai:feed` 事件）+ 屏自清补齐 | ✅ 已完成（2026-09-15） |
 | 6 | **ai 挂总线**：registry（每类预算/温度/端点）+ run（唯一调用实现）+ 事件化（`ai:start/done/fail/verdict`）+ `qa:ai` 度量；**50 处手工 `showThinking` 与 24 处 `bumpAiCount` 收编** | ✅ 已完成（2026-09-15） |
-| 7 | `main.js` → `flow/*` 拆分；`__czScreens` 由内核供出；同步三个源码扫描脚本（check-handoff / av-audit / check-tts） | 🔄 拆前准备已完成（2026-09-15）：dev 门面归内核、三个扫描脚本改成扫**整个流程层**（以后搬文件不用再改它们）；`flow/*` 的搬迁进行中 |
+| 7 | `main.js` → `flow/*` 拆分；`__czScreens` 由内核供出；同步三个源码扫描脚本（check-handoff / av-audit / check-tts） | ✅ 已完成（2026-09-15）：`main.js` 2216 → **535 行（只剩组合根）**，流程拆成 `flow/{kit,view,echo,tables,games-flow,quiz,night,act,end}.js`；dev 门面归内核；三个扫描脚本改成扫整个流程层 |
+
+### 七点五、`flow/*` 模块地图（批 7 收口后的形状）
+
+| 文件 | 回答什么问题 | 不许做的事 |
+|---|---|---|
+| `flow/kit.js` | 流程共用地基：状态（`S` 只读代理 / `st` / `hasS`）、模型薄壳（`callAI`）、步骤封装（`step`/`waitBtn`/`withLock`）、只读上下文（幕次/史实卡/配置）、记流水（`logChoice`/`markLine`/`markDone`/`LINE_NAMES`） | 不写业务逻辑；不 import 任何流程文件（依赖方向只能是 flow/* → kit） |
+| `flow/view.js` | 「看」的那一摊：素材探测、立绘（`PORTRAIT_FILE`）、行程缎带、夜色、灯笼、`originText` | 不改状态（唯一的写样式也只动 DOM 属性） |
+| `flow/echo.js` | 史实回响三栏（`showEcho` / `afterJudge` / `bindEcho`） | 不各写一份三栏文案（20 多处都走 `afterJudge`） |
+| `flow/tables.js` | 数据表：`CHOICE_SETS` / `REPEATABLE_HOTSPOTS` | 不放函数 |
+| `flow/games-flow.js` | 玩法流程：开一局 → 模型复盘 → 走回响（含分汤/分粮这类 AI 裁决的小流程） | 不碰板屏 DOM（那是 `modules/games` 宿主的事） |
+| `flow/quiz.js` · `flow/night.js` | 知识对决 / 篝火夜 | — |
+| `flow/act.js` | **一幕的推进**：营地日 → 热点派发 → 抉择/玩法 → 启程 → 幕间结算 → 下一幕（营地与幕推进合在一个文件：它们本来互相咬，拆开必成环） | 不反向 import end/sandbox |
+| `flow/end.js` | 收尾：失败结算 / 终局总评 / 关系面板 / 终局两个按钮 | 不反向 import act（会成环） |
+| `main.js`（组合根） | boot、chrome 绑定、设置面板、答辩面板、手记、dev 钩子、入口按钮接线 | 不写流程逻辑——只把 act/end 的入口接到按钮与钩子上 |
 
 ## 七、怎么加东西（两个最常见）
 
@@ -161,11 +175,15 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 **改一类模型调用的行为（预算 / 温度 / 端点）**：只改 [`modules/ai/registry.js`](../modules/ai/registry.js) 的一张表，别的都不用动——
 把它调窄是省额度，调宽是给长文本留地方；新增 callType 时**必须**同步 `server/schema.js` 的 REQUIRED 表（字段契约的唯一真源），
 `npm run qa:ai` 会对账"策略表 ↔ 字段契约 ↔ 真调日志"三方，漂了就红。
-后台静默调用（营地氛围、选项预告、沙盘收尾）写 `callAI({ … }, { quiet: true })`：
 **quiet 只关进度 UI**（不弹「思考中」、失败也不弹重试面板），**预算、账目、计数照走**——
 这类调用自己吞错、自己管气泡，顶一个全局提示反而打扰玩家。
 调用点只写 `await callAI({ callType, scene, … })`（内部走 `kernel.api('ai').ask`）：**不要再手工写
 `showThinking(true/false)`、`bumpAiCount()`、`setStepState('busy')`**——那三样现在归 ai 模块与 shell（坑 46）。
+
+**加一段流程（`flow/*`）**：批 7 把 `main.js` 拆成了 `flow/*`（见 §七点五的模块地图）。加流程代码时的三条：
+① 需要状态/模型/步骤契约，从 `flow/kit.js` 拿，别 import 别的流程文件（依赖方向只能 `flow/* → kit`）；
+② 收尾（把新流程接进幕轴、热点表、dev 钩子）改 `flow/act.js` 与 `main.js` 的钩子，**别在 `main.js` 里写流程逻辑**——它现在只是组合根；
+③ 加了新的流程文件，把它加进 `scripts/check-tts.mjs` 的扫描清单（其余两个扫描脚本已自动扫 `flow/` 全目录）。
 
 **加一个交互游戏**：读 [`modules/games/README.md`](../modules/games/README.md) —— 复制 `_template.js`，填 `id/title/stats/actions/mount`，
 在 `modules/games/manifest.js` 里加**两行**（import 一行 + GAMES 一行），再到 `tests/manual/qa-board.mjs` 的 `specs` 里登记一行。

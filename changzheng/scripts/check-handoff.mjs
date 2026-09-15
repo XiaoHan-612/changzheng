@@ -24,14 +24,14 @@ function checkFiles() {
 }
 
 /**
- * 流程层的全部源码（main.js + flow/* + 各模块 + sandbox/minigames）。
+ * 流程层的全部源码（main.js + flow/* + 各模块 + minigames）。
  *
  * 批 7 起 main.js 在往 flow/* 拆——扫描一律走这里，别硬编码单个文件：
  * 搬一次文件就要改三处扫描脚本，是这类拆分最容易留下的长期税（而且漏改会变成"扫不到 = 绿"）。
  */
 function flowSrc() {
   const dir = path.join(ROOT, 'public/js');
-  const files = ['main.js', 'sandbox.js', 'minigames.js', 'ai-client.js', 'ui.js', 'step.js'];
+  const files = ['main.js', 'minigames.js', 'ai-client.js', 'ui.js', 'step.js'];
   for (const sub of ['flow', 'modules/games', 'modules/ai', 'modules/shell', 'modules/hud', 'modules/screens', 'modules/state', 'modules/audio', 'kernel']) {
     const d = path.join(dir, sub);
     if (!fs.existsSync(d)) continue;

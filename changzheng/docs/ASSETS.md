@@ -72,7 +72,6 @@
 
 ## 三、事件图（`public/assets/events/`，6 张，已有）
 
-`ev_rain`、`ev_night_march`、`ev_starve`、`ev_village`、`ev_loss`、`ev_river` —— 自由行军沙盘的事件图卡，映射表在 [`data/sim-visuals.json`](../data/sim-visuals.json)（由 `/api/data/sim-visuals` 下发，前端不再硬编码）。
 
 ## 四、音频
 
@@ -90,6 +89,5 @@
 |---|---|
 | `data/acts.json` | 五幕定义：热点、每日场景 `dayScenes`、强制链、对决、史实卡绑定 |
 | `data/facts.json` | 史实卡 14 张（real/fiction 分栏） |
-| `data/sim-visuals.json` | 沙盘事件图与标签映射 |
 | `data/tts-lines.json` | 固定台词清单（TTS 生成的输入） |
 | `design/asset-prompts.md` | 生图 prompt 包 |

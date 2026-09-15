@@ -50,7 +50,6 @@ key = sha1(callType | scene | situation | options.join('|'))
 ## 5. 运行时接入点（未来实施时）
 
 - **拦截层放在服务端**，不动前端 `public/js/ai-client.js`：客户端继续按原样请求，命中与否由服务端决定。
-- 需要同时覆盖两个端点：`POST /api/decide`（主线，16 类 callType 里的 15 类）与 `POST /api/sim`（沙盘 `sim_turn`）。
 - 开关来自 `runtime-config.json` 的 `REPLAY_MODE`（值为回放包文件名，缺省关闭），并在「设置」面板暴露只读状态，避免现场临时改文件。
 - 命中：返回录制的 `response`，写日志 `source=REPLAY`，`durationMs` 记为 0，附带 `replayOf`（原记录 id）。
 - 未命中：返回与真调失败同形的错误（前端 `decide()` 已按 `ok:false` 抛错），触发既有「重试／跳过」，不新增任何前端分支。
@@ -60,7 +59,6 @@ key = sha1(callType | scene | situation | options.join('|'))
 
 一份"可用"的回放包必须满足：
 
-- 覆盖完整演示路径上的全部 16 类 callType：`scene_gen`、`choice_hint`、`npc_chat`、`share_judge`、`minigame_review`、`branch_judge`、`quiz_generate`、`quiz_answer_ai`、`quiz_judge`、`night_options`、`night_resolve`、`ending_review`、`act_review`、`failure_review`、`study_report`、`sim_turn`（清单与 `server/schema.js` 的 `REQUIRED` 表同源）。
 - 按演示路径重跑时 **命中率 ≥ 95%**，且未命中的必须都是可跳过的可选内容。
 - 自查命令（实施时提供）：`node scripts/build-replay.mjs --verify <pack>`，输出命中率与 miss 清单。
 

@@ -55,8 +55,6 @@ npm run test:unit     # 53 项：状态层 / 契约 / 配置层 / 减员 / 数�
 npm run qa:smoke      # 标题 → 营地 → 一次互动（顺带断言用过的热点当场作废）
 npm run qa:board      # 玩法板体检：玩法逐屏摆上板（板屏壳/数值签/契约标记）+ 三方对账
 npm run test:e2e      # 五幕真调通关（约 76 次调用）+「不重复结算」等回归断言
-npm run qa:sandbox    # 自由行军沙盘：两回合 + 存档恢复
-npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
 npm run qa:ai         # AI 调用体检：预算表 ↔ 字段契约 ↔ 真调日志三方对账
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫

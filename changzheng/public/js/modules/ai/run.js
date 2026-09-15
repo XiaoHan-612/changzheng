@@ -10,7 +10,7 @@
  * 四个职责缠在一起，于是 50 个调用点各自还要手工配 `showThinking` 与 `bumpAiCount`。
  * 现在"怎么发"只有这一份，换端点/加超时/改 body 都只改这里。
  */
-import { decide, runSimTurn } from '../../ai-client.js';
+import { decide } from '../../ai-client.js';
 
 /**
  * 发一次请求（不含重试、不含事件）。端点与 body 形状按 callType 的策略走。
@@ -22,17 +22,6 @@ import { decide, runSimTurn } from '../../ai-client.js';
  */
 export async function invoke(payload, policy) {
   const { callType, maxTokens, temperature } = { ...payload, ...policy };
-  if (policy.endpoint === '/api/sim') {
-    // 沙盘：body 是 { world, action, intent }，预算与温度带给服务器
-    return runSimTurn({
-      world: payload.world,
-      action: payload.situation || payload.action || '',
-      intent: payload.extraContext,
-      callType: 'sim_turn',
-      maxTokens,
-      temperature,
-    });
-  }
   return decide({
     ...payload,
     callType,

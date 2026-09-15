@@ -18,7 +18,6 @@
 | 4 | AudioContext 被自动播放策略/休眠挂起 → **全哑且无人知道** | `reconcile()` 恢复 ctx；首次发现 `suspended` 且已开音 → 一次性提示「点一下页面恢复声音」 |
 | 5 | 音效名拼错 → 静默落到默认蜂鸣（"看着对、其实错"） | 音效走**注册表**；未知名字 → 控制台告警 + 审计列出，不再静默兜底 |
 | 6 | 音量/增益是散落各处的魔法数（0.75 / 0.8 / 0.85 / 0.32 …） | **混音表唯一处**（`audio/mix.js`）+ lint：别处不许出现 volume/gain 数字 |
-| 7 | 场景↔声音的映射散落（`ambientFor(act, day)` + 沙盘里硬编码 `'camp'`） | **场景声明表**（`scene-table.js`）：一个屏一行，`audio.scene(name)` 一处调用 |
 | 8 | 想加 BGM 得改一堆文件（现在根本没有 BGM） | BGM 是**平级通道**；加曲子 = 表里加一行 + 文件落盘 |
 | 9 | TTS 命中靠"逐字一致 + voiceId 走映射"，改文本就白做 | 守卫静态核对 `tts-lines.json` / `ACTOR_VOICE` / 缓存文件（并进 §八 的守卫） |
 | 10 | 语音没有打断与闪避策略（新句盖旧句、压住背景音） | 语音通道集中定义：**新句打断旧句**、播放期间 **duck** 背景（BGM 最大，环境床轻闪避） |
@@ -77,7 +76,6 @@ audio.state();                         // 调试快照（= window.__czAudio）
 **硬规矩（`npm run qa:audio` 的「框架一致性」段已强制）**：`public/js/` 里除 `audio/` 之外，
 **不许出现** `new Audio(` / `new AudioContext` / `.volume =` / `.gain.value =`，也不许再出现旧 API 名
 （`playAmbient` / `stopAmbient` / `playSfx` / `setEnabled`），并且**只允许从 `./audio/index.js` 进门**（深模块不外露）。
-——这条是"统一"的机械保证：谁绕开框架，守卫立刻报。批 1 落地时就靠它抓出了沙盘里自己 `new Audio` 的反应语音。
 
 ---
 
@@ -153,13 +151,12 @@ reconcile(): 让 actual 追上 desired —— 该起的起（带淡入）、该�
 
 **批 1 · 骨架 + 静音模型**（行为等价搬迁，不改任何声音）
 - 建 `audio/{index,mix,core}.js` + 四条通道；把现实现搬进框架（含上一版临时补丁的语义）
-- `main.js` / `ui.js` / `sandbox.js` / `minigames.js` 的音频调用**全量改到门面**；删除 `public/js/audio.js`
 - 混音 lint + `qa:smoke` 断言保住；`docs/AUDIO-SYSTEM.md` 从"设计稿"转"实现说明"
 - 验收：`test:unit` / `qa:smoke` / `qa:av` / `test:e2e` 全绿，且听感与现状一致
 
 **批 2 · 声明式场景表 + BGM 通道**（✅ 已完成）
 - 已落地：`scene-table.js`（幕轴 `ACT_SOUNDS` / 分日 `DAY_SOUNDS` / 独立场景 `SCENE_SOUNDS` / 兜底）+
-  `audio.scene()` 接管全部场景切换（`ambientFor` 已删除、沙盘硬编码已进表）；`bgm.js` 通道（元素循环 +
+  `audio.scene()` 接管全部场景切换（`ambientFor` 已删除、各场景进声明表）；`bgm.js` 通道（元素循环 +
   淡入 + 语音闪避 + 缺文件记账）；`fade.js` 音量斜坡；语音播放期间 BGM 重闪避／环境床轻闪避
 - 守卫：`qa:audio` 增「场景表 ↔ 文件映射 ↔ 磁盘」对账 + 新增「app 代码不许直调 `audio.ambient/bgm.play`」；
   `qa:handoff` 修好（它原先还指着已删除的 `public/js/audio.js`）

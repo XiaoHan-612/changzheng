@@ -77,17 +77,6 @@ export async function testConfig(payload = {}) {
   return data;
 }
 
-export async function runSimTurn({ world, action, intent, maxTokens, temperature }) {
-  const res = await fetch('/api/sim', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ world, action, intent, maxTokens, temperature }),
-  });
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || '沙盘推进失败');
-  return data.result;
-}
-
 export async function clearLogs() {
   const res = await fetch('/api/logs/clear', { method: 'POST' });
   return res.json();

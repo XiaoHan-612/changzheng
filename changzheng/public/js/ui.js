@@ -47,7 +47,7 @@ const ENTRANCE = {
 
 /** 该屏里"要入场"的那一层：模板内容盒，其次各屏幕自己的内容面（题字卡、纸卷、面板、抽屉、侧栏） */
 function entranceTarget(el) {
-  return el.querySelector('.tpl-body, .title-card, .sheet, .panel, .journal, .echo-cinema, .sb-world, .cut-caption-wrap, .hud-left');
+  return el.querySelector('.tpl-body, .title-card, .sheet, .panel, .journal, .echo-cinema, .cut-caption-wrap, .hud-left');
 }
 
 /**

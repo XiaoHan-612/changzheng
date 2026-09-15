@@ -13,8 +13,6 @@
     "test:e2e": "node tests/e2e/full-run.mjs",
     "test:e2e:headed": "node tests/e2e/full-run.mjs --headed",
     "qa:smoke": "node tests/e2e/smoke.mjs",
-    "qa:sandbox": "node tests/e2e/sandbox.mjs",
-    "qa:regress": "node tests/e2e/regressions.mjs",
     "qa:failure": "node tests/e2e/march-failure.mjs",
     "qa:playtest": "node tests/e2e/playtest.mjs",
     "qa:av": "node tests/e2e/av-audit.mjs",

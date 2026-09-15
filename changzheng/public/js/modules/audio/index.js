@@ -4,13 +4,13 @@
  * 它自己不产生声音：内部还是调用 `public/js/audio/` 那套框架（混音表 / 通道 / 场景声明表 / 静音模型）。
  * 这个模块的职责只有一个：**把总线上的事件翻译成音频框架的调用**，并把音频框架的回执（静音状态、
  * ctx 挂起）翻译回事件。于是：
- *   · 业务代码（main / ui / minigames / sandbox）再也不用认识音频 API，只发事件；
+ *   · 业务代码（main / ui / minigames / flow）再也不用认识音频 API，只发事件；
  *   · "谁在什么时候放了什么声音"在诊断里是一条条事件，能回看；
  *   · 将来加 BGM 之外的通道、加新场景，都只动音频框架与场景表，不动业务。
  *
  * 事件 ↔ 调用 的对应（契约见 kernel/contracts.js）：
  *   flow:act-enter {actId,day,label} → audio.scene({act:{id},label})   幕轴上的场景（含第四幕分日）
- *   scene:enter    {name}            → audio.scene(name)               独立场景 title/sandbox/luding/ending
+ *   scene:enter    {name}            → audio.scene(name)               独立场景 title/luding/ending
  *   sfx:play       {name}            → audio.sfx(name)
  *   voice:say      {text,actorId,…}  → audio.speak({…})
  *   audio:toggle-mute                → audio.setMuted(!muted) → 回执 audio:muted

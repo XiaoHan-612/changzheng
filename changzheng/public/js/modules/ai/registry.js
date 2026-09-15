@@ -41,8 +41,6 @@ export const CALL_POLICY = {
   ending_review: { label: '终局总评', maxTokens: 1600, temperature: 0.8 },
   failure_review: { label: '失败结算', maxTokens: 1200, temperature: 0.75 },
   study_report: { label: '研学报告', maxTokens: 1500, temperature: 0.6 },
-  // 沙盘走自己的端点（body 形状不同），但同样进这张表：预算与显示名一致对待
-  sim_turn: { label: '沙盘推演', maxTokens: 2400, temperature: 0.8, endpoint: '/api/sim' },
 };
 
 /** 取某类调用的策略（表里没有就用兜底） */

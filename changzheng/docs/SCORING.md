@@ -19,10 +19,9 @@
 | 对决出题/作答/判分 | quiz_* | 是，对抗 |
 | 幕间总评 / 掉队结算 | act_review / failure_review | 是 |
 | 夜间 / 终局 / 研学报告 | night_* / ending_review / study_report | 是 |
-| 自由行军沙盘 | sim_turn | 是（独立入口） |
 
 - 每次调用 JSONL + 游戏内「记录」+ **答辩面板**按类型聚合 + `npm run qa:audit` 产出 schema 审计报告
-- 一局**真调**约 **76** 次调用（标准模式，`npm run test:e2e` 实测），覆盖 **16 类** callType；`source=GLM`，具体模型名与推理档位见 `model` 字段，可审计
+- 一局**真调**约 **76** 次调用（标准模式，`npm run test:e2e` 实测），覆盖 **15 类** callType；`source=GLM`，具体模型名与推理档位见 `model` 字段，可审计
 - 快速模式（每幕只跑主玩法+对决）调用更少，供 18 分钟路演（2026-09-13 实测：标准模式真调一局约 5 分钟）
 
 ## 技术创新与复杂度 10%

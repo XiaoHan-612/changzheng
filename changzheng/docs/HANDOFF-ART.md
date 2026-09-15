@@ -27,7 +27,6 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | 类别 | 生成 | 导出 | 路径 |
 |---|---|---|---|
 | 全景 `*_pano` | 1536×1024 | 1280 宽 JPEG **q82** | `changzheng/public/assets/scenes/` |
-| 近景 `*_close` / 事件图 | 1536×1024 | 1280 宽 JPEG q82 | `changzheng/public/assets/scenes/`（沙盘事件图放 `assets/events/`） |
 | 立绘 | 1024×1024 | **280×280 PNG**，脸心居中偏上 | `changzheng/public/assets/characters/` |
 | UI 底纹 | 1024×1024 | PNG/JPEG | `changzheng/public/assets/scenes/` |
 

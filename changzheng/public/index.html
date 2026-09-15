@@ -56,10 +56,6 @@
             <b>行军模式</b>
             <span>资源见底会掉队，错误抉择会有人留下。</span>
           </button>
-          <button type="button" class="mode-card sandbox" id="btn-mode-sandbox">
-            <b>自由行军</b>
-            <span>不选选项——写下或说出你要做什么，模型当世界裁判。</span>
-          </button>
           <button type="button" class="mode-card" id="btn-mode-quick">
             <b>快速演示</b>
             <span>每幕只跑主玩法与对决，约 18 分钟走完五幕。</span>
@@ -374,42 +370,6 @@
           通用性：同一套「全景探索 + 指定大模型裁决 + 可审计日志」可复制到任意史实节点。
         </p>
       </div>
-    </section>
-
-    <!-- 自由行军沙盘 -->
-    <section id="screen-sandbox" class="screen hidden tpl-world">
-      <div class="sandbox-bg" id="sb-scene" style="background-image:url('/assets/scenes/marsh.jpg')"></div>
-      <div class="sandbox-grade"></div>
-      <div class="sb-scene-tag" id="sb-scene-tag">草地行军</div>
-
-      <aside class="sb-world glass">
-        <div class="sb-place">
-          <span class="sb-day">第 <b id="sb-day">1</b> 天</span>
-          <span id="sb-place" class="sb-place-name">草地边缘</span>
-        </div>
-        <div class="sb-bars">
-          <div class="sb-bar"><span>粮食</span><div class="track"><i id="sb-food"></i></div><em id="sb-food-n">0</em></div>
-          <div class="sb-bar"><span>士气</span><div class="track"><i id="sb-morale"></i></div><em id="sb-morale-n">60</em></div>
-          <div class="sb-bar"><span>体力</span><div class="track"><i id="sb-stamina"></i></div><em id="sb-stamina-n">70</em></div>
-        </div>
-        <h4>队伍</h4>
-        <div id="sb-people" class="sb-people"></div>
-        <h4>情报</h4>
-        <ul id="sb-intel" class="sb-intel"></ul>
-        <button type="button" id="btn-sb-logs" class="btn ghost sm block">行军记录</button>
-        <button type="button" id="btn-sb-reset" class="btn ghost sm block">重开沙盘</button>
-      </aside>
-
-      <main class="sb-main">
-        <div id="sb-feed" class="sb-feed"></div>
-        <div id="sb-suggest" class="sb-suggest"></div>
-        <form id="sb-form" class="sb-form">
-          <button type="button" id="sb-mic" class="btn ghost" title="语音说出行动">🎙</button>
-          <input id="sb-input" type="text" placeholder="你要做什么？（例：用绳子把队伍串起来）" autocomplete="off" />
-          <button type="submit" class="btn primary" id="sb-send">行动</button>
-        </form>
-        <p class="sb-hint muted sm">写下任意行动，模型会判定可行性、推进世界，并让同伴回应。你也可以按住说话。世界会自动存档，刷新可续上。</p>
-      </main>
     </section>
 
     <div id="toast" class="toast hidden"></div>

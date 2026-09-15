@@ -6,6 +6,7 @@
  */
 import { $, showScreen, escapeHtml } from '../ui.js';
 import { choiceButton, markAction, setStepState } from '../step.js';
+import { kernel } from '../kernel/index.js';
 import { S, st, callAI, step, waitBtn, publicState } from './kit.js';
 import { afterJudge } from './echo.js';
 

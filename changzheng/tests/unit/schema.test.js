@@ -6,8 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { REQUIRED, missingFields, contractStamp } from '../../server/schema.js';
 
-test('契约表覆盖 16 类 callType', () => {
-  assert.equal(Object.keys(REQUIRED).length, 16);
+test('契约表覆盖 15 类 callType', () => {
+  assert.equal(Object.keys(REQUIRED).length, 15);
 });
 
 test('缺必需字段会被点名', () => {
@@ -40,12 +40,12 @@ test('非对象整体判失败', () => {
   assert.deepEqual(missingFields('npc_chat', 'reply'), ['(整体不是对象)']);
 });
 
-test('回归：数组不是对象（2026-09-13 沙盘真调实测）', () => {
+test('回归：数组不是对象（2026-09-13 真调实测）', () => {
   // 模型把整个响应包成数组 [{...}]。空数组会被"空 JSON"那条拦下，
   // 但非空数组 `typeof === 'object'` 成立、键数也大于 0，一路放行到界面，
-  // 玩家就得到一个没有叙事的空白回合（沙盘当时也没接这张表，见 server/sim.js 的注释）。
-  assert.deepEqual(missingFields('sim_turn', [{ feasible: 'yes', narrative: 'x' }]), ['(整体不是对象)']);
-  assert.deepEqual(missingFields('sim_turn', ['x', 'y']), ['(整体不是对象)']);
+  // 玩家就会得到一个没有叙事的空白回合（当时有个端点没接这张表，真调才暴露）。
+  assert.deepEqual(missingFields('ending_review', [{ ending_id: 'x', paragraphs: ['y'] }]), ['(整体不是对象)']);
+  assert.deepEqual(missingFields('ending_review', ['x', 'y']), ['(整体不是对象)']);
 });
 
 test('回归：模型把 answer_index 键名写坏时必须报出来', () => {
@@ -59,7 +59,7 @@ test('契约戳记：落库时盖的那一笔账', () => {
   // 合规 / 不合规
   assert.equal(contractStamp('npc_chat', { reply: '好' }), true);
   assert.equal(contractStamp('npc_chat', { mood: '平静' }), false);
-  assert.equal(contractStamp('sim_turn', [{ feasible: 'yes', narrative: 'x' }]), false);
+  assert.equal(contractStamp('ending_review', [{ ending_id: 'x', paragraphs: ['y'] }]), false);
   // 不判定（null）：没带回响应（ERROR 记录）或没登记的类型——不能替它们说"合规"
   assert.equal(contractStamp('npc_chat', undefined), null);
   assert.equal(contractStamp('npc_chat', null), null);

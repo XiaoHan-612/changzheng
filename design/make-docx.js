@@ -709,7 +709,6 @@ ch.push(p(
   server/
     index.js            # 路由 + 静态 + gzip
     ai.js               # VN 侧：提示词 / 真调 / 重试 / 契约校验
-    sim.js              # 沙盘侧世界裁判
     schema.js           # 响应契约唯一真源（REQUIRED）
     logger.js           # JSONL 落库（按日文件 + 会话镜像 + 契约戳记）
     balance.js config.js
@@ -717,9 +716,7 @@ ch.push(p(
     index.html          # 18 个屏：标题/怎么玩/设置/过场/营地/舞台/玩法板/…
     css/                # fonts → tokens → base → framework（模板+区块）→ components
     js/                 # main.js（状态机）step.js（交互契约）minigames.js（8 玩法）
-                        # sandbox.js / ui.js / state.js / audio.js / data.js / origin.js
     assets/scenes|characters|events/    fonts/    audio/{ambient,sfx,cache,reactions}/
-  data/                 # acts.json facts.json sim-visuals.json tts-lines.json
   logs/                 # 入库样本 sample-full-run.jsonl + 运行时按日日志（不入库）
   tests/                # unit / e2e（Playwright）/ manual（体检脚本）
   docs/                 # 交接、架构、QA、设计系统、交付
@@ -765,7 +762,6 @@ ch.push(p("source 只标「走的是真模型」，具体模型名看 model 字�
 
 ch.push(h2("10.6 验收脚本（每轮必跑）"));
 ch.push(
-  bullet("全流程（真调）：`npm run test:e2e`（五幕通关 + 不重复结算断言，一次约 76 次调用）；`qa:sandbox` / `qa:regress` / `qa:failure` / `qa:av`。"),
   bullet("局部（不烧 AI）：`npm run test:unit`（49 项）、`qa:smoke`、`qa:board`（玩法板 36 项）。"),
   bullet("视觉守卫：`qa:tokens`（不许新增颜色/字体/圆角字面量）、`qa:frames`（页面只用模板与区块）、`qa:tone`（纸面面积 ≤35%）、`qa:motion`（五个标准动效真的挂上）。"),
   bullet("文档守卫：`qa:handoff`（交接文档与代码契约一致）、`qa:audit`（日志 schema 审计）。"),

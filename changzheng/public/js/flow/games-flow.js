@@ -6,10 +6,11 @@
  *   本文件负责**玩完之后怎么办**（调哪个模型、记什么状态、点亮哪条附身线、弹不弹回响）。
  * 所以这里出现 callAI / afterJudge / markLine 是正常的，出现板屏 DOM 就不正常（那是宿主的事）。
  */
-import { $, showScreen, setStageBanner, setStagePanel, say } from '../ui.js';
-import { waitContinue } from '../step.js';
+import { $, showScreen, setStageBanner, setStagePanel, say, setPortrait, toast, escapeHtml } from '../ui.js';
+import { askChoice, waitContinue } from '../step.js';
 import { kernel } from '../kernel/index.js';
-import { S, st, gamesApi, callAI, step, waitBtn, publicState, markLine, markDone } from './kit.js';
+import { S, st, gamesApi, callAI, step, waitBtn, publicState, logShare, markLine, markDone } from './kit.js';
+import { COMPANIONS } from '../data.js';
 import { sceneImage, showNpc } from './view.js';
 import { afterJudge } from './echo.js';
 
@@ -241,4 +242,62 @@ export async function doLuding(act) {
   st().pushCampLog('泸定桥', op.summary || '');
   await waitBtn('继续');
   await afterJudge(result, '飞夺泸定桥', 'h_luding');
+}
+
+export async function doSoup() {
+  step('soup', 'choice');
+  showScreen('screen-stage');
+  setStageBanner('煮粥分汤', '/assets/scenes/pond_close.jpg');
+  setPortrait('老班长', '炊事班长', '班', '沉默', '/assets/characters/laoban.png');
+  setStagePanel('<p class="hint">锅里只有几条小鱼和草根。</p><div class="choices" id="soup-opts"></div>');
+  await say('老班长', '汤要分匀。伤员先喝，我们再看锅底。', 'laoban_soup');
+  const soupOpts = [
+    { label: '稠的全给伤员，自己喝清汤', icon: '汤' },
+    { label: '全班平分', icon: '分' },
+    { label: '只给病号', icon: '病' },
+    { label: '自己先盛一碗', icon: '己' },
+  ];
+  const choice = (await askChoice($('soup-opts'), soupOpts)).label;
+  logShare(choice);
+  let result;
+  result = await callAI({
+    scene: '煮粥分汤',
+    callType: 'share_judge',
+    situation: `分配：${choice}`,
+    state: publicState(),
+    options: [choice],
+    operation: { type: 'soup', choice },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  await waitBtn('继续');
+  await afterJudge(result, '金色的鱼钩', 'h_fishhook');
+}
+
+export async function doShare(h = {}) {
+  step('share', 'choice');
+  showScreen('screen-stage');
+  setStageBanner('分一口粮', '/assets/scenes/night_fire.jpg');
+  // 热点带 npc 就立这个人（如"岸边伤员"），否则立玩家自己
+  if (h.npc) showNpc(h.npc, { role: h.sub });
+  else setPortrait('你', '年轻战士', '你', '平静');
+  setStagePanel('<div class="choice-row" id="share-opts"></div>');
+  const shareOpts = ['全给伤员', '全班平分，自己少一点', '先紧着小鬼和卫生员', '自己留大半'];
+  const choice = (await askChoice($('share-opts'), shareOpts.map((label) => ({ label })), {
+    extraOf: () => '',
+  })).label;
+  logShare(choice);
+  let result;
+  result = await callAI({
+    scene: '分享口粮',
+    callType: 'share_judge',
+    situation: `玩家选择：${choice}`,
+    state: publicState(),
+    options: [choice],
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('分享', result.narrative || choice);
+  await waitBtn('继续');
+  await afterJudge(result, '行军中的分享', 'h_share');
 }

@@ -6,7 +6,6 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { CONFIG, saveRuntimeConfig } from './config.js';
 import { callGlm51, probeGlm } from './ai.js';
-import { callSim } from './sim.js';
 import { readSessionLogs, clearSessionLogs } from './logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,21 +60,6 @@ app.post('/api/decide', async (req, res) => {
     res.json({ ok: true, result });
   } catch (err) {
     console.error('AI 决策失败:', err);
-    res.status(500).json({ ok: false, error: String(err.message || err) });
-  }
-});
-
-// ─── 自由行军沙盘 ───
-app.post('/api/sim', async (req, res) => {
-  try {
-    const { world, action, intent } = req.body || {};
-    if (!action || !String(action).trim()) {
-      return res.status(400).json({ ok: false, error: '缺少 action' });
-    }
-    const result = await callSim({ world, action: String(action).slice(0, 200), intent });
-    res.json({ ok: true, result });
-  } catch (err) {
-    console.error('沙盘失败:', err);
     res.status(500).json({ ok: false, error: String(err.message || err) });
   }
 });
@@ -166,12 +150,6 @@ app.get('/api/data/acts', (_req, res) => {
   const p = path.join(__dirname, '..', 'data', 'acts.json');
   if (fs.existsSync(p)) res.sendFile(p);
   else res.json({ ok: false, error: 'no acts' });
-});
-
-app.get('/api/data/sim-visuals', (_req, res) => {
-  const p = path.join(__dirname, '..', 'data', 'sim-visuals.json');
-  if (fs.existsSync(p)) res.sendFile(p);
-  else res.json({ ok: false, error: 'no sim-visuals' });
 });
 
 // SPA 兜底：只对"页面路由"回 index.html。

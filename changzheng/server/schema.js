@@ -25,7 +25,6 @@ export const REQUIRED = {
   act_review: ['title', 'lines'],
   failure_review: ['paragraphs'],
   study_report: ['summary'],
-  sim_turn: ['narrative', 'feasible'],
 };
 
 /** 返回缺失的字段名数组（空数组 = 合规）；未登记的 callType 不做判定 */

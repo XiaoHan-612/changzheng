@@ -1,5 +1,5 @@
 # 音频体检报告
-> 由 `npm run qa:audio` 生成 · 共 55 个文件（ambient 8 · bgm 0 · cache 20 · voices 21 · reactions 6）
+> 由 `npm run qa:audio` 生成 · 共 49 个文件（ambient 8 · bgm 0 · cache 20 · voices 21）
 | 文件 | 容器 | 采样 | 声道 | 时长 | 体积 | HTTP | MIME | 可解码 |
 |---|---|---|---|---|---|---|---|---|
 | `public/audio/ambient/depart_river.ogg` | vorbis | 44100 | 1 | 24.4s | 117 KB | 200 | audio/ogg | ✅ |
@@ -51,11 +51,5 @@
 | `public/audio/voices/zhiyuan_grass.wav` | wav | 24000 | 1 | 2.2s | 105 KB | 200 | audio/wav | ✅ |
 | `public/audio/voices/zhiyuan_hello.wav` | wav | 24000 | 1 | 2.6s | 120 KB | 200 | audio/wav | ✅ |
 | `public/audio/voices/zhiyuan_path.wav` | wav | 24000 | 1 | 6.6s | 308 KB | 200 | audio/wav | ✅ |
-| `public/audio/reactions/guide_advice.wav` | wav | 24000 | 1 | 2.4s | 113 KB | 200 | audio/wav | ✅ |
-| `public/audio/reactions/laoban_oppose.wav` | wav | 24000 | 1 | 3.8s | 180 KB | 200 | audio/wav | ✅ |
-| `public/audio/reactions/laoban_support.wav` | wav | 24000 | 1 | 1.6s | 75 KB | 200 | audio/wav | ✅ |
-| `public/audio/reactions/recruit_guilt.wav` | wav | 24000 | 1 | 3.2s | 150 KB | 200 | audio/wav | ✅ |
-| `public/audio/reactions/weisheng_worry.wav` | wav | 24000 | 1 | 3.7s | 173 KB | 200 | audio/wav | ✅ |
-| `public/audio/reactions/xiaogui_stubborn.wav` | wav | 24000 | 1 | 2.6s | 120 KB | 200 | audio/wav | ✅ |
 ## 结论
 全部通过：容器/扩展名一致、HTTP 200、MIME 正确、浏览器可解码、且都能被代码路径引用到。

@@ -28,8 +28,6 @@
 | `npm run qa:smoke` | 标题→营地→热点→回营地；含**静音→取消静音后环境床恢复**断言 | SMOKE PASS |
 | `npm run test:e2e` | 五幕**真调**通关（约 76 次调用）+ 各玩法恰好 1 次 + 不重复结算 | E2E FULL PASS，`source=GLM`，无 pageerror（gomoku 偶尔落空时失败信息会带「营地历次热点」） |
 | `node tests/e2e/full-run.mjs --quick` | 快速模式通关 | E2E FULL PASS |
-| `npm run qa:sandbox` | 沙盘两回合 + 存档恢复 | SANDBOX PASS |
-| `npm run qa:regress` | 沙盘监听泄漏、存档回合 | REGRESS PASS |
 | `npm run qa:failure` | 行军模式失败线（`failure_review` 真调） | MARCH FAILURE PASS，失败屏有标题/段落/史实要点 |
 | `npm run qa:playtest` | 自动试玩：人类节奏下的单局时长与资源曲线（`--mode/--strategy/--runs/--speed/--doc`） | PLAYTEST DONE，`docs/PLAYTEST.md` 落表 |
 | `npm run qa:loss` | 行军模式减员定点验证（注入断粮 → 走到高风险抉择 → 必须失去一个人） | LOSS CHECK PASS |
@@ -41,7 +39,7 @@
 | `node tests/e2e/layout-audit.mjs [--width 820]` | 逐屏布局硬伤（横向溢出/控件出界/点按区<32px），含**玩法板五屏**巡屏 | 1280 与 820 均 0 处问题 |
 | `npm run qa:board` | **玩法板体检**：玩法逐屏摆到板屏上（板屏壳/数值签/契约标记/第一步可点/离开清空）+ **三方对账**（玩法清单 ↔ 体检表 ↔ 描述符里声明的 `actions`）。同事插新玩法时，这一节会直接指出缺哪一步 | 66 项全 ✓ |
 | `npm run qa:assets` | 素材落盘即生效：立绘兜底顺序（如「母亲」必须是 `mother.png`）等回归断言 | ASSETS PASS |
-| `npm run qa:ai` | **AI 调用体检**：策略表 ↔ 字段契约（16 类）↔ 真调日志三方对账；报每类的次数/平均耗时/额度/token（读日志，不烧调用） | 三方一致、无绕过 `ask()` 的调用 |
+| `npm run qa:ai` | **AI 调用体检**：策略表 ↔ 字段契约（15 类）↔ 真调日志三方对账；报每类的次数/平均耗时/额度/token（读日志，不烧调用） | 三方一致、无绕过 `ask()` 的调用 |
 | `npm run qa:audit` | 日志 schema 审计（按 `contractOk` 戳记分「本版本 / 历史」两拨算账） | 本版本字段缺失 0、FALLBACK 0；历史违约单列并注明成因 |
 
 > `npm run verify:fast` / `verify:full` 是上面这些命令的编排器（见开头三层表）：

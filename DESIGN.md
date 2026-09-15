@@ -69,11 +69,10 @@
 
 本地只判手感与节奏；**每次结算都走 `/api/decide`**（`minigame_review` / `share_judge`），写进 JSONL 日志。
 
-## 7. 大模型调用点（16 类，服务端契约表见 `server/schema.js`）
+## 7. 大模型调用点（15 类，服务端契约表见 `server/schema.js`）
 
 `scene_gen` · `choice_hint` · `npc_chat` · `share_judge` · `minigame_review` · `branch_judge`  
 `quiz_generate` · `quiz_answer_ai` · `quiz_judge` · `night_options` · `night_resolve`  
-`act_review` · `ending_review` · `failure_review` · `study_report` · `sim_turn`（沙盘）
 
 失败重试 2 次 → 记 `source=ERROR` 并在界面提示原因、给「重试」键（不编造兜底文案）。无 Key 直接报错。整局真调约 76 次（`npm run test:e2e` 实测并断言）；每次调用的响应都过同一张契约表，缺字段即重试。
 

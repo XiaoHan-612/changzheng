@@ -30,7 +30,6 @@ export const DAY_SOUNDS = {
 /** 独立场景（不挂在幕轴上） */
 export const SCENE_SOUNDS = {
   title: { ambient: null, bgm: null },            // 标题页：安静
-  sandbox: { ambient: 'camp', bgm: null },        // 自由行军：只铺环境床，不配乐
   luding: { ambient: 'luding', bgm: 'luding' },   // 飞夺泸定桥玩法
   ending: { ambient: null, bgm: 'huining' },      // 终局：只留 BGM
 };
@@ -41,7 +40,7 @@ export const FALLBACK_SOUNDS = { ambient: 'wind', bgm: null };
 /**
  * 把「场景」解析成 { ambient, bgm }。
  * @param {string|{act?:object, day?:number, label?:string}} spec
- *   - 字符串：SCENE_SOUNDS 里的场景名（`'title'` / `'sandbox'` / `'luding'` / `'ending'`）
+ *   - 字符串：SCENE_SOUNDS 里的场景名（`'title'` / `'luding'` / `'ending'`）
  *   - 对象：`{ act, label }`，label 是 `dayScene()` 给的"雪山/草地"这类分日标签（可省）
  */
 export function soundsFor(spec) {
