@@ -46,6 +46,8 @@ export function preloadScenes() {
     '/assets/scenes/depart_crowd.jpg', '/assets/scenes/xiangjiang_wreck.jpg',
     '/assets/scenes/xiangjiang_night.jpg', '/assets/scenes/zunyi_room.jpg',
     '/assets/scenes/map_route.jpg', '/assets/scenes/echo_paper.jpg',
+    // 第 2 轮待产（落盘即生效；没产出时 sceneImage 退回现用图，见 design/asset-prompts.md）
+    '/assets/scenes/map_route_deep.jpg', '/assets/scenes/huining_dusk.jpg', '/assets/scenes/poem_paper.jpg',
     // 立绘（第三轮）：落盘即生效，见 portraitImage()
     '/assets/characters/mother.png', '/assets/characters/xianggui.png', '/assets/characters/guide.png',
     '/assets/characters/boatman.png', '/assets/characters/recruit.png', '/assets/characters/straggler.png',

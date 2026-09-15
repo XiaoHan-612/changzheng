@@ -64,13 +64,14 @@ export const SEQUENCES = {
    * 一条编排管两件事，靠 ctx 区分（`flow/act.js` 的 `runActIntro` 是唯一调用点）：
    *   · 第一幕（`idx = 0`）**不演**——序章已经演过题字与全程路线图，再来一遍就是重复；
    *   · 第二幕起：`review` 是上一幕的幕间总评（模型给的 1–2 句，失败时为 null，那就只留空镜与题字）。
+ *   底图由 `ctx.mapImg` 给（流程层用 `sceneImage()` 探测"有没有暗调新版"），缺省用现成的 `map_route.jpg`。
    * 原先这两处是 `marchTransition` 的一层闪白 + 一段 `runCutscene`，现在都归这里（批 D）。
    */
-  'act-intro': ({ act, idx = 0, prev = null, review = null }) => {
+  'act-intro': ({ act, idx = 0, prev = null, review = null, mapImg = '/assets/scenes/map_route.jpg' }) => {
     if (!act || !idx) return [];
     const beats = [{
       kind: 'map',
-      img: '/assets/scenes/map_route.jpg',
+      img: mapImg,                                // 流程层探测的结果（有 map_route_deep.jpg 就用它）
       stageClass: 'is-map',
       sfx: 'march',
       lit: idx,                                  // 走过的每一段常亮，本幕还暗着
@@ -103,14 +104,14 @@ export const SEQUENCES = {
    * 节奏全部来自 `data/poem.json`：有整段朗诵就跟着它（逐句窗口是量出来的），没有就按 pace 走。
    * 可跳过（一跳到底）、可加速（1×/1.5×，同时作用于语音与逐字）。
    */
-  'ending-poem': [
+  'ending-poem': ({ photoImg = '/assets/scenes/huining_pano.jpg', paperImg = '' } = {}) => [
     {
       kind: 'photo',
-      img: '/assets/scenes/huining_pano.jpg',
+      img: photoImg,
       text: '会宁的城墙下，三支队伍站到了一起。',
       holdMs: 1600,
     },
-    { kind: 'poem' },
+    { kind: 'poem', img: paperImg || undefined },
     { kind: 'seal' },
   ],
 

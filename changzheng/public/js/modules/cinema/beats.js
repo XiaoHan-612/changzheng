@@ -107,7 +107,8 @@ export const BEATS = {
     async render(ctx, b) {
       const poem = await fetchPoem();
       if (!poem) { ctx.cap.textContent = ''; return; }
-      ctx.stage.style.backgroundImage = 'none';         // 黑场：让诗自己立住
+      // 底纹可选（`data/poem.json` 之外由编排给）：没有就是纯黑场，让诗自己立住
+      ctx.stage.style.backgroundImage = b.img ? `url('${b.img}')` : 'none';
       const lines = poem.lines || [];
       const chars = (t) => [...String(t || '')];
       ctx.beat.innerHTML = `<div class="poem">

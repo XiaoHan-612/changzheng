@@ -1,93 +1,75 @@
 # 素材清单（可勾选）
 
-> 状态标记：**已有** = 已在仓库且被引用；**占位** = 用现有素材/CSS/合成音顶着，不阻塞开发；**待生成** = 需要生图或音频模型产出。
+> 状态标记：**已有** = 已在仓库且被引用；**备用** = 在盘但暂无接线点；**占位** = 用现有素材/CSS/合成音顶着，不阻塞开发；**待生成** = 需要生图或音频模型产出。
 > 生图规格与 prompt 见 [`design/asset-prompts.md`](../../design/asset-prompts.md)；音频见 [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md)。
+> 数字对账过（2026-09-15）：`scenes = 36`、`characters = 14`、`events = 6`、`ambient = 8`、`voices = 21`、`cache = 20`。
 
-## 一、场景图（`public/assets/scenes/`）
+## 一、场景图（`public/assets/scenes/`，36 张）
 
-**21 张全部就位（2026-09-13）**。前 15 张为初版，其余为加密轮补入；全部走「落盘即生效」约定，清单由 `npm run qa:handoff` 与代码里的预热表自动对齐。
+**36 张全部在盘并被引用**（唯一例外 `pond.jpg` 是设计内的备用图）。其中 **21 张走「落盘即生效」**
+（前端 `sceneImage()` 存在就用、boot 时预热，换图不改代码）——那 21 张的完整清单与生效位置见
+[`HANDOFF-ART.md`](HANDOFF-ART.md) 第四节；`npm run qa:handoff` 会逐行核对"文档承诺自动生效"与"代码确实预热"。
 
-| 文件 | 用途 |
-|---|---|
-| `depart_pano.jpg` | 开场·于都河全景（兼标题背景） |
-| `xiangjiang_pano.jpg` | 一幕·湘江全景 |
-| `zunyi_pano.jpg` | 二幕·遵义全景 |
-| `jinsha_pano.jpg` | 三幕·金沙江渡口全景 |
-| `luding_pano.jpg` | 三幕·泸定桥全景（泸定桥小游戏背景） |
-| `snow_pano.jpg` | 四幕·雪山全景（第 1 日营地 + 陡坡小游戏） |
-| `camp_pano.jpg` | 四幕·草地营地全景（第 2 日营地、分糖/五子棋/夜岗背景） |
-| `huining_pano.jpg` | 五幕·会宁会师全景（终局背景） |
-| `pond_close.jpg` | 钓鱼/分汤近景 |
-| `school_close.jpg` | 夜校近景 |
-| `night_fire.jpg` | 篝火夜（夜间抉择屏背景） |
-| `marsh.jpg` | 过草地 |
-| `path_choice.jpg` | 岔路点选 |
-| `camp_evening.jpg` | 休息近景 |
-| `pond.jpg` | 备用池塘景 |
-| `sentry_night.jpg` | 夜岗近景（暗夜营地边缘、树线、哨位） |
-| `sugar_close.jpg` | 分糖近景（火光下的手与三颗糖） |
-| `snow_climb.jpg` | 雪山陡坡（拉人时机） |
-
-> 「落盘即生效」= 按文件名放进 `public/assets/scenes/` 就会被自动用上，不用改代码。
-> 完整清单（含 14 张自动生效的图）见 [`HANDOFF-ART.md`](HANDOFF-ART.md) 第四节；自检 `npm run qa:assets`。
-
-### 后续补齐（策划案 §11.1，目标 28–32 张）
-
-| 幕 | 待生成 |
-|---|---|
-| 开场 | `depart_bridge` ✅（船只+门板浮桥，夜行列队）· `depart_crowd` ✅（返工后为短打布衣 + 包头巾/斗笠，不再像长袍） |
-| 一幕 | `xiangjiang_bridge` ✅（断桥无遗体）· `xiangjiang_wreck` ✅（行装与担架，严格无人物）· `xiangjiang_night` ✅（江边宿营，绑腿与八角帽） |
-| 二幕 | `zunyi_room` ✅（门缝旁听，人物背对无面孔）· `map_desk` ✅（油灯地图桌，无可读文字）· `zunyi_street` ✅（雨巷空无一人） |
-| 三幕 | `jinsha_ferry` ✅ · `luding_bridge` ✅（铁索压中段，适配横版小游戏）· `luding_run` ✅（湿脚印 + 丢下的草鞋 + 远处火把） |
-| 四幕 | `snow_camp` ✅ · `snow_let_clothes` ✅ 均已就位（2026-09-12，返工后双手为自然肤色，红军红只留帽徽） |
-| 五幕 | `lazikou_cliff` ✅（陡壁 + 藤蔓岩缝，无人物）· `huining_flag` ✅（褪色破损红旗，旗面无徽记文字）· `huining_crowd` ✅（黄土塬两路汇合，远处看面孔不可辨） |
-| 通用 | `map_route` ✅（做旧路线图，虚线路标 + 空白标记框，无可读地名）· `echo_paper` ✅（纯做旧纸纹理，无主体） |
-
-> **场景图 21/21 全部就位**（2026-09-13）。`map_route` 用作手记（回望）底图、`echo_paper` 用作史实回响卡底纹，两者都叠了一层深色渐变保证文字可读；实机截图见 `tests/e2e/artifacts/look-journal.png` 与 `look-echo.png`（`npm run qa:look` 可重跑）。
-
-## 二、角色立绘（`public/assets/characters/`）
-
-**14 张全部就位（2026-09-13）**。规格：1024×1024 生成 → 导出 **280×280 PNG**，脸心居中偏上（圆形头像框裁切安全，28px 小图仍可辨）。
-
-| 文件 | 角色 | 生效位置 |
+| 组 | 文件 | 用途 |
 |---|---|---|
-| `laoban.png` | 老班长 | 钓鱼、分汤、篝火夜 |
-| `zhiyuan.png` | 指导员 | 遵义旁听、过草地 |
-| `xiaogui.png` | 红小鬼 | 分糖、五子棋、「我腿不软」 |
-| `weisheng.png` | 卫生员 | 夜校、关怀对话 |
-| `mother.png` | 母亲 | 开场「母亲 · 告别」 |
-| `xianggui.png` | 老乡 | 三幕「老乡 · 问渡」（2026-09-13 起正式使用） |
-| `guide.png` | 向导 | 五幕「向导老乡 · 问路」 |
-| `boatman.png` | 船工 | 三幕「老船工 · 问夜渡」 |
-| `recruit.png` | 新兵 | 五幕「新兵 · 说一句寄语」 |
-| `straggler.png` | 掉队战士 | 四幕「扶他一把」抉择（当事人先露面） |
-| `drummer.png` | 宣传员 | 四幕「宣传员 · 拟一句鼓动」 |
-| `captain.png` | 突击队长 | 泸定桥开场 |
-| `teacher.png` | 文化教员 | 夜校识字 |
-| `wounded.png` | 担架伤员 | 三幕「岸边伤员 · 让他先渡」 |
+| 全景 | `depart_pano` · `xiangjiang_pano` · `zunyi_pano` · `jinsha_pano` · `luding_pano` · `snow_pano` · `camp_pano` · `huining_pano` | 各幕营地全景（`acts.json` 的 `pano`）；`depart_pano` 兼标题页背景、`huining_pano` 兼终局屏背景 |
+| 过场空镜 | `depart_crowd` · `xiangjiang_night` · `zunyi_street`（场景图）+ `ev_river` · `ev_rain` · `ev_night_march`（事件图，见 §三） | 各幕 `cutAlt`：幕间过场"回望上一幕"那一拍用它们 |
+| 近景/抉择 | `pond` · `pond_close` · `school_close` · `camp_evening` · `night_fire` · `marsh` · `path_choice` · `sentry_night` · `sugar_close` · `snow_climb` · `snow_camp` · `snow_let_clothes` · `luding_bridge` · `luding_run` · `jinsha_ferry` · `map_desk` · `zunyi_room` · `lazikou_cliff` · `huining_flag` · `xiangjiang_bridge` · `xiangjiang_wreck` · `huining_crowd` | 小游戏背景与热点/抉择横幅（`acts.json` 的 `img`、`flow/tables.js` 的 `CHOICE_SETS`） |
+| 通用底纹 | `map_route` · `echo_paper` | 手记（回望）底图与史实回响底纹，都叠了一层深色渐变保证文字可读 |
 
-> **落盘即生效**：`main.js` 的 `PORTRAIT_FILE` 映射 + `showNpc()` 统一入口。热点/抉择集只要写 `npc` 字段，立绘自动生效；配不到专属立绘就退回文字头像，不报错。
-> 2026-09-13：`xianggui.png`（老乡）已由三幕新增热点「老乡 · 问渡」接上，14 张立绘全部在用。同一批还新增了 act1「卫生员 · 包扎」（用 `weisheng.png`）与 act1「担架上的伤员」（用 `wounded.png`）。
-> 体检：`npm run qa:inspect`（含立绘尺寸/体积/重复检测，会当场抓住"没缩放的 1024 原图"）。
+> `pond.jpg` 是**备用池塘景**（在用的是 `pond_close.jpg`），保留在盘、无接线点，别当垃圾删。
+> 序章与每幕幕间共用一个过场屏（`#screen-cutscene`）；其中路线图那一拍现在用 `map_route`。
+> **第 2 轮三张图待产**（`map_route_deep.jpg` / `huining_dusk.jpg` / `poem_paper.jpg`，prompt 见
+> [`asset-prompts.md`](../../design/asset-prompts.md) §1）：三张都已接上「落盘即生效」——
+> 流程层用 `sceneImage()` 探测，产完丢进 `public/assets/scenes/` 就自动顶掉现在用的图，**不用改代码**；
+> `qa:assets` 现在会把它们列在「待生成图片」里。
 
-## 三、事件图（`public/assets/events/`，6 张，已有）
+## 二、角色立绘（`public/assets/characters/`，14 张）
 
+**14 张全部就位并接线**。规格：1024×1024 生成 → 导出 **280×280 PNG**，脸心居中偏上（圆形头像框裁切安全）。
+
+`laoban`（老班长）· `zhiyuan`（指导员）· `xiaogui`（红小鬼）· `weisheng`（卫生员）· `mother`（母亲）·
+`xianggui`（老乡）· `guide`（向导）· `boatman`（船工）· `recruit`（新兵）· `straggler`（掉队战士）·
+`drummer`（宣传员）· `captain`（突击队长）· `teacher`（文化教员）· `wounded`（担架伤员）
+
+> **落盘即生效**：`flow/view.js` 的 `PORTRAIT_FILE` 映射 + `showNpc()` 统一入口；热点写 `npc` 字段就自动用上，
+> 配不到专属立绘退回文字头像、不报错。两个坑：① 必须缩到 280×280 再落盘（1024 原图单张 2MB+，
+> `qa:inspect` 会拦）；② 别把"老班长"当万能兜底（见 [`HANDOFF-CODE.md`](HANDOFF-CODE.md) 坑 16）。
+
+## 三、事件图（`public/assets/events/`，6 张）
+
+2026-09-12 产出、**2026-09-15 接线**（此前 6 张全在盘却没有任何代码引用，本节还是空的）。
+
+| 文件 | 现在用在哪 |
+|---|---|
+| `ev_river.jpg` | 第三幕（金沙江·泸定）过场空镜：`data/acts.json` 的 `cutAlt`——涉水渡江 |
+| `ev_rain.jpg` | 第四幕（雪山·草地）过场空镜：雨中草地行军 |
+| `ev_night_march.jpg` | 第五幕（腊子口·会宁）过场空镜：月下夜行军 |
+| `ev_loss.jpg` | **失败结算屏**底图（体力耗尽）：一双留在路上的旧鞋 |
+| `ev_starve.jpg` | **失败结算屏**底图（断粮掉队）：火上的一口空锅 |
+| `ev_village.jpg` | 备用（村落宿营空镜）：暂无接线点，留给以后的新热点 |
+
+> 事件图**不属于**"落盘即生效"那一档：它们被 `acts.json` 的 `cutAlt` 与 `flow/end.js` 的失败屏
+> 按**字面路径**引用（路径别拼字符串，否则素材对账扫不到）。换图要改数据/代码。
 
 ## 四、音频
 
 | 类别 | 现状 | 说明 |
 |---|---|---|
-| 环境床 | **已就位 8 条（2026-09-12，Ogg Vorbis）** | 真正的 **Ogg Vorbis**（文件头 `OggS`），单声道 44.1kHz、24.4s，体积 116–226KB（合计 1.3MB）。`qa:assets` 浏览器解码 24s 全部通过。代码的 `.ogg → .wav → 合成` 回退链保留，但当前只存在 `.ogg` |
-| 操作音效 | **合成兜底** | click / cast / hook / echo / correct / wrong / march / day 等，同上 |
-| 预录台词 | **已有 21 条** | `public/audio/voices/*.wav` + 索引 `public/audio/voice-lines.json` |
-| 同伴反应音 | **已有 6 条** | `public/audio/reactions/*.wav`（老班长赞成/反对、卫生员担忧、红小鬼嘴硬、向导建议、新兵自责） |
-| TTS 缓存 | **已就位 20 条（2026-09-12）** | `public/audio/cache/*.wav`（22050Hz 单声道，2.33MB）。清单见 [`TTS-MANIFEST.md`](TTS-MANIFEST.md)；验收 `npm run qa:tts`。真调一局实测命中 **20+ 次**（14 张史实卡标题 + 哨兵/泸定/分糖/篝火夜开场句 + 对话台词；`qa:av` 每次会报这个数） |
+| 环境床 | **8 条已就位**（共 9 种 kind） | `public/audio/ambient/*.ogg`（真 Ogg Vorbis，单声道 44.1kHz、24.4s、116–226KB）。第 9 种 `wind` 是兜底场景、未产出 → 走合成兜底（`qa:audio` 会列出"正在兜底"） |
+| 操作音效 | **合成兜底**（8 个待预录） | `click` · `cast` · `hook` · `echo` · `correct` · `wrong` · `march` · `day`：`sfx-table.js` 有合成配方，把同名 `.ogg` 放进 `public/audio/sfx/` 即顶替合成音（落盘即生效） |
+| **BGM** | **8 首待产（唯一待产线）** | `public/audio/bgm/<kind>_bgm.ogg`，文件名与情绪已定（见 [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md) §六）。**放进目录就自动生效**，代码无需改动；未产出时该场景只放环境床 |
+| 预录台词 | **21 条** | `public/audio/voices/*.wav` + 索引 `voice-lines.json` |
+| TTS 缓存 | **20 条** | `public/audio/cache/*.wav`（22050Hz 单声道，2.33MB）。清单 [`TTS-MANIFEST.md`](TTS-MANIFEST.md)，验收 `npm run qa:tts` |
+| **终局升华的整段朗诵** | **1 条（不入库）** | `public/audio/poem/qilv-changzheng.mp3`（《七律·长征(朗诵版)》，59.3s）。八句起止毫秒**是量出来的**、写在 `data/poem.json`；换音频要重新量（见 [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md) §六点五）。该目录 gitignore，换机器演示要一起拷 |
+| 同伴反应音 | **已撤**（2026-09-14） | 原先 6 条 `audio/reactions/*.wav` 随「自由行军沙盘」一起移除、归档在 `_archive/audio-reactions-sandbox/`；没有任何代码路径引用它们，**别按旧文档去补** |
 
 ## 五、数据与配置（非素材，但属于交付面）
 
 | 文件 | 说明 |
 |---|---|
-| `data/acts.json` | 五幕定义：热点、每日场景 `dayScenes`、强制链、对决、史实卡绑定 |
+| `data/acts.json` | 五幕定义：热点、每日场景 `dayScenes`、强制链路、对决、史实卡绑定、过场空镜 `cutAlt` |
 | `data/facts.json` | 史实卡 14 张（real/fiction 分栏） |
 | `data/tts-lines.json` | 固定台词清单（TTS 生成的输入） |
-| `design/asset-prompts.md` | 生图 prompt 包 |
+| `data/poem.json` | 终局升华的诗与落款：**诗的唯一真源**（字幕/逐字/配音都读它）+ 逐句时间轴 + 无声节奏 |
+| `design/asset-prompts.md` | 生图 prompt 包（含"本轮"与历史轮次） |

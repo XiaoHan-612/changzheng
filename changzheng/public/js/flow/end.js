@@ -10,11 +10,21 @@ import { markAction } from '../step.js';
 import { kernel } from '../kernel/index.js';
 import { COMPANIONS } from '../data.js';
 import { S, hasS, st, callAI, step, publicState, cinemaApi } from './kit.js';
-import { originText } from './view.js';
+import { originText, sceneImage } from './view.js';
 
 export async function runFailure(fail, act) {
   step('failure', 'end');
   showScreen('screen-end');
+  // 失败结算的底图按"怎么失败的"换（两张都是 public/assets/events/ 里原先闲置的素材）：
+  // 断粮掉队 → 火上的一口空锅；体力耗尽 → 一双留在路上的旧鞋。
+  // 这屏与终局成功共用同一个屏，所以成功的 runEnding 会把底图换回会宁。
+  // 路径**写成字面量**（不要拼文件名）：素材体检/文档对账都是按字面路径扫的，拼出来的路径扫不到。
+  const FAIL_BG = {
+    断粮: '/assets/events/ev_starve.jpg',
+    体力: '/assets/events/ev_loss.jpg',
+  };
+  const failBg = Object.keys(FAIL_BG).find((k) => String(fail?.kind || '').includes(k));
+  if ($('end-bg')) $('end-bg').style.backgroundImage = `url('${FAIL_BG[failBg] || FAIL_BG.体力}')`;
   $('end-eyebrow').textContent = `${S.mode === 'march' ? '行军模式' : '研学模式'} · ${fail.kind}`;
   $('end-title').textContent = '结算中…';
   $('end-paras').innerHTML = '';
@@ -62,6 +72,8 @@ export async function runEnding() {
   step('end', 'end');
   kernel.emit('scene:enter', { name: 'ending' });
   showScreen('screen-end');
+  // 终局成功回到会宁全景（失败结算可能把这屏的底图换成了 ev_loss/ev_starve）
+  if ($('end-bg')) $('end-bg').style.backgroundImage = "url('/assets/scenes/huining_pano.jpg')";
   $('end-title').textContent = '结算中…';
   $('end-paras').innerHTML = '';
   $('end-history').innerHTML = '';
@@ -116,7 +128,13 @@ export async function runEnding() {
   //   · 失败分支（上面的结算未完成）不会走到这里，所以失败局不演升华；
   //   · 报告是"可带走的纸面"，让它落在诗之后，玩家读完诗再去看报告。
   // 它全程可跳过（一跳到底），且**不做任何模型调用**（诗与时间是本地数据）。
-  await cinemaApi()?.play('ending-poem');
+  await cinemaApi()?.play('ending-poem', {
+    ctx: {
+      // 第 2 轮的两张待产图（落盘即生效）：收束空镜与诗页底纹，没产出就退回会宁全景 / 纯黑场
+      photoImg: sceneImage('/assets/scenes/huining_dusk.jpg', '/assets/scenes/huining_pano.jpg'),
+      paperImg: sceneImage('/assets/scenes/poem_paper.jpg', ''),
+    },
+  });
 
   // 研学报告（课后复盘用；对外不出现行业与场景口径，见 docs/PITCH.md）
   try {

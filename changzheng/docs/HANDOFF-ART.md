@@ -32,11 +32,19 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 
 命名**必须**与 `design/asset-prompts.md` 表格一致（小写下划线），前端按文件名直接引用。
 
-## 三、当前进度（**无待生成项**）
+## 三、当前进度（**第 1 轮已全清；第 2 轮 3 张图待产**）
 
-**场景图 21/21、立绘 14/14、事件图 6/6 全部就位并接线**（2026-09-13）。本节历史上按 P0/P1/P2 排过优先级
-（夜岗/分糖/陡坡三张曾用 `camp_pano.jpg`、`snow_pano.jpg` 占位），现已全部补齐——清单与逐行用途见
-[`ASSETS.md`](ASSETS.md)，下一步若要补图（例如给新热点配近景），照 §二 的规格与 §四 的命名约定产出即可。
+**落盘即生效那 21 张 + 立绘 14 + 事件图 6 全部在盘并被引用**（2026-09-15 复核；场景目录实为 36 张，
+其中 15 张是被数据显式引用的近景/抉择图，清单见 [`ASSETS.md`](ASSETS.md) 第一节）。
+历史轮次：2026-09-12 补齐场景与事件图，2026-09-13 补齐立绘（夜岗/分糖/陡坡三张曾用 `camp_pano`/`snow_pano` 占位）。
+
+**事件图 6 张 2026-09-15 接线**（此前闲置）：3 张当各幕过场空镜（`acts.json` 的 `cutAlt`）、
+2 张当失败结算屏底图（`flow/end.js` 按失败类型换），剩 `ev_village.jpg` 备用。
+
+**第 2 轮（进行中）**：3 张图 + 一批音频，prompt 见
+[`design/asset-prompts.md`](../../design/asset-prompts.md) 的「第 2 轮」。三张图都是"现有图能顶、但产出了明显更好"：
+暗调路线图（现在用 `map_route`，满屏太亮、代码里要压暗一档）、升华收束空镜（现在复用 `huining_pano`）、
+诗页底纹（现在诗屏是纯黑场）。**音频那批（8 首 BGM + 8 个操作音效）优先级更高**，它们落盘即生效。
 
 ## 四、落盘即生效（不用改代码）
 
@@ -56,7 +64,7 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `xiangjiang_night.jpg` | 第一幕过场第二帧（`cutAlt`） |
 | `xiangjiang_wreck.jpg` | 湘江「沉默的老兵」交谈（热点 `img` 字段） |
 | `zunyi_room.jpg` | 遵义「小楼门口」交谈（热点 `img` 字段） |
-| `map_route.jpg` | 手记（回望）面板底图，叠在手记上（会压一层深色渐变保证可读） |
+| `map_route.jpg` | 手记（回望）面板底图（叠一层深色渐变保证可读）+ 序章/幕间「路线图」那一拍 |
 | `echo_paper.jpg` | 史实回响面板底纹，叠在回响卡上（同上） |
 | `jinsha_ferry.jpg` | 「今夜能不能渡」抉择 |
 | `map_desk.jpg` | 「往哪里走」抉择 |
@@ -66,8 +74,12 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `xiangjiang_bridge.jpg` | 「护送伤员过封锁」抉择 |
 | `zunyi_street.jpg` | 「一封密信」抉择 |
 | `huining_crowd.jpg` | 会宁「数一数熟面孔」 |
+| `map_route_deep.jpg` | **第 2 轮待产**：序章与每幕幕间「路线图」那一拍的暗调底图（没产出时用 `map_route.jpg`） |
+| `huining_dusk.jpg` | **第 2 轮待产**：终章升华的收束空镜（没产出时用 `huining_pano.jpg`） |
+| `poem_paper.jpg` | **第 2 轮待产**：诗页底纹（没产出时是纯黑场） |
 
-场景图 **21/21 全部就位并接线**（2026-09-13），本表即完整清单；`qa:handoff` 会逐行核对"文档承诺自动生效"与"代码确实预热"是否一致。
+本表即"落盘即生效"的完整清单（**21 行**，场景目录另有 15 张由数据显式引用的近景/抉择图，不在本表）；
+`qa:handoff` 会逐行核对"文档承诺自动生效"与"代码确实预热"是否一致。
 
 **立绘同样落盘即生效**：`public/assets/characters/` 下按约定名放就能自动替换文字头像（`main.js` 的 `PORTRAIT_FILE` 映射 + `showNpc()` 统一入口）：
 `laoban`（老班长）· `zhiyuan`（指导员）· `xiaogui`（红小鬼）· `weisheng`（卫生员）· `mother`（母亲）· `xianggui`（老乡）· `guide`（向导）· `boatman`（船工）· `recruit`（新兵）· `straggler`（掉队战士）· `drummer`（宣传员）· `captain`（突击队长）· `teacher`（文化教员）· `wounded`（担架伤员）——**14 张全部就位并接线（2026-09-13）**，规格 280×280 PNG、脸心居中偏上。

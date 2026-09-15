@@ -30,7 +30,62 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 
 ---
 
-## 1. 本轮必需（3 张，新玩法用）
+## 1. 当前轮（第 2 轮 · 2026-09-15）：3 张图 + 16 条音频
+
+> 为什么还要这三张：不是缺图，而是"现有图能顶、产出了明显更好"。三张都已接上「落盘即生效」——
+> **按文件名放进 `changzheng/public/assets/scenes/`，刷新页面就生效，不用改任何代码**
+> （`sceneImage()` 会探测新图，没探测到就退回现在用的那张）。
+> 音频那批优先级更高：8 首 BGM 是**唯一还没产出的产线**，落盘即生效（见 `HANDOFF-AUDIO.md` §六）。
+
+### 1.1 图（3 张）
+
+| 文件名 | 用途 | 中文描述 | 完整 prompt（前缀 + 主体） | 尺寸 | 验收 |
+|---|---|---|---|---|---|
+| `map_route_deep.jpg` | 序章题字之后 + 每幕幕间的「路线图」那一拍（全片出现 7 次，**性价比最高的一张**） | 油灯下的行军路线图：做旧纸面但**整体压暗**（以墨色为主调），山峦用浓淡墨块，河流淡青灰，一条朱红虚线路线自左下蜿蜒到右上；四角留空白标记框；油灯暖光自左上斜照，四周明显暗角 | `...prefix..., a campaign route map under oil-lamp light: aged paper darkened to deep ink tones, mountains as layered ink washes, rivers in pale blue-grey, one vermilion dotted route winding from lower-left to upper-right, blank cartouches at the corners, warm lamp glow from the upper-left, heavy vignette, deliberately low-key and dark so pale text can sit on top, no place names, no letters, no compass rose` | 1536×1024 → 1280 宽 JPEG q82 | 中央压得住白字（不许出现大片高亮纸面）；无文字/数字/印章；四周留 6% 安全区 |
+| `huining_dusk.jpg` | 终章升华的收束空镜（**全片最后一眼**） | 会宁城外黄土塬与残城墙，暮色低角度暖光，画面**空无一人**（或极远处几个不可辨剪影），上方大面积低对比天空（要压诗句），安静、克制 | `...prefix..., wide empty loess plateau before the low ruined earthen walls of Huining at dusk, long warm low-angle light raking across dry grass, no people or only a few unreadable distant silhouettes, large quiet sky occupying the upper half for text overlay, restrained elegiac mood, deep soft shadows` | 1536×1024 → 1280 宽 JPEG q82 | 无人脸、无文字；上部约 40% 是低对比天空（压得住白字） |
+| `poem_paper.jpg` | 诗页底纹（给升华那屏一点纸/墨的呼吸，现在是纯黑场） | 极淡的宣纸纹理 + 画面下缘一线远山淡影，近乎单色、**整体偏暗**（诗是白字），无主体 | `...prefix..., extremely subdued rice-paper texture with the faintest suggestion of distant mountain ridges along the bottom edge, almost monochrome dark ink wash, no subject, no figures, evenly dark enough for pale text, subtle fibre grain, no borders` | 1536×1024 → 1280 宽 JPEG q85 | 整体亮度低（白字要立得住）；无文字；拉伸平铺都不露接缝 |
+
+### 1.2 音频（8 首 BGM + 8 个操作音效）
+
+**BGM**：Ogg Vorbis 立体声 44.1kHz、**60–120 秒且可无缝循环**、单条 1–2MB；
+落盘路径 `changzheng/public/audio/bgm/<文件名>`（**放进目录即生效**，代码无需改动）；
+红线：**不含人声**、不用强节奏与打击乐重音、整体克制（都是"夜里行军"的音量）。
+
+| 文件名 | 场景 / 情绪 | 给音频模型的提示词 |
+|---|---|---|
+| `depart_bgm.ogg` | 开场·于都河：告别、克制、向前 | 低音弦乐长音铺底，一支箫偶尔一句短动机；约 60 BPM；不写"悲壮"，写"不舍但要走"；无打击乐 |
+| `xiangjiang_bgm.ogg` | 一幕·湘江：代价、暗流、压抑 | 低音提琴持续音 + 极轻的鼓皮（稀疏、像远处闷响）；不做旋律高潮；音量始终压在环境床之下 |
+| `zunyi_bgm.ogg` | 二幕·遵义：雨夜、思索、室内 | 雨声之外的室内感：钢琴/扬琴单音点缀 + 低音持续，留大量空白；不煽情 |
+| `jinsha_bgm.ogg` | 三幕前·金沙江：水流、紧张但克制 | 弦乐长音浮在水声之上，节奏靠水流而不是鼓；不写"追击感" |
+| `luding_bgm.ogg` | 三幕后·泸定桥：铁索、紧张度最高 | 金属摩擦质感 + 低鼓点式脉冲（心跳感），**不打重拍、不做爆炸**；紧张靠密度不靠音量 |
+| `snow_bgm.ogg` | 四幕·雪山：冷、稀疏、留白 | 高频空灵音色 + 低音嗡鸣，风声留白；音符越少越好 |
+| `grass_bgm.ogg` | 四幕·草地：泥泞、疲惫、缓慢 | 低音铺底 + 轻微不规则的脉冲（像踩进泥里）；速度感最慢的一条 |
+| `huining_bgm.ogg` | 五幕·会宁：汇合、暖调、收束 | 弦乐 + 极轻的铜管长音，调性转暖；**不喊口号、不做进行曲**，像"终于站到一起" |
+
+**操作音效**：≤0.4 秒、干声、克制、**不带音高旋律**（避免与 TTS 抢）；
+落盘 `changzheng/public/audio/sfx/<名>.ogg`（同名文件自动顶替现在的 WebAudio 合成音）。
+现在走合成、够用；预录只是音质升级，属于可选项：
+
+| 文件名 | 用途 | 提示词 |
+|---|---|---|
+| `click.ogg` | 点热点/按钮 | 一声极轻的木质轻叩（像指尖敲桌），不刺耳 |
+| `cast.ogg` | 钓鱼抛竿 | 竹竿挥出的风声 + 极轻的线入水 |
+| `hook.ogg` | 钓鱼提竿 | 竿梢绷紧的一声"嗒" + 短促水花 |
+| `echo.ogg` | 史实回响翻开 | 一张老纸被翻动的沙沙声（0.3s 内） |
+| `correct.ogg` | 答对 | 两枚木质音（上行，无旋律），克制 |
+| `wrong.ogg` | 答错 | 一声闷的木质低音，不刺耳、不"惩罚感" |
+| `march.ogg` | 启程/换幕鼓点 | 一记低鼓 + 两步草鞋落地，短促 |
+| `day.ogg` | 进入新的一日 | 一声远的号音（单音，无旋律）+ 轻微环境扬起 |
+
+> **不需要**：诗的逐句配音。终章升化用的是一整段真人朗诵（`public/audio/poem/qilv-changzheng.mp3`，
+> 已带量好的逐句时间轴），逐句 TTS 那条路只是备份，不必为此花额度。
+
+## 2. 第 1 轮（**已完成**，2026-09-12 / 09-13）：场景 21 张 + 立绘 14 张
+
+下列三节是本轮之前的产图任务，**产出已全部就位并接线**（清单与生效位置见
+[`changzheng/docs/ASSETS.md`](../changzheng/docs/ASSETS.md) 与 `HANDOFF-ART.md` §四），保留在此供返工时对齐风格。
+
+### 2.1 本轮必需（3 张，新玩法用）
 
 | 文件名 | 用途 | 中文描述 | 完整 prompt（前缀 + 主体） | 尺寸 | 验收 |
 |---|---|---|---|---|---|
@@ -38,7 +93,7 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `sugar_close.jpg` | 分糖小游戏 | 火光下摊开的手掌里三颗包着纸的糖，背景两名年轻战士虚影 | `...prefix..., close-up of an open young soldier's palm holding three small paper-wrapped candies, warm campfire rim light from below, two blurred young comrades watching in the background, shallow depth of field, tender restrained mood` | 1280 宽 JPEG q82 | 糖纸不出现文字；手部不畸形 |
 | `snow_climb.jpg` | 雪山陡坡（拉人时机） | 暴风雪中的陡雪坡，一只手下探抓住另一只手腕，风雪横吹 | `...prefix..., steep snow slope in a blizzard, one soldier reaching down to grip another's wrist, wind-blown snow streaking sideways, pale grey-white palette with a single dark red armband accent, no faces in focus` | 1280 宽 JPEG q82 | 手部结构合理；无血腥 |
 
-## 2. 后续补齐 · 场景（18 张，策划案 §11.1）
+### 2.2 后续补齐 · 场景（18 张，策划案 §11.1）
 
 | 文件名 | 用途 | 中文描述 | 完整 prompt（前缀 + 主体） | 尺寸 |
 |---|---|---|---|---|
@@ -61,7 +116,7 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `map_route.jpg` | 通用·路线大地图 | 做旧的川黔滇长征路线图（无文字） | `...prefix..., an aged hand-drawn campaign map of western China mountain terrain, rivers and a dotted route line, blank cartouches where labels would be` | 1024 PNG |
 | `echo_paper.jpg` | 通用·回响底纹 | 做旧纸张纹理，边缘焦黄 | `...prefix..., plain aged rice paper texture with foxed edges and faint fiber grain, no subject` | 1024 JPEG q85 |
 
-## 3. 后续补齐 · 立绘（14 张）
+### 2.3 后续补齐 · 立绘（14 张）
 
 统一句式：`...prefix..., half-body portrait of <角色描述>, three-quarter view, soft side light, plain parchment background, calm expression, 1935 Red Army uniform`
 
@@ -82,7 +137,7 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `teacher.png` | 文化教员 | a soft-spoken teacher holding a twig, chalk dust on fingers |
 | `wounded.png` | 担架伤员 | a wounded soldier half-sitting on a stretcher, leg wrapped in cloth |
 
-## 4. 交付检查
+## 3. 交付检查
 
 - [ ] 全部图片**无文字、无字母、无水印**
 - [ ] 色调与色板一致（纸黄 / 墨 / 红军红 / 金 / 青灰），无霓虹与过饱和

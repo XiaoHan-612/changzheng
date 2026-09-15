@@ -41,7 +41,9 @@ export async function startRun(mode = 'study') {
   if (mode === 'quick') toast('快速演示：每幕只跑主玩法与对决', 3200);
   // 序章（电影化，见 modules/cinema）：黑场题字 → 路线图。快速模式只留题字一拍——
   // 它按定义要在 18 分钟内走完五幕，不能被序章吃掉时间。
-  await cinemaApi()?.play(mode === 'quick' ? 'prologue-quick' : 'prologue-open');
+  await cinemaApi()?.play(mode === 'quick' ? 'prologue-quick' : 'prologue-open', {
+    ctx: { mapImg: sceneImage('/assets/scenes/map_route_deep.jpg', '/assets/scenes/map_route.jpg') },
+  });
   // 快速模式按定义要短，跳过开场设定；标准/行军模式走一次出身与出发前一问
   if (mode !== 'quick') {
     await runOrigin();
@@ -119,7 +121,11 @@ export async function runActIntro(incoming = {}) {
   if ($('act-tag')) $('act-tag').textContent = `${act.title} · ${act.subtitle}`;
   const order = getActsData()?.order || [];
   await cinemaApi()?.play('act-intro', {
-    ctx: { act, idx: order.indexOf(act.id), prev: incoming.prev || null, review: incoming.review || null },
+    ctx: {
+      act, idx: order.indexOf(act.id), prev: incoming.prev || null, review: incoming.review || null,
+      // 路线图底图：第 2 轮的暗调新版（落盘即生效），没产出就用现成的 map_route
+      mapImg: sceneImage('/assets/scenes/map_route_deep.jpg', '/assets/scenes/map_route.jpg'),
+    },
   });
   if (act.prelude) await runPrelude(act);
   if (S.mode === 'quick') return runQuickAct(act);
