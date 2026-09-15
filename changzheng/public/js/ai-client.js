@@ -7,7 +7,8 @@ export async function fetchConfig() {
     modeCache = data;
     return data;
   } catch {
-    return { model: 'glm-5.3-flash', hasKey: false, availableModels: ['glm-5.3-flash'] };
+    // 兜底占位：与赛制指定模型一致（真值以 /api/config 为准）
+    return { model: 'glm-5.1', hasKey: false, availableModels: ['glm-5.1'] };
   }
 }
 

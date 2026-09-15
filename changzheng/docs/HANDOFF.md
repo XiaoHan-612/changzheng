@@ -102,16 +102,16 @@ npm run test:e2e     # 五幕真调通关：unit 之外的总验收（~76 次调
 npm run qa:sandbox   # 沙盘两回合 + 建议行动      · npm run qa:regress  沙盘监听泄漏/存档错位
 npm run qa:failure   # 行军模式失败线（failure_review 真调）
 npm run qa:av        # 影音运行时审计：资源 404 / 立绘 / 环境床 / TTS 解码
-npm run test:unit    # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏
+npm run test:unit    # 53 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致
 npm run qa:smoke     # 标题→营地→一次互动→回设置
 npm run qa:board     # 玩法板体检 57 项（8 个玩法的板屏壳 / 数值签 / 契约标记 / 离开清空）
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫：字面量 / 模板 / 纸面 / 动效
 npm run qa:bus       # 总线守卫（模块化规则 + 内核运行时体检）· qa:handoff 交接文档一致性
 ```
 
-当前结果：unit 49/49 · smoke PASS · board 57/57 · motion 16/16 · e2e FULL PASS ·
+当前结果：unit 53/53 · smoke PASS · board 57/57 · motion 16/16 · e2e FULL PASS ·
 sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 全绿 ·
-`dev:check` 7/7（≈6s）· `layout-audit --width 820` 与 1280 均零布局缺陷
+`dev:check` 9/9（≈7s）· `layout-audit --width 820` 与 1280 均零布局缺陷
 
 ## 三、还没做 / 已知缺口（按优先级）
 
@@ -124,6 +124,7 @@ sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 
 | P2 | 沙盘多智能体偏轻 | NPC 有 goal 与 3 条记忆，但没有「目标推进」的主动事件 |
 | P2 | 操作音效仍是合成 | click/hook/echo 等由 WebAudio 合成；是否预录看路演音质要求 |
 | P2 | 封装未定型 | 一键启动（`start.bat` + 便携 Node）见 [`DELIVERY.md`](DELIVERY.md)，演示前收口 |
+| P3 | 终局屏小字偏淡 | `#end-report` 里几处用 `.muted`(#8d8474)，在纸面上对比度约 **2.9:1**（正文级偏淡）。终局失败那句已改正常墨色；报告块属设计层选择，改前先看整体观感（见 HANDOFF-CODE 坑 41） |
 | P3 | 离线回放（备选） | 现场无网/额度耗尽的风险预案，见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)，**未开发** |
 
 ## 四、接着干的话，从哪儿下手

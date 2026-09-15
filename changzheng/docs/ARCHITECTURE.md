@@ -123,7 +123,7 @@ npm run test:e2e      # 五幕真调通关（~76 次调用）+ 不重复结算�
 npm run qa:sandbox    # 沙盘两回合 + 存档恢复 · qa:regress 沙盘回归 · qa:failure 失败线
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
 # 局部（多数不烧 AI）
-npm run test:unit     # 49 项：资源钳制 / 史实解锁 / 契约 / 配置层 / 减员 / 数值护栏
+npm run test:unit     # 53 项：资源钳制 / 史实解锁 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致
 npm run qa:smoke      # 标题→营地→一次互动（含"用过的热点当场作废"断言）
 npm run qa:board      # 玩法板体检 36 项（板屏壳 / 数值签 / 契约标记）
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫

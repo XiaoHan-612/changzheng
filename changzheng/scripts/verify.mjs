@@ -12,7 +12,7 @@
  * 所以并行不会互相踢端口、不会把日志写成一锅粥、也不会动仓库里的 runtime-config.json。
  * 失败时先把带 ✗ 的行捞出来，再补输出尾部——省得在几百行日志里找。
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -79,13 +79,38 @@ function countCalls(logDir) {
   }
 }
 
+/**
+ * 杀掉某个端口上的监听进程。
+ *
+ * 为什么每个任务跑完要做这一步：任务里的脚本会 `ensureServer()` 起一个**游离**服务，
+ * 它在本任务结束后还活着。下一个任务、甚至下一轮验收，如果正好落在同一个端口上，
+ * `ensureServer` 只看代码指纹——指纹一致就把旧进程**当成自己的继续用**，
+ * 于是请求写到旧进程的 `LOG_DIR`（临时目录，多半已被删）。症状极具迷惑性：
+ * 任务里"一次真调都没发生"，而仓库日志里却多出几条来路不明的记录
+ * （2026-09-15 的 loss 项超时 10 分钟、真调 0 次，就是这个；单跑必过）。
+ */
+function killByPort(port) {
+  try {
+    const out = spawnSync('netstat', ['-ano'], { encoding: 'utf8' }).stdout || '';
+    const pids = new Set(out.split('\n')
+      .filter((l) => /LISTENING/i.test(l) && new RegExp(`:${port}\\s`).test(l))
+      .map((l) => l.trim().split(/\s+/).pop())
+      .filter((p) => /^\d+$/.test(p) && Number(p) !== process.pid));
+    for (const p of pids) { try { process.kill(Number(p)); } catch { /* 已经没了 */ } }
+    return pids.size;
+  } catch {
+    return 0;
+  }
+}
+
 function run(task, slot) {
   return new Promise((resolve) => {
+    const port = 3200 + slot;
     const logDir = path.join(TMP, `logs-${task.name}`);
     fs.mkdirSync(logDir, { recursive: true });
     const env = {
       ...process.env,
-      PORT: String(3200 + slot),
+      PORT: String(port),
       LOG_DIR: logDir,
       RUNTIME_CONFIG: path.join(TMP, `runtime-${task.name}.json`),
     };
@@ -95,7 +120,8 @@ function run(task, slot) {
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
     child.on('close', (code) => {
-      resolve({ ...task, code, ms: Date.now() - t0, out, calls: countCalls(logDir) });
+      const killed = killByPort(port);      // 交还端口：别让游离服务活到下一个任务/下一轮
+      resolve({ ...task, code, ms: Date.now() - t0, out, calls: countCalls(logDir), killed });
     });
   });
 }

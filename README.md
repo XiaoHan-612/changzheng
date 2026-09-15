@@ -1,6 +1,6 @@
 # 长征 · 抉择
 
-> 赛道二 AI 游戏 · 指定模型智谱 GLM（默认 `glm-5.3-flash`，可用 `glm-5.1` 替代）
+> 赛道二 AI 游戏 · 指定模型智谱 GLM（默认 `glm-5.1`；本机网络受限时用 `.env` 换成 `glm-5.3-flash`，日志 `model` 字段如实记录）
 > 网页端五幕 AI 科普互动游戏：暮色营地探索 → 抉择/小游戏 → 大模型裁决 → 史实回响 → 启程
 
 玩家以「过客」视角走进 1934–1936 年的长征关键节点：在营地画面里点光点附身，
@@ -48,10 +48,10 @@ npm start          # http://localhost:3001
 
 ```powershell
 cd changzheng
-npm run dev:check     # 开发快检：总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板（约 6 秒）
+npm run dev:check     # 开发快检：总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 输入框不吃快捷键 / 终局失败不空屏（约 7 秒）
 npm run verify:fast   # 提交前那一档：上面这些 + 动效 / 音频 / 素材 / 影音守卫，并行约 30 秒
 npm run verify:full   # 推送与交付前：真调那一档（e2e / av / sandbox / …），分钟级
-npm run test:unit     # 49 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏
+npm run test:unit     # 53 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致
 npm run qa:smoke      # 标题 → 营地 → 一次互动（顺带断言用过的热点当场作废）
 npm run qa:board      # 玩法板体检：8 个玩法逐屏摆上板（板屏壳 / 数值签 / 契约标记）
 npm run test:e2e      # 五幕真调通关（约 76 次调用）+「不重复结算」等回归断言
@@ -59,7 +59,7 @@ npm run qa:sandbox    # 自由行军沙盘：两回合 + 存档恢复
 npm run qa:regress    # 沙盘监听泄漏 / 存档回合错位
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫
-npm run qa:bus        # 总线守卫：模块化规则（四条）+ 内核运行时体检
+npm run qa:bus        # 总线守卫：模块化规则（六条）+ 内核运行时体检
 ```
 
 ## 重新生成策划文档

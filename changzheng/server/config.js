@@ -61,7 +61,9 @@ export const CONFIG = {
 
 export function saveRuntimeConfig(patch) {
   const next = { ...runtime, ...patch };
-  // 不把空字符串当成清除——允许显式清空 key 时传 null
+  // 清除与保留的语义分开：**空字符串 = 清除这一项**（设置里清空输入框就是清空），
+  // null / undefined = 没给这一项，保持原值（也会从文件里删掉，不留 `"X": null` 这种垃圾）。
+  // 早先注释写反了（说"传 null 清空"），而实现只认空字符串——注释已按实际行为改正。
   for (const k of Object.keys(next)) {
     if (next[k] === null || next[k] === undefined) delete next[k];
   }
@@ -72,7 +74,9 @@ export function saveRuntimeConfig(patch) {
   if ('GLM_API_URL' in patch) CONFIG.GLM_API_URL = patch.GLM_API_URL ?? CONFIG.GLM_API_URL;
   if ('GLM_REASONING_EFFORT' in patch) CONFIG.GLM_REASONING_EFFORT = patch.GLM_REASONING_EFFORT ?? CONFIG.GLM_REASONING_EFFORT;
   if (patch.GLM_API_KEY === '') CONFIG.GLM_API_KEY = '';
-  if (patch.GLM_MODEL === '') CONFIG.GLM_MODEL = 'glm-5.3-flash';
+  // 清空模型字段 = 回到**赛制指定的那个**（不是回到本机测试用的 flash）：
+  // 这里回退成 glm-5.3-flash 会让"清一下输入框"顺手把赛制口径换掉，评委问起来说不清（2026-09-15 修）
+  if (patch.GLM_MODEL === '') CONFIG.GLM_MODEL = 'glm-5.1';
   return {
     model: CONFIG.GLM_MODEL,
     reasoningEffort: CONFIG.GLM_REASONING_EFFORT,

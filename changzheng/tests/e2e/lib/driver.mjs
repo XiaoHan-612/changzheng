@@ -271,7 +271,14 @@ export async function playThrough(page, {
   for (;;) {
     const s = await snap(page);
     if (s.screens.includes('screen-end')) return { trace, seconds: Math.round((Date.now() - t0) / 1000), snapshot: s };
-    if (Date.now() - t0 > maxMs) throw new Error(`跑局超时 ${Math.round(maxMs / 60000)} 分钟`);
+    if (Date.now() - t0 > maxMs) {
+      // 超时也要带现场：只报"跑局超时 N 分钟"查不出它这十分钟在忙什么。
+      // 2026-09-15：loss 在编排器里超时 10 分钟、真调 0 次，就是靠这条定性的。
+      throw new Error(`跑局超时 ${Math.round(maxMs / 60000)} 分钟 · 最后一次快照：`
+        + `screen=${s.screens.join(',')} step=${s.step} kind=${s.kind} state=${s.state}`
+        + ` choices=${s.choices} cont=${s.cont} echo=${s.echoOk} mini=${s.mini}/${s.miniState}`
+        + ` apOn=${s.apOn} act=${s.act}｜最近动作：${trace.slice(-8).join(' → ')}`);
+    }
 
     const actKey = s.act || s.step.split(':')[0];
     if (actKey && actKey !== currentAct) {
