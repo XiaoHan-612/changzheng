@@ -31,7 +31,14 @@ const ART = path.join(ROOT, 'tests/e2e/artifacts');
 fs.mkdirSync(ART, { recursive: true });
 
 const acts = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/acts.json'), 'utf8'));
-const mainSrc = fs.readFileSync(path.join(ROOT, 'public/js/main.js'), 'utf8');
+// 批 7：main.js 在往 flow/* 拆——期望值从**整个流程层**静态解析，搬文件不必改这里
+const flowFiles = ['main.js', 'minigames.js', 'sandbox.js']
+  .concat(fs.existsSync(path.join(ROOT, 'public/js/flow'))
+    ? fs.readdirSync(path.join(ROOT, 'public/js/flow')).filter((f) => f.endsWith('.js')).map((f) => `flow/${f}`)
+    : []);
+const mainSrc = flowFiles
+  .map((f) => { try { return fs.readFileSync(path.join(ROOT, 'public/js', f), 'utf8'); } catch { return ''; } })
+  .join('\n');
 
 // 从 main.js 里取出各 CHOICE_SET 的舞台图（测试自己的期望值，不依赖运行时）
 function choiceImages() {
@@ -248,7 +255,7 @@ async function main() {
 
   // 8) 无声率：把 /api/tts 未命中的台词分类——固定台词（可预生成）vs AI 自由文本（结构性无声）
   const fixedSources = [
-    fs.readFileSync(path.join(ROOT, 'public/js/main.js'), 'utf8'),
+    mainSrc,
     fs.readFileSync(path.join(ROOT, 'public/js/minigames.js'), 'utf8'),
     fs.readFileSync(path.join(ROOT, 'public/js/ui.js'), 'utf8'),
     fs.readFileSync(path.join(ROOT, 'data/tts-lines.json'), 'utf8'),

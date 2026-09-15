@@ -38,7 +38,7 @@ import * as UI from './ui.js';
 import { setStep, setStepState, waitContinue, askChoice, markAction, choiceButton, activateChoice } from './step.js';
 // 内核：模块注册 / 事件总线 / 契约 / 只读快照 / 诊断（架构见 docs/BUS.md）。
 // 批 1 只把地基启动起来，业务模块从批 2 起逐个挂上来（见 wiring.js 的 MODULES 清单）。
-import { kernel, loadModules } from './kernel/index.js';
+import { kernel, loadModules, exposeDevFacade } from './kernel/index.js';
 
 const { $, showScreen, setTopbar,
   toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
@@ -386,9 +386,9 @@ function exposeSheetHooks() {
       return true;
     },
   };
-  // 登记进内核的统一入口（唯一真相），再挂到 window 供脚本使用
+  // 登记进内核的统一入口（唯一真相）；window.__czScreens 这个镜像由内核供出（批 7）
   kernel.screens.register(() => api);
-  window.__czScreens = api;
+  exposeDevFacade();     // 注册完再挂一次：这时才有东西可镜像
 }
 
 function bindChrome() {

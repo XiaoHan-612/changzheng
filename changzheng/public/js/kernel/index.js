@@ -40,15 +40,34 @@ export async function loadModules(list = MODULES) {
       console.warn(`[kernel] 模块「${item.name}」加载失败（跳过）：`, err && err.message);
     }
   }
+  // 挂上 dev 门面（__czKernel / __czModules）；__czScreens 要等 screens 的 api 注册后再补一次
+  // （组合根注册完会再调一次 exposeDevFacade，见 main.js 的 exposeSheetHooks）
+  exposeDevFacade();
   return loaded;
+}
+
+/**
+ * 把 dev 门面挂到 window：`__czKernel`（调试句柄）、`__czModules`（体检核对清单）、
+ * `__czScreens`（摆屏入口镜像）。
+ *
+ * 为什么归内核：这些是给脚本（qa:screens / qa:board / layout-audit / dev:check）用的**门面**，
+ * 不属于任何一块业务流程——批 7 把 main.js 拆成 flow/* 时，"谁来挂"本来是个假问题。
+ * 需要**在 screens 的 api 注册之后**再调一次（组合根注册完就调，见 main.js 的 exposeSheetHooks）。
+ */
+export function exposeDevFacade() {
+  if (typeof window === 'undefined') return;
+  window.__czKernel = kernel;
+  window.__czModules = MODULES;
+  // 注意 `register(() => api)` 记的是**工厂**：这里要调一下才拿到那本 api。
+  // （踩过：直接把函数当 api 挂上，脚本读 `__czScreens.face` 是 undefined，报的却是"没有这个入口"。）
+  const hook = kernel.screens?.get?.();
+  if (typeof hook === 'function') window.__czScreens = hook();
+  else if (hook) window.__czScreens = hook;
 }
 
 // 调试句柄：和 __czAudio 同级。事件流、已注册模块、契约违规、锁的持有者，一眼看清。
 // 排错入口：`__czKernel.state()` / `__czKernel.diag.dump()` / `__czKernel.diag.toJsonl()`
-if (typeof window !== 'undefined') {
-  window.__czKernel = kernel;
-  window.__czModules = MODULES;   // 体检用：核对「清单里的模块都真的注册上了」
-}
+exposeDevFacade();
 
 export { EVENTS, isEvent, checkPayload } from './contracts.js';
 export { MODULES } from './wiring.js';

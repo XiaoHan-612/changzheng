@@ -23,9 +23,26 @@ function checkFiles() {
   }
 }
 
-// 文档表格里的 xxx.jpg 清单 vs main.js 的 preloadScenes()
+/**
+ * 流程层的全部源码（main.js + flow/* + 各模块 + sandbox/minigames）。
+ *
+ * 批 7 起 main.js 在往 flow/* 拆——扫描一律走这里，别硬编码单个文件：
+ * 搬一次文件就要改三处扫描脚本，是这类拆分最容易留下的长期税（而且漏改会变成"扫不到 = 绿"）。
+ */
+function flowSrc() {
+  const dir = path.join(ROOT, 'public/js');
+  const files = ['main.js', 'sandbox.js', 'minigames.js', 'ai-client.js', 'ui.js', 'step.js'];
+  for (const sub of ['flow', 'modules/games', 'modules/ai', 'modules/shell', 'modules/hud', 'modules/screens', 'modules/state', 'modules/audio', 'kernel']) {
+    const d = path.join(dir, sub);
+    if (!fs.existsSync(d)) continue;
+    for (const f of fs.readdirSync(d)) if (f.endsWith('.js')) files.push(`${sub}/${f}`);
+  }
+  return files.map((f) => { try { return read(`public/js/${f}`); } catch { return ''; } }).join('\n');
+}
+
+// 文档表格里的 xxx.jpg 清单 vs preloadScenes() 的预热清单
 function checkSceneDropin() {
-  const main = read('public/js/main.js');
+  const main = flowSrc();
   const body = main.slice(main.indexOf('function preloadScenes'));
   const code = pick(body.slice(0, body.indexOf('].forEach')), /\/assets\/scenes\/([a-z_]+\.jpg)/g);
   const doc = pick(read('docs/HANDOFF-ART.md'), /^\| `([a-z_]+\.jpg)`/gm);
@@ -69,7 +86,7 @@ function checkTts() {
   }
 }
 
-// 立绘：HANDOFF-ART 承诺"落盘即生效"的角色 vs main.js 的 PORTRAIT_FILE 映射
+// 立绘：HANDOFF-ART 承诺"落盘即生效"的角色 vs PORTRAIT_FILE 映射（同样扫整个流程层）
 // 策划案里的初始数值 vs 代码：这两张表评委是拿来对着看的，漂了就成了"文档说一套、游戏跑一套"
 // （2026-09-15 发现：策划案写 体力75/信念65，代码早已调成 72/58，五项好感也全对不上）。
 async function checkInitialStats() {
@@ -117,7 +134,7 @@ function checkPortraitDropin() {
   }
   const para = md.slice(anchor).split('\n\n')[0];
   const doc = pick(para, /`([a-z_]+)`（/g);
-  const main = read('public/js/main.js');
+  const main = flowSrc();
   const body = main.slice(main.indexOf('const PORTRAIT_FILE'), main.indexOf('function portraitImage'));
   const code = pick(body, /\/assets\/characters\/([a-z_]+)\.png/g);
   const onlyDoc = doc.filter((x) => !code.includes(x));

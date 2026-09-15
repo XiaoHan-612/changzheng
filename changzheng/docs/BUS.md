@@ -147,7 +147,7 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | 4 | **state 挂总线** + 只读快照 + HUD 订阅渲染（消掉"绕纯函数直改字段"与"手工 render 配对"） | ✅ 已完成 |
 | 5 | **games 宿主变服务**（8 个玩法改成插件、清单一行可插）+ **sandbox 去 window 全局**（`ai:feed` 事件）+ 屏自清补齐 | ✅ 已完成（2026-09-15） |
 | 6 | **ai 挂总线**：registry（每类预算/温度/端点）+ run（唯一调用实现）+ 事件化（`ai:start/done/fail/verdict`）+ `qa:ai` 度量；**50 处手工 `showThinking` 与 24 处 `bumpAiCount` 收编** | ✅ 已完成（2026-09-15） |
-| 7 | `main.js` → `flow/*` 拆分；`__czScreens` 由内核供出；同步三个源码扫描脚本（check-handoff / av-audit / check-tts） | ⏳ |
+| 7 | `main.js` → `flow/*` 拆分；`__czScreens` 由内核供出；同步三个源码扫描脚本（check-handoff / av-audit / check-tts） | 🔄 拆前准备已完成（2026-09-15）：dev 门面归内核、三个扫描脚本改成扫**整个流程层**（以后搬文件不用再改它们）；`flow/*` 的搬迁进行中 |
 
 ## 七、怎么加东西（两个最常见）
 
