@@ -106,6 +106,23 @@ audio.speak({ text: '……', voiceId: 'laoban', actorId: 'laoban' })
 
 **已存在的预录台词**（21 条，`public/audio/voices/` + 索引 `voice-lines.json`）：老班长 hello/hook/soup、指导员 hello/path/grass、红小鬼 hello/home、卫生员 care、文化教员 school、船工 night、向导 lazikou、母亲 bye、湘江老兵 xj、新兵 msg，以及旁白 `narr_act_open/narr_echo/narr_night/narr_quiz/narr_rally/narr_snow`。这些不用重做。
 
+### 五点半、语音的"回声"与控制（批 A，2026-09-15）
+
+语音通道现在会把自己在干什么**发到总线上**，不再"发射后不管"（细节见 [`AUDIO-SYSTEM.md`](AUDIO-SYSTEM.md) §六点一）：
+
+```text
+voice:start    {durationMs}       开始出声（0 = 元数据还没到）
+voice:progress {t, duration}      约 10Hz；t = 已播毫秒 ← 终局升华逐字跟读的唯一时钟
+voice:ended    {interrupted}      播完 / 被打断 / 出错三条路都发
+voice:stop     （反向请求）        跳过升华时连音频一起停
+```
+
+对配音侧只有一句要求：**音频多长都行，流程一定跟着它走**。等待上限按 `时长 × 1.2 + 3s` 自适应
+（硬顶 90s），所以整段朗诵几十秒不会被截断；**音频缺失时逐字退化成固定节奏**，红线「不放音频也不阻塞流程」照旧。
+
+另外修了一处静默故障：没有音色时前端回落算的 id 与服务端 `/api/tts` 的默认曾是两个值（`'narr'` vs `'default'`），
+缓存名（`sha1('音色|文本')`）会分岔、永远命不中——现在 `qa:audio` 会核对这两处。
+
 ## 六、产线 ④ BGM（章节/场景各不同）——**唯一待产线，等额度恢复后执行**
 
 > 需求（用户 2026-09-13 确认）：不只是台词有声音，整体要有背景音乐，且不同章节、不同场景不一样。

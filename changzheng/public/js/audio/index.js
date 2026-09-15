@@ -8,7 +8,11 @@
  *   audio.scene('title' | 'luding' | 'ending')   // 不在幕轴上的独立场景
  *   audio.sfx('click');                      // 关键时机②：交互（名字见 sfx-table.js；同名文件落盘即覆盖合成音）
  *   await audio.speak({ text, actorId });    // 关键时机③：台词（预置 → TTS 缓存 → 静默）
+ *   audio.voiceStop();                       // 关键时机③b：停当前台词（跳过时连音频一起停）
  *   audio.setMuted(true);                    // 关键时机④：静音开关（取消即按意图恢复）
+ *
+ * 语音的"回声"（开播/进度/收尾）不是回头去问门面，而是 `modules/audio` 把它转成
+ * `voice:start / voice:progress / voice:ended` 事件——逐字跟读就是订阅这三条做的（见 kernel/contracts.js）。
  *
  * 硬规矩（由 scripts/check-audio.mjs 强制）：`public/js/` 里除 `audio/` 之外，
  * 不许出现 `new Audio(` / `new AudioContext` / `volume =` / `gain.value =`，
@@ -17,11 +21,12 @@
  * 结构见 docs/AUDIO-SYSTEM.md：mix（值）→ core + channels（框架）→ scene/sfx 表（声明，批 2/3 落）。
  */
 import { AudioCore } from './core.js';
+import { MIX } from './mix.js';
 import { AmbientChannel, AMBIENT_FILE } from './channels/ambient.js';
 import { BgmChannel, BGM_FILE } from './channels/bgm.js';
 import { SfxChannel } from './channels/sfx.js';
 import { SFX_TABLE, SFX_NAMES, sfxFile } from './sfx-table.js';
-import { VoiceChannel, ACTOR_VOICE } from './channels/voice.js';
+import { VoiceChannel, ACTOR_VOICE, DEFAULT_VOICE } from './channels/voice.js';
 import { ACT_SOUNDS, DAY_SOUNDS, SCENE_SOUNDS, FALLBACK_SOUNDS, soundsFor } from './scene-table.js';
 
 export class Audio {
@@ -54,6 +59,12 @@ export class Audio {
 
   /** 台词：命中顺序 = 预置 wav → TTS 缓存 → 静默 */
   speak(line) { return this.voice.speak(line); }
+  /** 停当前台词（终局升华的"跳过"：一跳到底要连音频一起停）；没在播时无副作用 */
+  voiceStop() { this.voice.stop(); }
+  /** 语音通道状态快照（cinema 播放器与体检读它；业务别拿它做逻辑判断，那是事件的活） */
+  voiceState() { return this.voice.describe(); }
+  /** 可选语速档位（终局升华的 1x/1.5x）——值在 mix.js，别在业务里再抄一份 */
+  voiceRates() { return MIX.voice.rates.slice(); }
 
   /** 游戏内静音（顶栏 🔊）：停声、保留意图，取消即恢复 */
   setMuted(on) { this.core.setMuted(on); }
@@ -63,6 +74,13 @@ export class Audio {
 
   /** ctx 被自动播放策略挂起时的提示回调，由 main.js 注入 toast */
   onSuspended(fn) { this.core._onSuspendedHint = fn; }
+
+  /**
+   * 语音回声的出口：把框架内发生的事（`voice:start/progress/ended`）交给总线。
+   * 由 `modules/audio` 在 ready 时接线——**通道不认识总线**，回执只能从这一个口出。
+   * （漏接这行的症状很隐蔽：声音照响，只是没人收得到开播/进度/收尾，逐字跟读永远不动。）
+   */
+  onReport(fn) { this.core.onReport(fn); }
 
   /* ── 查询与调试（测试、体检、现场排查用） ── */
   isPlaying(name) { return this.core.isPlaying(name); }
@@ -78,5 +96,5 @@ audio.boot();
 // （muted / ctx / desired 该响什么 / actual 现在在响什么）
 window.__czAudio = audio;
 
-export { AMBIENT_FILE, BGM_FILE, SFX_TABLE, SFX_NAMES, sfxFile, ACTOR_VOICE };
+export { AMBIENT_FILE, BGM_FILE, SFX_TABLE, SFX_NAMES, sfxFile, ACTOR_VOICE, DEFAULT_VOICE };
 export { ACT_SOUNDS, DAY_SOUNDS, SCENE_SOUNDS, FALLBACK_SOUNDS, soundsFor };

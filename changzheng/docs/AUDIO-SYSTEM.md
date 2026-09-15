@@ -118,7 +118,30 @@ reconcile(): 让 actual 追上 desired —— 该起的起（带淡入）、该�
 | **ambient** | `.ogg → .wav → 合成兜底`；循环；切场景 800ms 淡入淡出 | **0.7**（实测：0.32 时只有 −37 dBFS，比一般游戏床低一档多，听不出在不在响；0.7 ≈ −28 dBFS） | 兜底**在审计里显式列出**（"正在兜底"是可见状态，不是静默） |
 | **bgm** | `public/audio/bgm/<kind>_bgm.ogg`；60–120s 可循环；起播 1.2s 淡入 | ~0.18（低于环境床） | 语音播放时 duck 到 40%；**文件未产出时该场景只放环境床**（静默、记账在 `state().actual.bgm.missing` 与 `qa:audio`），落盘即生效 |
 | **sfx** | **注册表**（`sfx-table.js`）：`public/audio/sfx/<name>.ogg` 有文件就用文件，否则走合成配方；未知名字告警 + 通用音 | ~0.85 | ≤0.4s；同名 60ms 节流；文件探测**懒执行 + 负缓存**（整场只探一次） |
-| **voice** | 预置目录 `voice-lines.json` → TTS 缓存 `/api/tts` → 静默 | 1.0 | 新句打断旧句；播放期间闪避 BGM（最大）与环境床（轻） |
+| **voice** | 预置目录 `voice-lines.json` → TTS 缓存 `/api/tts` → 静默 | 1.0 | 新句打断旧句；播放期间闪避 BGM（最大）与环境床（轻）；**带事件与控制**（见下） |
+
+### 六点一、语音回声与控制（批 A，2026-09-15）
+
+语音不再是"发射后不管"：`VoiceChannel._playFile` 是唯一出声实现，也是 `voice:*` 事件的唯一来源。
+
+| 事件 | 载荷 | 谁在用 |
+|---|---|---|
+| `voice:start` | `{ durationMs }`（0 = 元数据还没到） | 终局升华的播放器知道"确有声、多长" |
+| `voice:progress` | `{ t, duration }`，**约 10Hz** | **逐字跟读的唯一时钟**（只认已播毫秒，不自造第二个） |
+| `voice:ended` | `{ interrupted }`（自然播完 / 被打断 / 出错三条路都发） | 收尾一律以它为准，别等 `start` 配对 |
+| `voice:stop`（反向） | — | 跳过终局升华时连音频一起停（`audio.voiceStop()`） |
+
+三条实现要点：
+
+1. **收尾一定落地**：`stop()` 除了停声，还会 settle 上一次 `speak()` 的 Promise 并发 `voice:ended`——
+   老实现里被顶替的那句永远不 resolve，当时没人 `await` 才没暴露（坑 48）。
+2. **等待上限自适应**：`duration × 1.2 + 3000ms`，再套 `waitCeilingMs = 90s` 硬顶（整段朗诵几十秒，
+   12s 硬顶会截断）；**时长未知**时才用 `maxWaitMs = 12s` 兜底。
+3. **语速可调**：`speak({ rate })` 落到元素的 `playbackRate`；档位表是 `mix.js` 的 `MIX.voice.rates = [1, 1.5]`，
+   不在表里的值一律回落 1（业务不许随手传没验过的档）。读法走 `kernel.api('audio').voiceRates()`。
+
+这条通道也是 `.gitignore` 里朗诵音频那条线的前提：**音频缺失时整套流程照走**（`voice:ended` 照发，
+升华退化成固定节奏逐字），红线「任何音频都不允许阻塞流程」不因新功能破例。
 
 ---
 
@@ -170,6 +193,13 @@ reconcile(): 让 actual 追上 desired —— 该起的起（带淡入）、该�
   实时回显 `state()`；页面**只 import 门面**，听到的就是游戏里播的）
 - 守卫：`qa:av` 新增**同时播放峰值 ≤1**（叠音/孤儿，对应不变量①）；4xx 分流（未产出=信息）已在批 2 落地
 - 验收：全绿 + 试听页人耳过一遍（`http://127.0.0.1:3001/dev/audio.html`）
+
+**批 4 · 语音回声与控制**（✅ 已完成 2026-09-15，动画批 A 的地基）
+- 已落地：契约登记 `voice:start/progress/ended/stop`；`_playFile` 重写（时长/进度/收尾/语速/自适应等待，
+  且 `stop()` 一定 settle）；`core.onReport` 作为"框架 → 总线"的唯一出口（由 `modules/audio` 接线）；
+  门面补 `voiceStop()/voiceState()/voiceRates()`；修好默认音色分岔（前端 `'narr'` vs 服务端 `'default'`，
+  `qa:audio` 现在会核对这两处，防再次分岔）
+- 守卫：`qa:av` 断言三条事件真的在流 + `ended` 不落单 + 载荷是数字（`语音事件_*` 三行进了报告）
 
 ---
 

@@ -190,8 +190,25 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 宿主（`modules/games/index.js`）替你开屏、写题名与背景、写数值签、声明自动化契约、收尾清理。
 **加玩法不必碰 `main.js`、内核或别的模块**——`npm run dev:check` 与 `npm run qa:board` 会告诉你哪一步没做全。
 
-## 八、暂时搁置（接口已预留）
+## 八、电影化三处（动画批次，接口已按此预留）
 
-电影化的开场/幕间过渡、终局结算电影、诗朗诵逐字——它们是挂在这套总线上的后续模块
-（`flow:act-enter`、`ai:request`、`voice:say` + 内核时钟）；届时的做法是新增 `modules/cinema/`，
-不改现有模块。设计稿留在对话与 `docs/AUDIO-SYSTEM.md` 的思路里，待发话再上。
+开场引导 / 每章过渡 / 终局结算与升华，共用**一个拍子播放器 + 一套拍子词汇**：新增 `modules/cinema/`
+（`index.js` 描述符 · `player.js` 唯一播放实现 · `beats.js` 拍子词汇 · `sequences.js` 三处编排），
+全部复用 `#screen-cutscene`（`tpl-title`，0% 纸面），**不新增屏、不新增 callType、不动 `#btn-cut-skip`
+与 `data-step-kind='cutscene'` 这九处脚本依赖的契约**。
+
+| 批 | 内容 | 状态 |
+|---|---|---|
+| A | **地基：语音通道事件-控制**（无可见变化）：契约登记 `voice:start/progress/ended/stop`；语音通道重写成带时长/进度/语速的通道；门面补 `voiceStop()/voiceState()/voiceRates()`；修默认音色分岔 | ✅ 已完成（2026-09-15） |
+| B | **诗与素材**：`data/poem.json`（8 句 + 出处 + 每句时间轴）；字体缺字（`逶/迤/礴`）补字符集重跑 `fonts:build`；朗诵音频落 `public/audio/poem/`（gitignore）；`qa:audio` 按需放宽到 mp3 | ⏳ 待做 |
+| C | **完整序章**：黑场题字 → 路线图 → 出身 → 告别空镜（接在 `flow/act.js` 的 `runOrigin()` 之前）；`quick` 只留题字一拍 | ⏳ 待做 |
+| D | **幕间过渡**：`flow/act.js` 的 `runCutscene` 退位给 `cinema.play('act-break')`，`marchTransition` 降级为拍子间的连接件 | ⏳ 待做 |
+| E | **终局结算 + 升华**：结算面板照旧，升华为独立整屏（空镜 → 8 句逐字跟音频 → 钤印）；自动播 + 可跳过 + 1x/1.5x；**失败分支不演** | ⏳ 待做 |
+
+拍子词汇**封闭**（风格一致靠它）：`title` 题字 · `map` 路线图点亮 · `photo` 空镜+字幕逐字 ·
+`poem` 逐句逐字跟音频 · `seal` 钤印收束；每种都有减动效降级。
+
+批 A 之后，语音的"回声"是**事件**而不是"回头问门面"：`voice:start {durationMs}` /
+`voice:progress {t,duration}`（~10Hz）/ `voice:ended {interrupted}` / `voice:stop`（反向请求）。
+逐字跟读只认 `voice:progress` 里的已播毫秒**一个时钟**；`qa:av` 会断言这三条真的在流、收尾不落单
+（见 [`AUDIO-SYSTEM.md`](AUDIO-SYSTEM.md) 的「语音回声」）。

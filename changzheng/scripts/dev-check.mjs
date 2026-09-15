@@ -137,6 +137,11 @@ await step('内核启动', async () => {
       badDescriptor: kind('bad-descriptor'),
       apiMiss: kind('api-miss'),
       loadErrors: problems.filter((p) => p.kind === 'module-load-error').map((p) => p.module),
+      // 内核会"捕获并跳过"模块 init/ready 抛的错——不报错、不崩，功能却静默少一块。
+      // 批 A 就踩过：audio 的 ready 抛了一句 TypeError，声音照响，但开播/进度/收尾事件全没了。
+      softErrors: problems
+        .filter((p) => ['init-error', 'ready-error', 'subscriber-error'].includes(p.kind))
+        .map((p) => `${p.kind} ${p.module || p.event || ''} ${p.message || ''}`.trim()),
       registered: st.modules.map((m) => m.name),
       expected: (window.__czModules || []).map((m) => m.name),
       snapshotFrozen: Object.isFrozen(kk.snapshot.get()),
@@ -151,6 +156,7 @@ await step('内核启动', async () => {
   assert(k.badDescriptor === 0, `坏描述符 ${k.badDescriptor} 个`);
   assert(k.apiMiss === 0, `取接口失败 ${k.apiMiss} 次`);
   assert(k.loadErrors.length === 0, `模块加载失败：${k.loadErrors.join('、')}（wiring.js 里的路径写错了？）`);
+  assert(k.softErrors.length === 0, `模块 init/ready/订阅者抛错（内核已跳过，功能会静默少一块）：${k.softErrors.join('；')}`);
   const missing = k.expected.filter((n) => !k.registered.includes(n));
   assert(missing.length === 0, `清单里的模块没注册上：${missing.join('、')}`);
   assert(k.snapshotProvided && k.snapshotFrozen, '只读快照没接上或没冻结');

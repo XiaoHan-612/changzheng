@@ -23,6 +23,20 @@ export class AudioCore {
     this._booted = false;
     this._hintShown = false;
     this._onSuspendedHint = null;         // 由 index.js 注入（弹一次提示，避免 core 依赖 UI）
+    this._onReport = null;                // 同上：把框架内发生的事转成总线事件的唯一出口
+  }
+
+  /**
+   * 事件回执出口（由 modules/audio 在 ready 时注入）：`report(name, payload)` → 总线事件。
+   *
+   * core 与各通道都不认识总线，这是**唯一**出口——别在别处再开一条"手工通道"
+   * （音频的进度/收尾要能被总线上的模块订阅，逐字跟读就靠它；见 kernel/contracts.js 的 voice:*）。
+   */
+  onReport(fn) { this._onReport = fn; }
+
+  /** 报一条框架内的事件（没注入回执时是 no-op；回执抛错不许影响声音） */
+  report(name, payload) {
+    try { this._onReport?.(name, payload); } catch { /* 回执失败不影响声音 */ }
   }
 
   /** 建 ctx 与四条总线（只建一次）；ctx 被挂起时顺手恢复 */

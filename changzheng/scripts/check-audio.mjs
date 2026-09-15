@@ -28,6 +28,16 @@ const notes = [];
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const TTS_HASH = (voice, text) => crypto.createHash('sha1').update(`${voice}|${text}`).digest('hex').slice(0, 16);
 
+/**
+ * 默认音色：`/api/tts` 的缓存文件名 = sha1(`音色|文本`) + 音色，所以"没指定音色时算哪个 id"
+ * 是**双方约定的一部分**——服务端算 'default'、前端算 'narr' 的话哈希对不上，缓存永远命中不了。
+ * 这里把两处抠出来对一下（以前脚本自己硬写 'narr'，正是这条约定悄悄分岔的地方）。
+ */
+const DEFAULT_VOICE = {
+  server: (read('server/index.js').match(/voiceId = '([^']+)'/) || [])[1] || '',
+  client: (read('public/js/audio/channels/voice.js').match(/export const DEFAULT_VOICE = '([^']+)'/) || [])[1] || '',
+};
+
 /** 收集所有音频文件（按目录分类） */
 function listAudio() {
   const out = [];
@@ -61,7 +71,7 @@ function references() {
   for (const l of voiceLines) voices.add(path.basename(l.file));
   const cache = new Set();
   const ttsLines = JSON.parse(read('data/tts-lines.json')).lines || [];
-  for (const l of ttsLines) cache.add(`${TTS_HASH(l.voiceId || 'narr', l.text)}_${l.voiceId || 'narr'}.wav`);
+  for (const l of ttsLines) cache.add(`${TTS_HASH(l.voiceId || DEFAULT_VOICE.client, l.text)}_${l.voiceId || DEFAULT_VOICE.client}.wav`);
   return { ambient: new Set([...ambient, ...ambientAlt]), bgm, voices, cache, voiceLines, ttsLines };
 }
 
@@ -152,6 +162,12 @@ async function main() {
     if (!have.has(b)) problems.push(`voice-lines.json 指向不存在的文件：${b}`);
   }
   for (const name of refs.cache) if (!have.has(name)) problems.push(`data/tts-lines.json 对应的缓存缺失：${name}（重跑 npm run tts:manifest 对照）`);
+  // 默认音色两处必须一致（否则哈希分岔，缓存永远命中不了）——顺手防"守卫自己被改成永远绿"
+  if (!DEFAULT_VOICE.server || !DEFAULT_VOICE.client) {
+    problems.push(`读不出默认音色（服务端 ${DEFAULT_VOICE.server || '?'} / 前端 ${DEFAULT_VOICE.client || '?'}）——check-audio 的正则与代码写法对不上了（守卫不能静默失效）`);
+  } else if (DEFAULT_VOICE.server !== DEFAULT_VOICE.client) {
+    problems.push(`默认音色不一致：服务端 '${DEFAULT_VOICE.server}'、前端 '${DEFAULT_VOICE.client}' —— sha1 会算出两个文件名，TTS 缓存永远命中不了`);
+  }
   for (const r of byDir('bgm')) {
     if (!Object.values(mapOf(read('public/js/audio/channels/bgm.js'), BGM_ENTRY)).some((u) => path.basename(u) === r.file)) {
       problems.push(`${r.url} 没有任何 BGM_FILE 映射指向它 → 永远播不到`);

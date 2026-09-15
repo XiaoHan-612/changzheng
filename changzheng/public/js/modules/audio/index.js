@@ -12,9 +12,13 @@
  *   flow:act-enter {actId,day,label} → audio.scene({act:{id},label})   幕轴上的场景（含第四幕分日）
  *   scene:enter    {name}            → audio.scene(name)               独立场景 title/luding/ending
  *   sfx:play       {name}            → audio.sfx(name)
- *   voice:say      {text,actorId,…}  → audio.speak({…})
+ *   voice:say      {text,actorId,…,rate} → audio.speak({…})             台词（rate 是语速档位）
+ *   voice:stop                       → audio.voiceStop()               停当前台词（跳过终局升华）
  *   audio:toggle-mute                → audio.setMuted(!muted) → 回执 audio:muted
  *   （audio:suspended 由音频框架的 onSuspended 回调转出：ctx 起不来时提示用户点一下）
+ *
+ * 反向：语音通道的"回声"（开播/进度/收尾）经 `audio.onReport` 转成
+ * `voice:start` / `voice:progress` / `voice:ended` 发到总线上——逐字跟读订阅这三条，不去问门面。
  */
 import { audio, ACT_SOUNDS, DAY_SOUNDS, SCENE_SOUNDS, SFX_NAMES, BGM_FILE } from '../../audio/index.js';
 
@@ -26,6 +30,7 @@ export default {
     'scene:enter': 'onSceneEnter',
     'sfx:play': 'onSfx',
     'voice:say': 'onVoice',
+    'voice:stop': 'onVoiceStop',
     'audio:toggle-mute': 'onToggleMute',
   },
 
@@ -34,8 +39,10 @@ export default {
     isPlaying: (channel) => audio.isPlaying(channel),
     /** 音频框架的内部状态快照（debug 面板与 qa:av 用） */
     state: () => audio.state(),
-    /** 场景表（给"想知道这一幕该放什么"的模块，例如将来的过场/电影模块） */
+    /** 场景表（给"想知道这一幕该放什么"的模块，例如过场/电影模块） */
     scenes: () => ({ ACT_SOUNDS, DAY_SOUNDS, SCENE_SOUNDS, BGM_FILE, sfx: SFX_NAMES }),
+    /** 可用语速档位（终局升华的 1x/1.5x 从这里取，别在业务里再抄一份数） */
+    voiceRates: () => audio.voiceRates(),
   },
 
   init(kernel) {
@@ -46,6 +53,8 @@ export default {
     // ctx 被自动播放策略挂起：音频框架给回调，这里转成事件，由 UI 决定怎么提示
     // （以前是 main.js 注入 toast 回调用，那条"手工通道"就此取消）
     audio.onSuspended((message) => kernel.emit('audio:suspended', { message }));
+    // 语音通道的回声（开播/进度/收尾）→ 总线事件：逐字跟读、体检、诊断都订阅这几条
+    audio.onReport((name, payload) => kernel.emit(name, payload));
   },
 
   /** 幕轴上的场景：进营地/换幕时发（第四幕按天带 label：雪山 / 草地） */
@@ -63,7 +72,13 @@ export default {
   },
 
   onVoice(p) {
-    audio.speak({ text: p.text, actorId: p.actorId, voiceId: p.voiceId, file: p.file }).catch(() => {});
+    audio.speak({ text: p.text, actorId: p.actorId, voiceId: p.voiceId, file: p.file, rate: p.rate }).catch(() => {});
+    // 注意：speak 是"发射出去就不管"的（播完/被打断都会 resolve）。要跟播放进度，**订阅** voice:progress，
+    // 别 await 它——await 只能等到"结束"，做不出逐字跟读。
+  },
+
+  onVoiceStop() {
+    audio.voiceStop();
   },
 
   onToggleMute() {

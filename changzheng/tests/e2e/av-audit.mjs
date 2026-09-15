@@ -130,6 +130,28 @@ async function main() {
   // 页面加载前埋点：媒体播放、WebAudio 音源、以及 /api/tts 的每一次请求与命中结果
   await page.addInitScript(() => {
     window.__av = { media: [], sfx: 0, tts: [], live: [], maxLive: 0 };
+    // 语音回声（批 A 的新地基）：元素在响 ≠ 事件在流。终局的逐字跟读订阅 voice:progress，
+    // 所以这里从诊断环形缓冲按游标抽走 voice:*（环只有 800 条，300ms 抽一次追得上），
+    // 拿到的是"事件真的发出来了、载荷里有数"——不是"元素在响"的推断。
+    window.__av.voice = { start: [], progress: 0, ended: [], badPayload: 0 };
+    let cursor = 0;
+    setInterval(() => {
+      const k = window.__czKernel;
+      if (!k || !k.diag) return;
+      for (const e of k.diag.events({ since: cursor })) {
+        if (e.i > cursor) cursor = e.i;
+        const p = e.payload || {};
+        if (e.event === 'voice:start') {
+          window.__av.voice.start.push(p.durationMs);
+          if (typeof p.durationMs !== 'number') window.__av.voice.badPayload += 1;
+        } else if (e.event === 'voice:progress') {
+          window.__av.voice.progress += 1;
+          if (typeof p.t !== 'number' || typeof p.duration !== 'number') window.__av.voice.badPayload += 1;
+        } else if (e.event === 'voice:ended') {
+          window.__av.voice.ended.push(!!p.interrupted);
+        }
+      }
+    }, 300);
     // 叠音/孤儿检查：记录"此刻还在播的元素"，按 src 前缀分类统计峰值
     const snapshotLive = () => {
       const live = window.__av.live.filter((e) => !e.paused && !e.ended);
@@ -317,6 +339,15 @@ async function main() {
   for (const [u, ok] of Object.entries(decodable)) if (!ok) problems.push(`TTS 音频无法解码：${u}`);
   if (!ambientOk.length) problems.push('整局没有一次成功的环境床播放（说明全在走合成兜底）');
   if (voicePlays.length === 0) problems.push('整局没有播放过任何语音（预录与 TTS 都没响）');
+  // 5b) 语音回声：逐字跟读的时间基准只来自 voice:progress，收尾只认 voice:ended——
+  //     缺任何一条，终局升华那屏要么没时钟（逐字不动）、要么永远等不到收尾（卡住不让走）
+  const ve = av.voice || { start: [], progress: 0, ended: [], badPayload: 0 };
+  if (ve.start.length === 0) problems.push('整局没有一条 voice:start —— 语音事件的回执通道没通（modules/audio 的 onReport 没接上？）');
+  if (ve.start.length > 0 && ve.progress === 0) problems.push('有 voice:start 却一条 voice:progress 都没有 —— 逐字跟读没有时钟可用');
+  if (ve.ended.length < ve.start.length - 1) {
+    problems.push(`voice:ended（${ve.ended.length}）跟不上 voice:start（${ve.start.length}）—— 有句子不落地，await 它的流程会挂住`);
+  }
+  if (ve.badPayload) problems.push(`voice:* 事件载荷里有 ${ve.badPayload} 处不是数字（durationMs / t / duration）—— 消费方算不出时间轴`);
   if (av.sfx < 10) problems.push(`音效链路可疑：整局只创建了 ${av.sfx} 个音源`);
   // 不变量①（AUDIO-SYSTEM §五）：**同一通道**最多一个句柄在播 —— 孤儿元素/重复播放会在这里露头
   const over = Object.entries(liveCheck.byChannel).filter(([, n]) => n > 1);
@@ -331,6 +362,10 @@ async function main() {
     文字头像角色_按设计无立绘: [...textAvatarNpcs],
     环境床成功播放: `${ambientOk.length}/${ambientPlays.length}`,
     语音播放次数: voicePlays.length,
+    语音事件_开播: ve.start.length,
+    语音事件_进度: ve.progress,
+    语音事件_收尾: `${ve.ended.filter(Boolean).length} 被打断 / ${ve.ended.filter((x) => !x).length} 自然播完`,
+    语音事件_首句时长ms: ve.start.find((d) => d > 0) ?? 0,
     TTS命中地址数: ttsUrls.size,
     TTS全部可解码: ttsCheck.every((t) => t.status === 200) && Object.values(decodable).every(Boolean),
     语音行数: ttsCalls.length,
