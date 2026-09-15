@@ -124,7 +124,7 @@ sandbox / regress / failure PASS · av AUDIT PASS · tokens/frames/tone/handoff 
 | P2 | 沙盘多智能体偏轻 | NPC 有 goal 与 3 条记忆，但没有「目标推进」的主动事件 |
 | P2 | 操作音效仍是合成 | click/hook/echo 等由 WebAudio 合成；是否预录看路演音质要求 |
 | P2 | 封装未定型 | 一键启动（`start.bat` + 便携 Node）见 [`DELIVERY.md`](DELIVERY.md)，演示前收口 |
-| P3 | 终局屏小字偏淡 | `#end-report` 里几处用 `.muted`(#8d8474)，在纸面上对比度约 **2.9:1**（正文级偏淡）。终局失败那句已改正常墨色；报告块属设计层选择，改前先看整体观感（见 HANDOFF-CODE 坑 41） |
+| P3 | ~~终局屏小字偏淡~~ | 已修（2026-09-15）：次要文字改由**材料**决定墨色——纸面 `--ink-note` 5.3:1、墨纱 `--paper-dim`，`qa:tone` 加了比值与结构断言。见 HANDOFF-CODE 坑 44 |
 | P3 | 离线回放（备选） | 现场无网/额度耗尽的风险预案，见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)，**未开发** |
 
 ## 四、接着干的话，从哪儿下手

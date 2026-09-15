@@ -43,6 +43,48 @@ for (const [name, p] of Object.entries(papers)) {
   console.log(`  ${name}: 墨字 ${rInk.toFixed(2)}:1 · 对插画暗部 ${rArt.toFixed(2)}:1 · 对插画亮部 ${rLight.toFixed(2)}:1 ${flags.length ? '← ' + flags.join('，') : ''}`);
 }
 
+// 次要文字：主字够了，次要字也会"发虚看不清"（研学报告里那种说明句就吃过这个亏）。
+//
+// 为什么在这里而不是另开脚本：qa:tone 本来就是"字可读"这一条的归属地，比值算法也在这。
+// 这一组守两件事：
+//   ① 纸面上**允许**的那一档（--ink-note）必须够读（≥4.5，正文级）；
+//   ② --muted 只许用在暗底——它是为暗底定的，落在纸上只有 1.86:1；而"纸面里自动换墨"
+//      这件事必须真的写在 CSS 里（framework.css 的覆盖被删掉，纸面上的 .muted 会静默退回发虚）。
+//   其余墨档只报数不判红（.blk-note 那类小字 4:1 上下属已知取舍，改它要动更多视觉）。
+{
+  const notes = {
+    'ink-note（纸面次要文字）': tok('ink-note'),
+    'ink-1': tok('ink-1'),
+    'ink-2': tok('ink-2'),
+    'muted（暗底次要文字）': tok('muted'),
+  };
+  const PAPER = tok('paper-1');
+  const DARK = tok('bg');            // 暗底基准（墨纱/顶栏坐在它上面）
+  console.log('\n次要文字对比度（纸面 paper-1 / 暗底 bg，正文级要求 ≥4.5）：');
+  for (const [name, hex] of Object.entries(notes)) {
+    if (!hex) { problem.push(`tokens.css 里找不到 ${name.split('（')[0]} 的色值`); continue; }
+    const rp = ratio(hex, PAPER);
+    const rd = ratio(hex, DARK);
+    const flags = [];
+    if (name.startsWith('ink-note')) {
+      if (rp < 4.5) { flags.push('纸面上不够读'); problem.push(`--ink-note 对纸面只有 ${rp.toFixed(2)}:1（要求 ≥4.5）`); }
+    }
+    if (name.startsWith('muted')) {
+      if (rd < 4.5) { flags.push('暗底上不够读'); problem.push(`--muted 对暗底只有 ${rd.toFixed(2)}:1（要求 ≥4.5）`); }
+      if (rp >= 4.5) flags.push('（它现在纸上也够读了，可以考虑合并回一档）');
+      else flags.push(`纸上仅 ${rp.toFixed(2)}:1 —— 靠材料切换兜住`);
+    }
+    console.log(`  ${name.padEnd(24)} 纸面 ${rp.toFixed(2)}:1 · 暗底 ${rd.toFixed(2)}:1 ${flags.length ? '← ' + flags.join('，') : ''}`);
+  }
+  const fw = fs.readFileSync(path.join(ROOT, 'public/css/framework.css'), 'utf8');
+  if (!/--muted:\s*var\(--ink-note\)/.test(fw)) {
+    problem.push('纸面材料没有把 --muted 换成 --ink-note（framework.css 那条覆盖被删了？纸面上的 .muted 会退回 1.86:1）');
+  }
+  if (!/--muted:\s*var\(--paper-dim\)/.test(fw)) {
+    problem.push('墨纱材料没有把 --muted 换成 --paper-dim（墨纱里的次要文字会发黑看不清）');
+  }
+}
+
 // 面积指标：逐页截图的纸色像素占比
 if (fs.existsSync(REPORT)) {
   const rep = JSON.parse(fs.readFileSync(REPORT, 'utf8'));

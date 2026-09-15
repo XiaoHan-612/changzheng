@@ -139,6 +139,18 @@
 .ink-surface .blk-lead { margin: 0; }        /* 题字条里不需要段落下边距 */
 .ink-surface .blk-note { border-left-color: var(--gold-soft); }
 
+/* 次要文字按**材料**换墨（不是逐处改调用点）：
+   `.muted` 一直读 `var(--muted)`，而 `--muted` 那一档是给暗底定的——落在纸面上只有 1.86:1
+   （实测，对 --paper-veil），研学报告里「可以带孩子重点看腊子口…」那种说明句会发虚看不清。
+   于是在纸面内把 `--muted` 重定义为 `--ink-note`（约 5.3:1），墨纱内重定义为 `--paper-dim`。
+   好处：调用点照旧写 `.muted`、不必知道自己在什么表面上；将来新写的也自动是对的；
+   嵌套时由**最内层材料**决定（墨纱嵌在纸面里也正确）。
+   与上面 .blk-stat / .ink-surface 是同一套思路，别退回"逐处改颜色"。 */
+.panel, .sheet, .journal, .echo-cinema, .cut-caption-wrap,
+.sb-feed, .quiz-panel, .night-panel, .end-panel, .ai-inspector, .paper-surface,
+.tpl-body.paper { --muted: var(--ink-note); }
+.ink-surface { --muted: var(--paper-dim); }
+
 .blk-choice-list { display: flex; flex-direction: column; gap: var(--sp-2); }
 .blk-choice {
   display: flex; align-items: center; gap: var(--sp-3); width: 100%;

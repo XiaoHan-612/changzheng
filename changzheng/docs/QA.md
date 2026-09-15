@@ -23,7 +23,7 @@
 |------|------|----------|
 | `npm run dev:check` | **批次中间的快检**：总线静态规矩 + 单元测试 + 文档一致性 + 页面侧（内核 boot/契约违规 0/模块全注册/快照冻结/开局到营地且 HUD 与存档一致/两个玩法挂得上/离开板屏清空/输入框不吃快捷键/终局失败不空屏/无 pageerror） | 9 步全 ✓，约 7 秒，0 次真调 |
 | `npm run test:unit` | 资源钳制、史实解锁、附身线门控、行动点、每日场景、失败判定、AI 响应契约、减员规则、数值护栏、同伴与好感一致 | **53/53** 通过 |
-| `npm run qa:tokens` · `qa:frames` · `qa:tone` · `qa:motion` | 设计系统守卫：颜色/字体/圆角无新增字面量、页面只用模板与区块、纸面面积在预算内、五个标准动效真的挂上 | 全部通过（口径见 [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md)） |
+| `npm run qa:tokens` · `qa:frames` · `qa:tone` · `qa:motion` | 设计系统守卫：颜色/字体/圆角无新增字面量、页面只用模板与区块、**纸面/暗底的次要文字对比度**（含"材料切换真的写在 CSS 里"的结构断言）、纸面面积在预算内、五个标准动效真的挂上 | 全部通过（口径见 [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md)） |
 | `npm run qa:screens -- <批次>` | 逐页截图 + 纸面占比 + 联系表（加 `--width 820` 出窄屏版） | 该批页面逐张出图，占比 ≤35% |
 | `npm run qa:smoke` | 标题→营地→热点→回营地；含**静音→取消静音后环境床恢复**断言 | SMOKE PASS |
 | `npm run test:e2e` | 五幕**真调**通关（约 76 次调用）+ 各玩法恰好 1 次 + 不重复结算 | E2E FULL PASS，`source=GLM`，无 pageerror（gomoku 偶尔落空时失败信息会带「营地历次热点」） |
