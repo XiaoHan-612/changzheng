@@ -18,6 +18,22 @@ export function replayAnim(el, cls) {
   el.classList.add(cls);
 }
 
+/**
+ * 这个按键事件是不是"正在输入"里发出的？
+ *
+ * 全局顺手键（1–9 选项、J 手记）必须让开输入框，否则：在设置里改 API 地址时敲到 j
+ * 会弹出「手记」，敲到 1–9 甚至会点掉底下的选项；沙盘里写行动时同理。
+ * 组字中（`isComposing`）也算"正在输入"——中文输入法打拼音时数字/字母是候选选择键，
+ * 抢了它，玩家连字都打不完（这条是中文项目的必备判断，英文项目一般不会踩）。
+ */
+export function isTypingTarget(e) {
+  if (e?.isComposing) return true;
+  const t = e?.target;
+  if (!t || !t.tagName) return false;
+  return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT'
+    || t.isContentEditable === true;
+}
+
 /** 屏幕入场动效：按模板选标准效果（题字/世界面板只淡入；纸卷与抽屉上滑；中央面板墨显） */
 const ENTRANCE = {
   'tpl-title': 'anim-fade',
@@ -32,6 +48,24 @@ const ENTRANCE = {
 /** 该屏里"要入场"的那一层：模板内容盒，其次各屏幕自己的内容面（题字卡、纸卷、面板、抽屉、侧栏） */
 function entranceTarget(el) {
   return el.querySelector('.tpl-body, .title-card, .sheet, .panel, .journal, .echo-cinema, .sb-world, .cut-caption-wrap, .hud-left');
+}
+
+/**
+ * 一个屏的**内容面**：能承载"临时插一行东西"的那个盒子（面板 / 纸卷 / 模板内容盒 / 世界面板…）。
+ *
+ * 为什么不能直接把行插进 `<section class="screen">`：屏的背景层（`.end-bg` / `.pano-img` /
+ * `.quiz-bg` …）都是 `position:absolute; inset:0`，插在 section 里的东西会被它盖住——
+ * **看得见、点不到**。终局屏的「重试／跳过」就这么废过：模型一失败，玩家卡在"结算中…"，
+ * 连重试键都点不动（2026-09-15 用 elementFromPoint 定的性，见 HANDOFF-CODE 坑 41）。
+ *
+ * 与 `entranceTarget` 是两个用途、两张表，别合并：入场动效要的是"看起来该动的那一层"，
+ * 这里要的是"点得到的那一层"（营地屏两者就不一样：入场动的是侧栏，插行该插在底部操作区）。
+ */
+const FACE = '.tpl-body, .sheet, .panel, .title-card, .sb-world, .hud-bottom,'
+  + ' .cut-caption-wrap, .path-head, .journal, .echo-cinema';
+export function contentFace(screenEl) {
+  if (!screenEl || !screenEl.querySelector) return screenEl || null;
+  return screenEl.querySelector(FACE) || screenEl;
 }
 
 /**

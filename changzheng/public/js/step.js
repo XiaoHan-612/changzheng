@@ -140,6 +140,27 @@ export function markAction(el, action) {
   return el;
 }
 
+/**
+ * 键盘数字键激活第 n 个选项（1 起）——**契约元素的查询只写在这一处**。
+ *
+ * 以前这段查询写在 main.js 的 keydown 里，和"哪些元素算选项"这个契约知识分了家：
+ * 契约在 step.js（`choiceButton` 产出 `data-choice-index` + `.kbd-hint` 序号），
+ * 查询却在别处硬拼选择器。以后新增一种选项容器（比如某个新玩法），要改的也是这里。
+ *
+ * 判可见用 `offsetParent`：`disabled` 与屏/浮层隐藏都不算候选。
+ * @returns {boolean} 是否真的点到了（没候选时返回 false，调用方据此决定要不要出声）
+ */
+export function activateChoice(n) {
+  const rows = [...document.querySelectorAll(
+    '.choice-row:not(.hidden) .blk-choice:not([disabled]), #stage-panel .blk-choice:not([disabled]),'
+    + ' #fire-opts .blk-choice:not([disabled]), #quiz-body .blk-choice:not([disabled]), .path-zone'
+  )].filter((el) => el.offsetParent !== null);
+  const el = rows[n - 1];
+  if (!el) return false;
+  el.click();
+  return true;
+}
+
 /** 小游戏容器统一声明契约 */
 export function markMini(host, name, state = 'awaiting') {
   if (!host) return host;

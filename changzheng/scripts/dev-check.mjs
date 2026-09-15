@@ -156,7 +156,25 @@ await step('内核启动', async () => {
   assert(missing.length === 0, `清单里的模块没注册上：${missing.join('、')}`);
   assert(k.snapshotProvided && k.snapshotFrozen, '只读快照没接上或没冻结');
   assert(k.heldLocks === 0, `启动后还占着锁：${k.heldLocks} 把`);
-  return `${k.registered.length} 个模块 · 事件流 ${k.events} 笔 · 快照已冻结`;
+
+  // 「临时插一行」（模型失败时的重试/跳过）会插到哪儿？落到 <section class="screen"> 就会被
+  // 背景层（position:absolute; inset:0）盖住 = 看得见点不到——终局的重试键就这么废过。
+  // 这里用真实现 __czScreens.face() 逐屏核对，不在脚本里抄一份选择器。
+  const faces = await page.evaluate(() => {
+    const api = window.__czScreens;
+    if (!api?.face) return [{ 屏: '(没有 __czScreens.face)', 落到: '(缺)', 危险: true }];
+    return [...document.querySelectorAll('.screen')].map((sec) => {
+      const face = api.face(sec);
+      const bg = [...sec.children].some((c) => {
+        const cs = getComputedStyle(c);
+        return cs.position === 'absolute' && (cs.inset === '0px' || cs.zIndex !== 'auto');
+      });
+      return { 屏: sec.id, 落到: face === sec ? '(退回 section)' : (face.id || face.className.split(' ')[0]), 危险: face === sec && bg };
+    });
+  });
+  const risky = faces.filter((f) => f.危险).map((f) => f.屏);
+  assert(!risky.length, `这些屏插行会落到 section、被背景层盖住：${risky.join('、')}`);
+  return `${k.registered.length} 个模块 · 事件流 ${k.events} 笔 · 全屏可插行`;
 });
 
 await step('开局到营地', async () => {
@@ -179,8 +197,20 @@ await step('开局到营地', async () => {
   assert(camp.hotspots >= 3, `营地热点只有 ${camp.hotspots} 个（该有 3 个以上）`);
   assert(camp.journey >= 5, `行程节点只有 ${camp.journey} 个`);
   assert(camp.locks === 0, `进营地流程结束后还占着 ${camp.locks} 把锁（withLock 没释放）`);
+
+  // HUD 读数必须等于存档：出身/开场问答改的是五维资源，写路一旦绕过状态模块就不会广播，
+  // HUD 会停在旧数字上（实测选完出身：存档体力 72→77，界面还写着 72）。这条断言守的就是那一类。
+  const drift = await page.evaluate(() => {
+    const s = JSON.parse(sessionStorage.getItem('czjc_demo_state_v1') || 'null');
+    const hud = (document.getElementById('stats') || {}).textContent || '';
+    if (!s) return ['读不到存档'];
+    return ['体力', '粮食', '士气', '信念', '民心']
+      .filter((k) => !hud.includes(`${k}${s[k]}`))
+      .map((k) => `${k}: 存档 ${s[k]}，HUD 里没有`);
+  });
+  assert(!drift.length, `HUD 与存档对不上（说明有写入没广播）——${drift.join('；')}`);
   assert(errs.length === before, `这一步新增报错：${errs.slice(before).join(' | ')}`);
-  return `热点 ${camp.hotspots} 个 · 行程 ${camp.journey} 节 · step=${camp.step || '?'}`;
+  return `热点 ${camp.hotspots} 个 · 行程 ${camp.journey} 节 · HUD 与存档一致`;
 });
 
 await step('玩法板挂得上', async () => {
@@ -222,6 +252,61 @@ await step('玩法板挂得上', async () => {
   assert(left.body === '', '离开板屏后玩法区还有残留节点');
   assert(left.locks === 0, `离开板屏后还占着 ${left.locks} 把锁`);
   return results.join(' · ');
+});
+
+await step('输入框不吃快捷键', async () => {
+  assert(!bail, '上一步没过');
+  // 全局顺手键（1–9 选项、J 手记）必须让开输入框：设置里的地址含 j 是常态，
+  // 沙盘里写行动也常带数字——抢键的后果是"打个字弹出浮层、顺手点掉底下的选项"。
+  await page.evaluate(() => document.getElementById('btn-settings').click());
+  await page.waitForTimeout(150);
+  await page.click('#set-url');
+  const valBefore = await page.inputValue('#set-url');
+  await page.keyboard.type('j8', { delay: 30 });
+  const typed = await page.evaluate(() => ({
+    val: document.getElementById('set-url').value,
+    journal: !document.getElementById('screen-journal').classList.contains('hidden'),
+  }));
+  assert(typed.val.includes('j8') && typed.val.length === valBefore.length + 2,
+    `在输入框里打的字没有原样进去（前 "${valBefore}" → 后 "${typed.val}"）`);
+  assert(!typed.journal, '在输入框里打 j 弹出了「手记」浮层（快捷键没让开输入框）');
+  // Esc 是浏览器惯例：在输入框里也要能关浮层
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+  const closed = await page.evaluate(() => document.getElementById('screen-settings').classList.contains('hidden'));
+  assert(closed, 'Esc 在输入框里关不掉浮层（这条是浏览器惯例，不该被输入判定连坐）');
+  return '打字不进浮层 · Esc 仍可关';
+});
+
+await step('终局失败也不空屏', async () => {
+  assert(!bail, '上一步没过');
+  // 把 /api/decide 打回失败，逼出「模型没返回终局总评」这条路：界面该明说 + 给重试，而不是空壳结算。
+  await page.route('**/api/decide', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{"ok":false,"error":"dev-check 故意失败"}' }));
+  await page.evaluate(() => window.__czScreens.end());
+  await page.waitForSelector('[data-action="ai-skip"]', { timeout: 15000 });
+  // 关键：这个键必须**真的点得到**。屏的背景层是 position:absolute; inset:0，
+  // 交互行一旦插错地方就会被它盖住——看得见、点不到，玩家永远卡在"结算中…"（真踩过）。
+  const reachable = await page.evaluate(() => {
+    const b = document.querySelector('[data-action="ai-skip"]');
+    const r = b.getBoundingClientRect();
+    const top = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+    return { ok: top === b || b.contains(top), top: top ? (top.id || top.className) : '(null)' };
+  });
+  assert(reachable.ok, `「跳过」键被盖住了（该点最上层是 ${reachable.top}）——玩家点不动`);
+  await page.click('[data-action="ai-skip"]');
+  await page.waitForTimeout(400);
+  const end = await page.evaluate(() => ({
+    title: (document.getElementById('end-title').textContent || '').trim(),
+    paras: (document.getElementById('end-paras').textContent || '').trim(),
+    retry: !!document.querySelector('[data-action="end-retry"]'),
+    rel: (document.getElementById('end-rel').textContent || '').trim().length,
+  }));
+  await page.unroute('**/api/decide');
+  assert(end.title === '结算未完成', `终局失败时标题是「${end.title}」，应该是「结算未完成」`);
+  assert(end.paras.length >= 20, '终局失败时没有给出任何说明（玩家只看到空屏）');
+  assert(end.retry, '终局失败时没有「重新结算」的入口');
+  assert(end.rel > 0, '终局失败时连本局关系都没渲染（这部分不依赖模型）');
+  return '键点得到 · 明说 + 可重试 · 关系照旧';
 });
 
 await step('全程无报错', async () => {

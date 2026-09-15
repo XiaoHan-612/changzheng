@@ -55,10 +55,12 @@ async function callAI(payload) {
 function actionHost() {
   const visible = [...document.querySelectorAll('.screen')].find((s) => !s.classList.contains('hidden'));
   if (!visible) return document.body;
+  // 落到"内容面"而不是 section 本身：屏的背景层是 position:absolute; inset:0，
+  // 插在 section 里的行会被它盖住（看得见、点不到）——终局的重试键就这么废过。
   return visible.querySelector('#night-body')
     || visible.querySelector('#stage-panel')
     || visible.querySelector('#sheet-actions')
-    || visible;
+    || contentFace(visible);
 }
 
 /** 调用失败时给「重试 / 跳过」两个明确选择（不再自动编造内容） */
@@ -118,7 +120,7 @@ function setJudgeMode(on) {
 import { runFishing, runNightSchool, runCandy, runSentry, runGomoku, runBendNeedle, runLuding, runGrab } from './minigames.js';
 import { bindSandbox } from './sandbox.js';
 import * as UI from './ui.js';
-import { setStep, setStepState, waitContinue, askChoice, markAction, markMini, choiceButton } from './step.js';
+import { setStep, setStepState, waitContinue, askChoice, markAction, markMini, choiceButton, activateChoice } from './step.js';
 // 内核：模块注册 / 事件总线 / 契约 / 只读快照 / 诊断（架构见 docs/BUS.md）。
 // 批 1 只把地基启动起来，业务模块从批 2 起逐个挂上来（见 wiring.js 的 MODULES 清单）。
 import { kernel, loadModules } from './kernel/index.js';
@@ -126,7 +128,7 @@ import { kernel, loadModules } from './kernel/index.js';
 const { $, showScreen, setTopbar,
   toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
   flashEffects, setAiMode, typeText, escapeHtml, renderLogs, renderFacts,
-  showOverlay, hideOverlay, replayAnim, wipe, bindParallax } = UI;
+  showOverlay, hideOverlay, replayAnim, wipe, bindParallax, isTypingTarget, contentFace } = UI;
 
 /**
  * 状态与它的别名：
@@ -139,7 +141,7 @@ const st = () => kernel.api('state');
 let S = null;
 let allFacts = {};
 let actsData = null;
-let config = { model: 'glm-5.3-flash', hasKey: false };
+let config = { model: 'glm-5.1', hasKey: false };   // 占位：真值由 /api/config 覆盖（赛制指定 glm-5.1）
 let echoResolve = null;
 let talkPending = false;
 
@@ -156,9 +158,10 @@ function step(id, kind = 'choice', state = 'awaiting') {
 const _imgState = new Map();
 function sceneImage(primary, fallback) {
   if (!primary) return fallback;
-  const st = _imgState.get(primary);
-  if (st === true) return primary;
-  if (st === false) return fallback;
+  // 别叫 st：外层 `st()` 是取 state 模块的助手，同名会互相遮蔽（历史上真撞过一次，改名 cached）
+  const cached = _imgState.get(primary);
+  if (cached === true) return primary;
+  if (cached === false) return fallback;
   const img = new Image();
   img.onload = () => _imgState.set(primary, true);
   img.onerror = () => _imgState.set(primary, false);
@@ -441,6 +444,12 @@ function exposeSheetHooks() {
     // 答题 / 篝火夜 / 终局：都太长（要走到深幕），截图时直接跑各自的**真实流程**，
     // 由截图脚本在中途等（不另写一套渲染，理由同 fire）。
     quiz: () => { if (S) runQuiz(currentActDef()); },
+    // 「临时插一行会插到哪儿」——给体检脚本用真实现（别在脚本里再抄一份选择器：
+    // 抄一份就有两个真相，改了一处另一处照旧绿；内容面的来龙去脉见 ui.js contentFace）
+    face: (el) => {
+      const target = el || [...document.querySelectorAll('.screen')].find((s) => !s.classList.contains('hidden'));
+      return contentFace(target);
+    },
     night: () => {
       if (!S) return;
       // 篝火夜的门槛是"点亮 ≥3 条附身线"；截图只需要过门槛，内容仍由模型现场生成
@@ -519,23 +528,24 @@ function bindChrome() {
   if (jBtn) jBtn.onclick = () => openJournal();
   const jClose = $('btn-journal-close');
   if (jClose) jClose.onclick = () => hideOverlay('screen-journal');
-  // 快捷键：1/2/3 选项，J 手记，Esc 关闭浮层
+  // 快捷键：1–9 选项、J 手记、Esc 关浮层。
+  //
+  // 两类键的规矩不一样：**Esc 是浏览器惯例**，在输入框里也得能关掉浮层
+  // （只有输入法组字中的 Esc 是"取消组字"，不抢）；而 1–9 与 J 是"顺手键"，
+  // 正在输入时一律不抢——否则在设置里改 API 地址敲到 j 会弹出「手记」、
+  // 在沙盘里写行动敲到数字会点掉屏幕上的选项（2026-09-15 修，见 HANDOFF-CODE 坑 40）。
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (e.isComposing) return;                    // 输入法组字中：这一下是"取消组字"
       ['screen-journal', 'screen-defense', 'screen-logs', 'screen-facts', 'screen-settings', 'screen-fire', 'screen-how']
         .forEach((id) => hideOverlay(id));
       return;
     }
+    if (isTypingTarget(e)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return; // 组合键留给浏览器（复制/粘贴/开发者工具）
     if (e.key.toLowerCase() === 'j' && S) { openJournal(); return; }
     const n = Number(e.key);
-    if (n >= 1 && n <= 9) {
-      const rows = [...document.querySelectorAll('.choice-row:not(.hidden) .blk-choice:not([disabled]), #stage-panel .blk-choice:not([disabled]), #fire-opts .blk-choice:not([disabled]), #quiz-body .blk-choice:not([disabled]), .path-zone')]
-        .filter((el) => el.offsetParent !== null);
-      if (rows[n - 1]) {
-        kernel.emit('sfx:play', { name: 'click' });
-        rows[n - 1].click();
-      }
-    }
+    if (n >= 1 && n <= 9 && activateChoice(n)) kernel.emit('sfx:play', { name: 'click' });
   });
 }
 
@@ -711,7 +721,7 @@ async function openSettings() {
   const cfg = await fetchConfig();
   config = cfg;
   const sel = $('set-model');
-  sel.innerHTML = (cfg.availableModels || ['glm-5.3-flash', 'glm-5.1'])
+  sel.innerHTML = (cfg.availableModels || ['glm-5.1', 'glm-5.3-flash'])
     .map((m) => `<option value="${m}" ${m === cfg.model ? 'selected' : ''}>${m}</option>`)
     .join('');
   const custom = $('set-model-custom');
@@ -863,7 +873,15 @@ async function runOrigin() {
   setStagePanel('<p class="hint">队伍就要出发了。先说说你自己——这一条只决定你的起点。</p>'
     + '<div class="choices" id="origin-opts"></div>');
   const picked = await askChoice($('origin-opts'), ORIGINS.map((o) => ({ label: o.label, sub: o.sub })));
-  const { origin, changes } = applyOrigin(S, ORIGINS[picked.index]?.id);
+  // 走 state 模块的 apply（而不是直接 applyOrigin(S, …)）：直接改不广播 state:change，
+  // HUD 于是停在旧数字上——实测选完出身，存档体力 72→77 而界面还写着 72（2026-09-15 修）。
+  // keys 用 effects 的键：HUD 的 PARTS 表按这些键决定重画哪几块。
+  const wantOrigin = findOrigin(ORIGINS[picked.index]?.id);
+  const { origin, changes } = st().apply(
+    '出身',
+    (s) => applyOrigin(s, wantOrigin?.id),
+    ['出身', ...Object.keys(wantOrigin?.effects || {})],
+  ) || {};
   if (!origin) return;                      // 理论上不会发生：选项由 ORIGINS 生成
   flashEffects(changes);
   st().pushCampLog('出发', `你是${origin.label}：${origin.sub}。`);
@@ -872,7 +890,11 @@ async function runOrigin() {
   step('origin:quiz', 'choice');
   setStagePanel(`<p class="hint">${escapeHtml(ORIGIN_QUIZ.question)}</p><div class="choices" id="origin-quiz"></div>`);
   const ans = await askChoice($('origin-quiz'), ORIGIN_QUIZ.options.map((label) => ({ label })));
-  const quiz = applyOriginQuiz(S, ans.index);
+  const quiz = st().apply(
+    '开场问答',
+    (s) => applyOriginQuiz(s, ans.index),
+    ['originQuiz', ...Object.keys(ORIGIN_QUIZ.effects || {})],
+  ) || {};
   if (quiz.right) flashEffects(quiz.changes);
   setStagePanel(`<p class="hint">${quiz.right ? '答对了。' : '记住了。'}${escapeHtml(ORIGIN_QUIZ.explain)}</p>`);
   st().pushCampLog('出发', `${quiz.right ? '答对' : '答错'}：${ORIGIN_QUIZ.explain}`);
@@ -1209,7 +1231,7 @@ const LINE_NAMES = {
 };
 const LINES_TOTAL = Object.keys(LINE_NAMES).length;
 
-function markLine(_state, key) {
+function markLine(key) {
   if (!LINE_NAMES[key]) return;
   if (st().markLine(key)) {
     st().pushCampLog('附身线', `点亮「${LINE_NAMES[key]}」（${st().linesDone()}/${LINES_TOTAL}）`);
@@ -1507,7 +1529,7 @@ async function doSchool() {
   const op = await runNightSchool(mountMini(board, 'school', 'school-host'), { stats: board.stats });
   showScreen('screen-stage');                         // 结算回到对白屏：人物 + 叙事 + 继续
   st().remember('tonightPassword', op.detail?.password || '瑞金');
-  markLine(S, 'school');
+  markLine('school');
   showThinking(true);
   let result;
   try {
@@ -1541,7 +1563,7 @@ async function doCandy() {
   const op = await runCandy(mountMini(board, 'candy', 'candy-host'), { stats: board.stats });
   showScreen('screen-stage');
   st().remember('sugarPlan', op.detail || null);
-  markLine(S, 'candy');
+  markLine('candy');
   showThinking(true);
   let result;
   try {
@@ -1576,7 +1598,7 @@ async function doSentry() {
   const op = await runSentry(S.tonightPassword, mountMini(board, 'sentry', 'sentry-host'), { stats: board.stats });
   showScreen('screen-stage');
   st().remember('sentryScore', op.score);
-  markLine(S, 'sentry');
+  markLine('sentry');
   showThinking(true);
   let result;
   try {
@@ -1611,7 +1633,7 @@ async function doGomoku() {
   const board = openBoard({ title: '泥地五子棋', bg: '/assets/scenes/camp_pano.jpg' });
   const op = await runGomoku(mountMini(board, 'gomoku', 'gomoku-host'), { stats: board.stats });
   showScreen('screen-stage');
-  markLine(S, 'gomoku');
+  markLine('gomoku');
   showThinking(true);
   let result;
   try {
@@ -1755,7 +1777,7 @@ async function doFishing(act, forced) {
   const op = await runFishing(mountMini(board, 'fishing', 'fish-host'), { stats: board.stats });
   showScreen('screen-stage');
   st().remember('fishingBest', Math.max(S.fishingBest || 0, op.score));
-  markLine(S, 'fishing');
+  markLine('fishing');
   showThinking(true);
   let result;
   try {
@@ -2067,6 +2089,20 @@ async function runQuiz(act) {
   } finally {
     showThinking(false);
   }
+  // 出题失败（玩家点了跳过／两次重试用尽）：**明说 + 跳过本题**，本节双方都不计分。
+  // 以前会拿"题目 /（题目选项缺失）"当一道真题继续走：玩家答一道不存在的题，
+  // 还要再烧 3 次调用（两个 AI 作答 + 判分）才能过去（2026-09-15 修，见 HANDOFF-CODE 坑 41）。
+  if (!q || q._error) {
+    // 用 blk-body（正常墨色、正文字号）：这句是玩家要读的正文，`.muted`/`.blk-note`
+    // 在纸面上都偏淡（约 2.9:1），放主信息里看不清
+    body.innerHTML = `<p class="blk-body">这一题没能出出来：模型没有返回题目。本题跳过、双方都不计分，原因已记入日志。</p>
+      <div class="blk-actions"><button type="button" class="btn primary" id="quiz-next" data-action="continue">继续</button></div>`;
+    markAction($('quiz-next'), 'continue');
+    setStepState('awaiting');
+    await new Promise((r) => { $('quiz-next').onclick = () => { $('quiz-next').onclick = null; r(); }; });
+    await afterJudge({ narrative: '本节出题未成，双方均不计分。' }, `知识对决 · ${act.title}`, act.facts?.[0]);
+    return;
+  }
   body.innerHTML = `
     <p class="blk-body">${escapeHtml(q.question || '题目')}</p>
     <div class="blk-choice-list" id="quiz-opts"></div>
@@ -2328,6 +2364,34 @@ async function runEnding() {
   } finally {
     showThinking(false);
   }
+  // 模型没给终局总评（玩家点了「跳过」/两次重试都用尽）：**明说 + 可重试**，不摆一个空壳结算。
+  // 以前这里直接用 end.xxx，失败了整屏只剩一个标题、没有正文也没有说明——终局是最容易被看到的一屏，
+  // 空屏等于翻车（2026-09-15 修，见 HANDOFF-CODE 坑 41）。
+  if (!end || end._error) {
+    $('end-eyebrow').textContent = '终局';
+    $('end-title').textContent = '结算未完成';
+    const box = $('end-paras');
+    // 这句是玩家在这屏上唯一要读的内容，用正常墨色：`.muted`(#8d8474) 在纸面上只有约 2.9:1，
+    // 那是给暗底 HUD 的次要标注用的，放在正文里会看不清（实测于 2026-09-15 的截图）。
+    box.innerHTML = '<p>模型没有返回这段终局总评。原因已记入日志：可在「设置 → 测试连接」复查 Key，'
+      + '或翻「记录」看失败详情。</p>';
+    const again = document.createElement('button');
+    again.type = 'button';
+    again.className = 'btn primary';
+    again.textContent = '重新结算';
+    markAction(again, 'end-retry');
+    again.addEventListener('click', () => {
+      again.remove();
+      showThinking(true);
+      runEnding();
+    });
+    box.appendChild(again);
+    $('end-history').innerHTML = '';
+    $('end-rel').innerHTML = renderRelations();   // 本局资源与关系照旧给全（它们不依赖模型）
+    $('end-personal').textContent = '';
+    bindEndActions(null);
+    return;
+  }
   $('end-eyebrow').textContent = `终局 · ${end.ending_id || ''}`;
   $('end-title').textContent = end.title || '长征之后';
   for (const t of end.paragraphs || []) {
@@ -2336,7 +2400,7 @@ async function runEnding() {
     await typeText(p, t, 14);
   }
   $('end-history').innerHTML = (end.history_points || []).map((h) => `<li>${escapeHtml(h)}</li>`).join('');
-  $('end-rel').innerHTML = COMPANIONS.map((c) => `${c.name}：${S[`好感_${c.name}`] ?? 40}`).join('<br/>');
+  $('end-rel').innerHTML = renderRelations();
   $('end-personal').textContent = end.personal || '';
   // 研学报告（课后复盘用；对外不出现行业与场景口径，见 docs/PITCH.md）
   try {
@@ -2361,21 +2425,36 @@ async function runEnding() {
     showThinking(false);
   }
 
-  const copyBtn = $('btn-copy-report');
-  if (copyBtn) {
-    copyBtn.onclick = () => {
-      const r = S.lastReport;
-      const text = [
-        `《长征·抉择》研学报告 — ${end.title || ''}`,
-        r?.summary || '',
-        '史实：' + (r?.knowledge || []).join('；'),
-        '价值：' + (r?.values || []).join('；'),
-        r?.suggest || '',
-      ].join('\n');
-      navigator.clipboard?.writeText(text).then(() => toast('报告已复制')).catch(() => toast('复制失败'));
-    };
-  }
+  bindEndActions(end);
   toast('全主线完成 · 可打开行军记录', 4000);
+}
+
+/**
+ * 终局屏的收尾按钮：报告没生成也不能留一个"点了没反应"的键。
+ * 以前「复制报告」的 onclick 在正常路径里现绑、闭包里带着本局的 `end`；
+ * 一旦走了失败分支就会留着**上一局**的闭包（复制出来的是旧内容），所以统一在这里绑。
+ * @param {object|null} end 终局总评；null = 这一局没生成
+ */
+function bindEndActions(end) {
+  const copyBtn = $('btn-copy-report');
+  if (!copyBtn) return;
+  if (!end) {
+    copyBtn.disabled = true;
+    copyBtn.onclick = null;
+    return;
+  }
+  copyBtn.disabled = false;
+  copyBtn.onclick = () => {
+    const r = S.lastReport;
+    const text = [
+      `《长征·抉择》研学报告 — ${end.title || ''}`,
+      r?.summary || '',
+      '史实：' + (r?.knowledge || []).join('；'),
+      '价值：' + (r?.values || []).join('；'),
+      r?.suggest || '',
+    ].join('\n');
+    navigator.clipboard?.writeText(text).then(() => toast('报告已复制')).catch(() => toast('复制失败'));
+  };
 }
 
 function publicState() {
