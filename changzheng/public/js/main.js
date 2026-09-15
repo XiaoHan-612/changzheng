@@ -29,9 +29,21 @@ import { kernel, loadModules, exposeDevFacade } from './kernel/index.js';
 // 流程层的共用地基（批 7）：状态读写、模型调用、步骤契约、只读上下文、记流水
 import {
   S, hasS, st, gamesApi, callAI, step, waitBtn, publicState, currentActDef,
-  logChoice, logShare, markDone, isDone, LINE_NAMES, LINES_TOTAL,
+  logChoice, logShare, markLine, markDone, isDone, LINE_NAMES, LINES_TOTAL,
   getActsData, setActsData, getFacts, setFacts, getConfig, setConfig,
 } from './flow/kit.js';
+// 「看」的那一摊：素材探测 / 立绘 / 行程 / 夜色（批 7 二·2）
+import {
+  sceneImage, portraitImage, showNpc, preloadScenes,
+  renderJourney, updateDusk, bindLantern, originText,
+} from './flow/view.js';
+// 史实回响（每步之后的三栏；被 20 多处调用）
+import { showEcho, afterJudge, bindEcho } from './flow/echo.js';
+// 叶子组（批 7 二·4）：数据表 / 玩法流程 / 对决 / 篝火夜
+import { CHOICE_SETS, REPEATABLE_HOTSPOTS } from './flow/tables.js';
+import { doSchool, doCandy, doSentry, doGomoku, doGrab, doRoster, doFishing, doLuding } from './flow/games-flow.js';
+import { runQuiz } from './flow/quiz.js';
+import { runNightChoice, nightContext } from './flow/night.js';
 
 const { $, showScreen, setTopbar,
   toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
@@ -39,7 +51,6 @@ const { $, showScreen, setTopbar,
   showOverlay, hideOverlay, replayAnim, wipe, bindParallax, isTypingTarget, contentFace, actionHost } = UI;
 
 
-let echoResolve = null;
 let talkPending = false;
 
 /** 声明当前步骤：全项目统一的交互契约入口（见 step.js） */
@@ -48,212 +59,11 @@ let talkPending = false;
  * 生图模型按 docs/HANDOFF-ART.md 的表把文件放进 public/assets/scenes/，
  * 无需改任何代码，下一次进入对应场景就会用上。
  */
-const _imgState = new Map();
-function sceneImage(primary, fallback) {
-  if (!primary) return fallback;
-  // 别叫 st：外层 `st()` 是取 state 模块的助手，同名会互相遮蔽（历史上真撞过一次，改名 cached）
-  const cached = _imgState.get(primary);
-  if (cached === true) return primary;
-  if (cached === false) return fallback;
-  const img = new Image();
-  img.onload = () => _imgState.set(primary, true);
-  img.onerror = () => _imgState.set(primary, false);
-  img.src = primary;
-  _imgState.set(primary, false); // 探测完成前先用兜底，避免白屏
-  return fallback;
-}
 
-/** 启动时预热候选素材，进入场景时就能立刻用上新图 */
-function preloadScenes() {
-  [
-    '/assets/scenes/sentry_night.jpg', '/assets/scenes/sugar_close.jpg', '/assets/scenes/snow_climb.jpg',
-    '/assets/scenes/snow_camp.jpg', '/assets/scenes/snow_let_clothes.jpg', '/assets/scenes/luding_bridge.jpg',
-    '/assets/scenes/jinsha_ferry.jpg', '/assets/scenes/map_desk.jpg', '/assets/scenes/depart_bridge.jpg',
-    '/assets/scenes/huining_flag.jpg', '/assets/scenes/lazikou_cliff.jpg',
-    '/assets/scenes/xiangjiang_bridge.jpg', '/assets/scenes/zunyi_street.jpg', '/assets/scenes/huining_crowd.jpg',
-    '/assets/scenes/luding_run.jpg', '/assets/scenes/luding_bridge.jpg', '/assets/scenes/jinsha_ferry.jpg',
-    '/assets/scenes/depart_crowd.jpg', '/assets/scenes/xiangjiang_wreck.jpg',
-    '/assets/scenes/xiangjiang_night.jpg', '/assets/scenes/zunyi_room.jpg',
-    '/assets/scenes/map_route.jpg', '/assets/scenes/echo_paper.jpg',
-    // 立绘（第三轮）：落盘即生效，见 portraitImage()
-    '/assets/characters/mother.png', '/assets/characters/xianggui.png', '/assets/characters/guide.png',
-    '/assets/characters/boatman.png', '/assets/characters/recruit.png', '/assets/characters/straggler.png',
-    '/assets/characters/drummer.png', '/assets/characters/captain.png', '/assets/characters/teacher.png',
-    '/assets/characters/wounded.png',
-  ].forEach((p) => {
-    const img = new Image();
-    img.onload = () => _imgState.set(p, true);
-    img.onerror = () => _imgState.set(p, false);
-    img.src = p;
-  });
-}
 
-/** 角色名 → 立绘文件（约定名，落盘即生效；没有就退回文字头像） */
-const PORTRAIT_FILE = {
-  老班长: '/assets/characters/laoban.png',
-  指导员: '/assets/characters/zhiyuan.png',
-  红小鬼: '/assets/characters/xiaogui.png',
-  卫生员: '/assets/characters/weisheng.png',
-  母亲: '/assets/characters/mother.png',
-  老乡: '/assets/characters/xianggui.png',
-  向导: '/assets/characters/guide.png',
-  船工: '/assets/characters/boatman.png',
-  新兵: '/assets/characters/recruit.png',
-  掉队的战士: '/assets/characters/straggler.png',
-  宣传员: '/assets/characters/drummer.png',
-  突击队长: '/assets/characters/captain.png',
-  文化教员: '/assets/characters/teacher.png',
-  担架伤员: '/assets/characters/wounded.png',
-};
 
-function portraitImage(name) {
-  if (!name) return undefined;
-  const key = Object.keys(PORTRAIT_FILE).find((k) => String(name).includes(k));
-  return key ? sceneImage(PORTRAIT_FILE[key], '') : undefined;
-}
 
-/**
- * NPC 立绘统一入口：专属立绘（PORTRAIT_FILE）→ 同伴立绘 → 文字头像。
- * 热点/抉择集只要写 npc 字段，新立绘落盘就自动生效，不用改这里。
- * 注意：同伴兜底必须放在专属立绘之后，否则"非同伴 NPC"会一律显示老班长的脸。
- */
-function showNpc(npc, { role, mood = '平静' } = {}) {
-  if (!npc) { setPortrait('你', role || '年轻战士', '你', mood); return; }
-  const comp = COMPANIONS.find((c) => npc.includes(c.name));
-  setPortrait(npc, role || comp?.role || '同行者', comp?.ava || npc.slice(0, 1), mood,
-    portraitImage(npc) || comp?.img);
-}
 
-const CHOICE_SETS = {
-  cross: {
-    title: '怎么过河',
-    callType: 'branch_judge',
-    img: '/assets/scenes/depart_bridge.jpg',
-    options: [
-      { label: '跟着队伍快走', sub: '跟上，别掉队' },
-      { label: '扶一把崴脚的战友', sub: '慢一点，拉他一把' },
-      { label: '帮老乡拆最后一块门板', sub: '桥要稳，民心也要稳' },
-    ],
-    factId: 'h_depart',
-  },
-  escort: {
-    title: '护送伤员过封锁',
-    callType: 'branch_judge',
-    img: '/assets/scenes/xiangjiang_bridge.jpg',
-    loss: { who: '担架上的伤员', reason: '为了抢时间冲过封锁，担架没能全部抬过去' },
-    options: [
-      { label: '立刻冲过去', sub: '快，但风险大', risk: 'high' },
-      { label: '等烟散了再走', sub: '稳，但更耗体力', risk: 'mid' },
-      { label: '绕浅滩', sub: '远一点，脚会湿', risk: 'low' },
-    ],
-    factId: 'h_xiangjiang',
-  },
-  direction: {
-    title: '往哪里走',
-    callType: 'branch_judge',
-    img: '/assets/scenes/map_desk.jpg',
-    options: [
-      { label: '要开个会，把方向定下来', sub: '信念向' },
-      { label: '听上面的就行', sub: '稳妥' },
-      { label: '我只想知道明天往哪走', sub: '小战士视角' },
-    ],
-    factId: 'h_zunyi',
-  },
-  ferry: {
-    title: '今夜能不能渡',
-    callType: 'branch_judge',
-    img: '/assets/scenes/jinsha_ferry.jpg',
-    // 抢渡是有代价的抉择：体力/粮食见底时硬渡，会有人留在江里
-    loss: { who: '木筏上的战士', reason: '抢在雾散前强渡，木筏撞上暗礁，有人没能上岸' },
-    options: [
-      { label: '跟船工的桨声走', sub: '信老乡', risk: 'mid' },
-      { label: '天亮再渡', sub: '更安全，更慢', risk: 'low' },
-      { label: '分批快渡，伤员先上', sub: '分工', risk: 'mid' },
-    ],
-    factId: 'h_jinsha',
-  },
-  let_clothes: {
-    title: '让出棉衣',
-    callType: 'share_judge',
-    options: [
-      { label: '把外衣让给发抖的战士', sub: '你冷，他更冷' },
-      { label: '两人挤一件走', sub: '一起扛' },
-      { label: '先赶到山顶再说', sub: '保存自己' },
-    ],
-    factId: 'h_xueshan',
-  },
-  lazikou: {
-    title: '腊子口怎么打',
-    callType: 'branch_judge',
-    img: '/assets/scenes/lazikou_cliff.jpg',
-    // 正面强攻从来不是零代价：这是全篇最后一个"会失去人"的抉择
-    loss: { who: '突击班里的战士', reason: '正面强攻腊子口，突击班没能全部下来' },
-    options: [
-      { label: '正面佯攻，侧崖奇袭', sub: '出其不意', risk: 'mid' },
-      { label: '集中火力正面强攻', sub: '硬碰硬', risk: 'high' },
-      { label: '找向导绕道', sub: '耗粮但稳', risk: 'low' },
-    ],
-    factId: 'h_huining',
-  },
-  rally: {
-    title: '会师',
-    callType: 'branch_judge',
-    img: '/assets/scenes/huining_flag.jpg',
-    options: [
-      { label: '跑过去和另一路兄弟拥抱', sub: '说不出话' },
-      { label: '先安顿伤员再会合', sub: '责任' },
-      { label: '把红旗插到高处', sub: '让所有人都看见' },
-    ],
-    factId: 'h_huining',
-  },
-  snow_help: {
-    title: '扶他一把',
-    callType: 'branch_judge',
-    img: '/assets/scenes/snow_climb.jpg',
-    npc: '掉队的战士',
-    npcRole: '雪山掉队',
-    loss: { who: '掉队的战士', reason: '风雪里他没能跟上，队伍在天黑前下不了山' },
-    options: [
-      { label: '架起他的胳膊一起走', sub: '慢，但谁都不落', risk: 'low' },
-      { label: '替他背枪，让他自己走', sub: '分担一点是一点', risk: 'mid' },
-      { label: '先赶到山顶再说', sub: '保存自己', risk: 'high' },
-    ],
-    factId: 'h_xueshan',
-  },
-  message: {
-    title: '一封密信',
-    callType: 'branch_judge',
-    img: '/assets/scenes/zunyi_street.jpg',
-    options: [
-      { label: '按地址送到，不问内容', sub: '守规矩' },
-      { label: '先交给指导员', sub: '稳妥' },
-      { label: '拆开看一眼', sub: '心里不踏实' },
-    ],
-    factId: 'h_zunyi',
-  },
-  oillamp: {
-    title: '油灯下的地图',
-    callType: 'branch_judge',
-    img: '/assets/scenes/map_desk.jpg',
-    options: [
-      { label: '照着地图找渡口', sub: '信图上的墨线' },
-      { label: '出门问当地的老乡', sub: '信活人' },
-      { label: '按原路折回一段', sub: '稳，但多耗体力' },
-    ],
-    factId: 'h_zunyi',
-  },
-  luding_plan: {
-    title: '铁索桥头',
-    callType: 'branch_judge',
-    img: '/assets/scenes/luding_bridge.jpg',
-    options: [
-      { label: '先派人试探铁索', sub: '稳，但探路的人最险', risk: 'high' },
-      { label: '等天色再暗些', sub: '隐蔽，但耗时间', risk: 'mid' },
-      { label: '一次冲过去', sub: '快，铁索上没处躲', risk: 'high' },
-    ],
-    factId: 'h_luding',
-  },
-};
 
 // ─── boot ───
 async function boot() {
@@ -554,16 +364,6 @@ async function startSandbox() {
   });
 }
 
-function bindEcho() {
-  $('btn-echo-ok').onclick = () => {
-    hideOverlay('screen-echo');
-    if (echoResolve) {
-      const r = echoResolve;
-      echoResolve = null;
-      r();
-    }
-  };
-}
 
 // ─── settings ───
 /** 设置页当前表单值（自定义模型名优先于下拉） */
@@ -674,46 +474,7 @@ function bindSettings() {
   };
 }
 
-function showEcho({ title, play, real, fic }) {
-  markAction($('btn-echo-ok'), 'echo-ok');
-  return new Promise((resolve) => {
-    kernel.emit('sfx:play', { name: 'echo' });
-    // 史实回响底纹：有 echo_paper 就用它（压一层深色渐变，保证文字可读）
-    const paper = sceneImage('/assets/scenes/echo_paper.jpg', '');
-    const cinema = document.querySelector('#screen-echo .echo-cinema');
-    if (cinema) {
-      cinema.style.backgroundImage = paper
-        // 同上：纸纱盖在纸纹上，保持浅底墨字
-        ? `linear-gradient(160deg, rgba(244,237,223,0.9), rgba(230,218,195,0.94)), url('${paper}')`
-        : '';
-    }
-    // 史实回响的播报点：有史实卡就念卡名（命中 14 张标题的 TTS 缓存），没有才念固定旁白
-    if (title) kernel.emit('voice:say', { text: title, actorId: '旁白', voiceId: 'narr' });
-    else kernel.emit('voice:say', { text: '你刚经历的，和真实发生过的，往往只隔着一层时间。', actorId: '叙事', voiceId: 'narr_echo' });
-    $('echo-title').textContent = title || '刚刚发生的事';
-    $('echo-play').textContent = play || '';
-    $('echo-real').textContent = real || '';
-    $('echo-fic').textContent = fic ? `虚构边界：${fic}` : '';
-    showOverlay('screen-echo');
-    // 回响两栏逐条入场（印章的钤印动效由 .echo-seal 自己的动画负责）
-    replayAnim(document.querySelector('#screen-echo .echo-grid'), 'anim-stagger');
-    echoResolve = resolve;
-  });
-}
 
-async function afterJudge(result, fallbackTitle, defaultFactId) {
-  const fid = result.factId || result.fact_id || defaultFactId;
-  if (fid) st().unlockFact(fid);
-  const fact = getFacts()?.[fid];
-  const play = result.narrative || result.scene_text || result.reply || '';
-  if (!fact && !play) return;
-  await showEcho({
-    title: fact?.title || fallbackTitle || '史实回响',
-    play: play || '（你刚完成一次操作）',
-    real: fact?.real || '走过这段路的部队普遍面临严酷考验；战友互助是大量回忆录中的共同记忆。',
-    fic: fact?.fiction || '本关卡具体操作为互动重演。',
-  });
-}
 
 // ─── run ───
 async function startRun(mode = 'study') {
@@ -766,12 +527,6 @@ async function runOrigin() {
   await waitContinue('进入于都河');
 }
 
-/** 出身显示文案：手记与终局关系面板共用 */
-function originText() {
-  const o = findOrigin(S?.origin);
-  if (!o) return '未设定';
-  return S.originQuiz ? `${o.label}（出发前一问${S.originQuiz.right ? '答对' : '答错'}）` : o.label;
-}
 
 /** 成败与粮荒结算：返回 true 表示已进入失败流程 */
 async function settlePressure(act) {
@@ -975,42 +730,8 @@ async function fireSceneGen(act) {
   } catch { /* 静默 */ }
 }
 
-function updateDusk() {
-  const dusk = $('dusk');
-  if (!dusk || !S) return;
-  const spent = Math.max(0, S.maxAp - S.ap);
-  const level = Math.min(4, spent + (S.day > 1 ? 1 : 0));
-  dusk.dataset.dusk = String(level);
-}
 
-function renderJourney() {
-  const el = $('journey');
-  if (!el || !getActsData()) return;
-  const order = getActsData().order || [];
-  const now = S?.actIndex ?? 0;
-  el.innerHTML = order.map((id, i) => {
-    const a = getActsData().acts[id];
-    const cls = i < now ? 'done' : i === now ? 'now' : '';
-    const line = i < order.length - 1 ? `<div class="j-line ${i < now ? 'done' : ''}"></div>` : '';
-    return `<div class="j-node ${cls}"><span class="j-dot"></span><span class="j-label">${a?.title || id}</span></div>${line}`;
-  }).join('');
-}
 
-function bindLantern() {
-  const dusk = $('dusk');
-  const lantern = $('lantern');
-  if (!dusk || !lantern || dusk._lanternBound) return;
-  dusk._lanternBound = true;
-  dusk.addEventListener('pointermove', (e) => {
-    const r = dusk.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 100;
-    const y = ((e.clientY - r.top) / r.height) * 100;
-    dusk.style.setProperty('--lx', x + '%');
-    dusk.style.setProperty('--ly', y + '%');
-    lantern.style.left = (e.clientX - r.left) + 'px';
-    lantern.style.top = (e.clientY - r.top) + 'px';
-  });
-}
 
 function bindMarchButton(act) {
   const btn = $('btn-march-fixed');
@@ -1079,12 +800,6 @@ function renderHotspots(act, hotspots) {
 
 /** 第四幕营地的五条附身线：点亮 ≥3 条解锁篝火夜 */
 
-function markLine(key) {
-  if (!LINE_NAMES[key]) return;
-  if (st().markLine(key)) {
-    st().pushCampLog('附身线', `点亮「${LINE_NAMES[key]}」（${st().linesDone()}/${LINES_TOTAL}）`);
-  }
-}
 
 /** 热点种类 → 处理函数（新增玩法只加一行，不动主流程） */
 const HOTSPOT_HANDLERS = {
@@ -1102,13 +817,6 @@ const HOTSPOT_HANDLERS = {
     await doChoice(act, h.action);
   },
 };
-
-/**
- * 可重复的热点类型。其余热点做过一次就置灰（isDone），
- * 既防"反复点同一个热点刷资源/刷模型调用"，也让玩家必须去走没走过的地方。
- * 「休息」不在其中：它是体力恢复阀，靠 restCount 递减而不是禁用。
- */
-const REPEATABLE_HOTSPOTS = new Set(['fire', 'rest']);
 
 /** 这个热点是否已经做过（走与 HOTSPOT_HANDLERS 相同的 action||id 口径） */
 function hotspotSpent(act, h) {
@@ -1345,168 +1053,11 @@ async function doShare(h = {}) {
   await afterJudge(result, '行军中的分享', 'h_share');
 }
 
-async function doSchool() {
-  step('school', 'minigame');
-  showScreen('screen-stage');
-  setStageBanner('夜校识字', '/assets/scenes/school_close.jpg');
-  showNpc('文化教员', { role: '夜校', mood: '耐心' });
-  setStagePanel('');                                  // 玩法不在纸卷里，正文区留空
-  await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
-  const op = await gamesApi().play('school');
-  showScreen('screen-stage');                         // 结算回到对白屏：人物 + 叙事 + 继续
-  st().remember('tonightPassword', op.detail?.password || '瑞金');
-  markLine('school');
-  let result;
-  result = await callAI({
-    scene: '夜校识字',
-    callType: 'minigame_review',
-    situation: `识字正确率 ${(op.score * 100) | 0}%`,
-    state: publicState(),
-    operation: { type: 'school', ...op },
-  });
-  st().applyEffects(result.effects);
-  await say('叙事', result.narrative || '');
-  st().pushCampLog('夜校', `口令「${S.tonightPassword}」`);
-  await waitBtn('继续');
-  await afterJudge(result, '行军中的文化学习', 'h_nightschool');
-}
 
-/** 红小鬼 · 分糖：三颗糖，AI 逐颗判定 */
-async function doCandy() {
-  step('candy', 'minigame');
-  showScreen('screen-stage');
-  setStageBanner('分糖', sceneImage('/assets/scenes/sugar_close.jpg', '/assets/scenes/camp_pano.jpg'));
-  setPortrait('红小鬼', '16岁小战士', '鬼', '倔强', '/assets/characters/xiaogui.png');
-  setStagePanel('');
-  await say('红小鬼', '我兜里有三颗糖。你说，给谁？');
-  const op = await gamesApi().play('candy');
-  showScreen('screen-stage');
-  st().remember('sugarPlan', op.detail || null);
-  markLine('candy');
-  let result;
-  result = await callAI({
-    scene: '分糖·红小鬼',
-    callType: 'share_judge',
-    situation: `三颗糖的分配：${op.summary}`,
-    state: publicState(),
-    options: [op.summary],
-    operation: { type: 'sugar', ...op.detail },
-  });
-  st().applyEffects(result.effects);
-  await say('叙事', result.narrative || '');
-  st().pushCampLog('分糖', op.summary);
-  await waitBtn('继续');
-  await afterJudge(result, '行军中的分享', 'h_share');
-}
 
-/** 哨兵 · 夜岗：五信号判断，夜校口令在此生效 */
-async function doSentry() {
-  step('sentry', 'minigame');
-  showScreen('screen-stage');
-  setStageBanner('夜岗', sceneImage('/assets/scenes/sentry_night.jpg', '/assets/scenes/camp_pano.jpg'));
-  setPortrait('哨兵', '夜哨', '哨', '警觉');
-  setStagePanel('');
-  await say('哨兵', '后半夜归你。听不清就再听一遍，别急着开枪。');
-  const op = await gamesApi().play('sentry', { params: { password: S.tonightPassword } });
-  showScreen('screen-stage');
-  st().remember('sentryScore', op.score);
-  markLine('sentry');
-  let result;
-  result = await callAI({
-    scene: '夜岗·哨位',
-    callType: 'minigame_review',
-    situation:
-      `五个信号处置 ${op.detail.hits}/${op.detail.total}`
-      + (S.tonightPassword ? `，夜校口令「${S.tonightPassword}」用上了` : '，未学过口令只能硬扛'),
-    state: publicState(),
-    operation: { type: 'sentry', ...op.detail },
-  });
-  st().applyEffects(result.effects);
-  await say('叙事', result.narrative || '');
-  st().pushCampLog('夜岗', op.summary);
-  await waitBtn('继续');
-  await afterJudge(result, '夜间警戒', 'h_sentry');
-}
 
-/** 两个小鬼 · 泥地五子棋 */
-async function doGomoku() {
-  step('gomoku', 'minigame');
-  showScreen('screen-stage');
-  setStageBanner('泥地五子棋', '/assets/scenes/camp_pano.jpg');
-  setPortrait('两个小鬼', '泥地上的棋', '棋', '专注', '/assets/characters/xiaogui.png');
-  setStagePanel('');
-  await say('红小鬼', '石子当子，泥地当盘。你要是输了，可不许说没吃饱。');
-  const op = await gamesApi().play('gomoku');
-  showScreen('screen-stage');
-  markLine('gomoku');
-  let result;
-  result = await callAI({
-    scene: '泥地五子棋',
-    callType: 'minigame_review',
-    situation: op.summary || '两个小鬼下了一盘棋',
-    state: publicState(),
-    operation: { type: 'gomoku', ...op.detail },
-  });
-  st().applyEffects(result.effects);
-  await say('叙事', result.narrative || '');
-  st().pushCampLog('五子棋', op.summary || '');
-  await waitBtn('继续');
-}
 
-/** 雪山陡坡 · 拽住同伴（时机操作） */
-async function doGrab() {
-  step('grab', 'minigame');
-  showScreen('screen-stage');
-  setStageBanner('陡坡上', sceneImage('/assets/scenes/snow_climb.jpg', '/assets/scenes/snow_pano.jpg'));
-  setPortrait('你', '年轻战士', '你', '咬牙');
-  setStagePanel('');
-  await say('你', '他的手在滑。前面的雪是硬的，下面是空的。');
-  const op = await gamesApi().play('grab');
-  showScreen('screen-stage');
-  let result;
-  result = await callAI({
-    scene: '雪山·拽住同伴',
-    callType: 'minigame_review',
-    situation: op.summary || '在陡坡上拉住同伴',
-    state: publicState(),
-    operation: { type: 'grab', ...op.detail },
-  });
-  st().applyEffects(result.effects);
-  await say('叙事', result.narrative || result.scene_text || '');
-  st().pushCampLog('陡坡', op.summary || '');
-  await waitBtn('继续');
-  await afterJudge(result, '风雪中的手', 'h_xueshan');
-}
 
-/** 会宁 · 数一数熟面孔（读关系与牺牲名单） */
-async function doRoster() {
-  showScreen('screen-stage');
-  setStageBanner('会宁 · 数一数熟面孔', sceneImage('/assets/scenes/huining_crowd.jpg', '/assets/scenes/huining_pano.jpg'));
-  setPortrait('你', '年轻战士', '你', '平静');
-  setStagePanel('<p class="hint">队伍汇合了，人山人海。你在人群里找那些熟悉的脸。</p>');
-  await say('你', '（你在数。有些位置，怎么数都空着。）');
-  let r = null;
-  try {
-    r = await callAI({
-      scene: '会宁·数一数熟面孔',
-      callType: 'act_review',
-      situation: '会师了，清点这一路还认得出来的人',
-      state: publicState(),
-      extraContext:
-        `关系：${COMPANIONS.map((c) => `${c.name}${S[`好感_${c.name}`] ?? 40}`).join('、')}`
-        + `；没能跟上的人：${(S.losses || []).map((l) => l.who).join('、') || '无'}`,
-    });
-    const box = $('stage-panel');
-    // 这里原先用 mg-title + 手写 style 的 paper-dim：那是"给暗底用的纸色"，落在浅墨纸卷上看不清（批五修）
-    box.innerHTML = `<h3 class="blk-title sm">${escapeHtml(r.title || '这一路')}</h3>`
-      + (r.lines || []).map((l) => `<p class="blk-body">${escapeHtml(l)}</p>`).join('');
-    await say('叙事', (r.lines || []).join(' '));
-    st().pushCampLog('会师', (r.lines || [])[0] || '');
-  } catch (err) {
-    toast('清点失败：' + err.message);
-  }
-  await waitBtn('继续');
-}
 
 /**
  * 打开玩法板（tpl-board）：题名 + 数值签 + 玩法区都由这里起头。
@@ -1524,43 +1075,6 @@ function clearStage() {
   const dlg = $('dlg-body'); if (dlg) dlg.textContent = '';
 }
 
-async function doFishing(act, forced) {
-  step('fishing', 'minigame');
-  showScreen('screen-stage');
-  // 弯针 → 咬钩起竿（与报名信息一致：先做钩，再钓鱼）
-  setStageBanner('金色的鱼钩 · 弯针', '/assets/scenes/pond_close.jpg');
-  setPortrait('老班长', '炊事班长', '班', '专注', '/assets/characters/laoban.png');
-  setStagePanel('');
-  await say('老班长', '鱼钩是缝衣针弯的。手上稳着点，别掰断。');
-  await gamesApi().play('needle');
-  showScreen('screen-stage');
-
-  setStageBanner('金色的鱼钩 · 起竿', '/assets/scenes/pond_close.jpg');
-  await say('老班长', '漂相看真了再起竿。晃是假的，沉才是口。', 'laoban_hook');
-  const op = await gamesApi().play('fishing');
-  showScreen('screen-stage');
-  st().remember('fishingBest', Math.max(S.fishingBest || 0, op.score));
-  markLine('fishing');
-  let result;
-  result = await callAI({
-    scene: '钓鱼·咬钩起竿',
-    callType: 'minigame_review',
-    situation: '钓鱼小游戏结束',
-    state: publicState(),
-    operation: { type: 'fishing', ...op },
-  });
-  st().applyEffects(result.effects);
-  await say('叙事', result.narrative || '');
-  st().pushCampLog('钓鱼', result.narrative || '');
-  await waitBtn('继续');
-  await afterJudge(result, '金色的鱼钩', 'h_fishhook');
-  if (!forced) markDone(act.id, 'fishing');
-  // 钓鱼后连带的分汤要一起登记，否则强制链里会再结算一次（同一锅汤结算两遍）
-  if (forced || S.day >= (act.apDays || 1)) {
-    await doSoup();
-    markDone(act.id, 'soup');
-  }
-}
 
 async function doSoup() {
   step('soup', 'choice');
@@ -1654,34 +1168,6 @@ async function doChoice(act, actionId) {
   await afterJudge(result, cs.title, cs.factId);
 }
 
-/** 飞夺泸定桥：横版过桥（第一次跌落由战友拉住，体力 −10） */
-async function doLuding(act) {
-  step('luding', 'minigame');
-  showScreen('screen-stage');
-  setStageBanner('飞夺泸定桥', sceneImage('/assets/scenes/luding_bridge.jpg', '/assets/scenes/luding_pano.jpg'));
-  kernel.emit('scene:enter', { name: 'luding' });        // 泸定桥：急流 + 该章的 BGM
-  showNpc('突击队长', { role: '红四团', mood: '决绝' });
-  setStagePanel('');
-  await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
-  const op = await gamesApi().play('luding');
-  showScreen('screen-stage');
-  st().remember('ludingResult', op.detail || null);
-  // 战友拉住的那一下，先落到状态里再交给模型写后果
-  if (op.detail?.retry) st().applyEffects({ 体力: -10 });
-  let result;
-  result = await callAI({
-    scene: `${act.title}·飞夺泸定桥`,
-    callType: 'minigame_review',
-    situation: op.summary || '突击队过桥',
-    state: publicState(),
-    operation: { type: 'luding', ...op.detail },
-  });
-  st().applyEffects(result.effects);
-  await say('叙事', result.narrative || result.scene_text || '');
-  st().pushCampLog('泸定桥', op.summary || '');
-  await waitBtn('继续');
-  await afterJudge(result, '飞夺泸定桥', 'h_luding');
-}
 
 // 「继续」统一走 step.js 的 waitContinue（带 data-action 契约标记）
 
@@ -1798,212 +1284,8 @@ async function runPathOnImage() {
   await afterJudge(result, '过松潘草地', 'h_grassland');
 }
 
-async function runQuiz(act) {
-  step(`${act.id}:quiz`, 'quiz');
-  showScreen('screen-quiz');
-  $('quiz-bg').style.backgroundImage = `url('${act.pano}')`;
-  $('quiz-score').textContent = `${S.quiz.human} : ${S.quiz.ai}`;
-  const body = $('quiz-body');
-  body.innerHTML = '<p class="muted">正在出题…</p>';
-  kernel.emit('voice:say', { text: '停一停。刚才走过的路，你还记得多少。', actorId: '叙事', voiceId: 'narr_quiz' });
-  let q;
-  q = await callAI({
-    scene: `知识对决·${act.title}`,
-    callType: 'quiz_generate',
-    situation: `根据「${act.title}·${act.subtitle}」出一道长征史实单选题`,
-    state: publicState(),
-    extraContext: `本幕主题：${act.theme}；史实：${(act.facts || []).join(',')}`,
-  });
-  // 出题失败（玩家点了跳过／两次重试用尽）：**明说 + 跳过本题**，本节双方都不计分。
-  // 以前会拿"题目 /（题目选项缺失）"当一道真题继续走：玩家答一道不存在的题，
-  // 还要再烧 3 次调用（两个 AI 作答 + 判分）才能过去（2026-09-15 修，见 HANDOFF-CODE 坑 41）。
-  if (!q || q._error) {
-    // 用 blk-body（正常墨色、正文字号）：这句是玩家要读的正文，`.muted`/`.blk-note`
-    // 在纸面上都偏淡（约 2.9:1），放主信息里看不清
-    body.innerHTML = `<p class="blk-body">这一题没能出出来：模型没有返回题目。本题跳过、双方都不计分，原因已记入日志。</p>
-      <div class="blk-actions"><button type="button" class="btn primary" id="quiz-next" data-action="continue">继续</button></div>`;
-    markAction($('quiz-next'), 'continue');
-    setStepState('awaiting');
-    await new Promise((r) => { $('quiz-next').onclick = () => { $('quiz-next').onclick = null; r(); }; });
-    await afterJudge({ narrative: '本节出题未成，双方均不计分。' }, `知识对决 · ${act.title}`, act.facts?.[0]);
-    return;
-  }
-  body.innerHTML = `
-    <p class="blk-body">${escapeHtml(q.question || '题目')}</p>
-    <div class="blk-choice-list" id="quiz-opts"></div>
-    <div id="quiz-feedback" class="blk-note"></div>
-    <div class="blk-actions">
-      <button type="button" class="btn ghost sm" id="quiz-auto" data-action="quiz-auto">看两个 AI 对答（ai_vs_ai）</button>
-      <button type="button" class="btn primary hidden" id="quiz-next" data-action="continue">继续</button>
-    </div>
-  `;
-  const optsBox = $('quiz-opts');
-  const opts = Array.isArray(q.options) && q.options.length >= 2
-    ? q.options.map((o) => String(o))
-    : ['（题目选项缺失）', '（请重开本题）'];
-  // 模型可能把下标写成字符串或越界：合法就取用，非法一律记 -1（本题不计分），
-  // 避免「解析失败」被当成默认选了 A
-  const normIdx = (v, len) => {
-    const n = Number(v);
-    return Number.isInteger(n) && n >= 0 && n < len ? n : -1;
-  };
-  await new Promise((resolveQuiz) => {
-    let answered = false;
-    const finish = async (humanIdx, auto = false) => {
-      if (answered) return;
-      answered = true;
-      const ans = normIdx(q.answer_index, opts.length);
-      const answerKnown = ans >= 0;
-      // ai_vs_ai：玩家这一侧由第二个 AI 人设代答
-      let humanAns = humanIdx;
-      if (auto) {
-        const h = await callAI({
-          scene: '知识对决·AI 代答（ai_vs_ai）',
-          callType: 'quiz_answer_ai',
-          situation: `题目：${q.question}\n选项：${opts.join(' / ')}`,
-          state: publicState(),
-          agent: '激进派小张',
-          options: opts,
-        });
-        humanAns = normIdx(h.answer_index, opts.length);
-      }
-      let aiAns;
-      const ai = await callAI({
-        scene: '知识对决·AI作答',
-        callType: 'quiz_answer_ai',
-        situation: `题目：${q.question}\n选项：${opts.join(' / ')}`,
-        state: publicState(),
-        agent: '稳健派老李',
-        options: opts,
-      });
-      aiAns = normIdx(ai.answer_index, opts.length);
-      const humanRight = answerKnown && humanAns === ans;
-      const aiRight = answerKnown && aiAns === ans;
-      st().quizScore({ human: humanRight ? 1 : 0, ai: aiRight ? 1 : 0 });
-      $('quiz-score').textContent = `${S.quiz.human} : ${S.quiz.ai}`;
-      let judge;
-      judge = await callAI({
-        scene: '知识对决·判分',
-        callType: 'quiz_judge',
-        situation: `标准答案 index=${ans}。${auto ? '红方(激进派小张)' : '玩家'}=${humanAns}。蓝方(稳健派老李)=${aiAns}`,
-        state: publicState(),
-        agent: auto ? 'ai_vs_ai' : 'human_vs_ai',
-        operation: { human: humanAns, ai: aiAns, answer_index: ans, mode: auto ? 'ai_vs_ai' : 'human_vs_ai' },
-      });
-      st().applyEffects(judge.effects || { 士气: humanRight ? 3 : -1 });
-      kernel.emit('sfx:play', { name: humanRight ? 'correct' : 'wrong' });
-      $('quiz-feedback').innerHTML = `
-        <div>${auto ? '激进派小张' : '你'}：<b>${humanRight ? '正确' : '错误'}</b> · 稳健派老李：<b>${aiRight ? '正确' : '错误'}</b><br/>
-        ${escapeHtml(answerKnown ? (q.explain || judge.explain || '') : '本题标准答案解析失败，双方均不计分。')}</div>
-      `;
-      [...optsBox.children].forEach((el, i) => {
-        el.disabled = true;
-        if (i === ans) el.classList.add('correct');
-        else if (i === humanAns) el.classList.add('wrong');
-      });
-      const next = $('quiz-next');
-      await new Promise((r) => {
-        next.onclick = () => { next.onclick = null; r(); };
-        next.classList.remove('hidden');
-      });
-      await afterJudge({
-        narrative: `${auto ? '小张' : '你'}答：${opts[humanAns] ?? '（未作答）'}。标准答案：${opts[ans] ?? '（本题答案缺失）'}。${q.explain || ''}`,
-      }, `知识对决 · ${act.title}`, act.facts?.[0]);
-      resolveQuiz();
-    };
-    opts.forEach((text, i) => {
-      // 选项一律走唯一的构建处（批三起的口径）：序号进徽章，键盘位自动带上
-      const b = choiceButton({ label: text, icon: String.fromCharCode(65 + i), index: i });
-      b.onclick = () => finish(i);
-      optsBox.appendChild(b);
-    });
-    const autoBtn = $('quiz-auto');
-    if (autoBtn) autoBtn.onclick = () => { autoBtn.disabled = true; finish(null, true); };
-  });
-}
 
-/** 交给夜间的上下文：这一夜之前到底发生了什么 */
-function nightContext() {
-  const done = (S.linesDone || []).map((k) => LINE_NAMES[k] || k);
-  return [
-    `已点亮附身线：${done.join('、') || '无'}`,
-    `钓鱼最佳 ${(S.fishingBest || 0).toFixed(2)}`,
-    `夜岗 ${Math.round((S.sentryScore || 0) * 100)} 分`,
-    S.tonightPassword ? `今晚口令「${S.tonightPassword}」` : '没上过夜校，不会口令',
-    S.sugarPlan ? `分糖：${JSON.stringify(S.sugarPlan)}` : '',
-  ].filter(Boolean).join('；');
-}
 
-/**
- * 第四幕幕末 · 篝火深夜：模型生成互斥抉择 → 玩家选 → 模型写「当夜之后」
- * 选项禁止写死；生成失败才用内置兜底两项。
- */
-async function runNightChoice(act) {
-  step('night', 'choice');
-  if (isDone(act.id, 'night')) return false;
-  if (!st().canNight(3)) {
-    st().pushCampLog('系统', `附身线不足三条（${st().linesDone()}/${LINES_TOTAL}），今夜没有议事。`);
-    return false;
-  }
-
-  showScreen('screen-night');
-  $('night-title').textContent = '篝火 · 深夜';
-  $('night-lead').textContent = '正在请模型写今夜的抉择…';
-  $('night-body').innerHTML = '';
-
-  let gen = null;
-  try {
-    gen = await callAI({
-      scene: `${act.title}·篝火夜`,
-      callType: 'night_options',
-      situation: '这一天结束了。后半夜怎么过、明天的口粮怎么带，得在火边定下来。',
-      state: publicState(),
-      extraContext: nightContext(),
-    });
-  } catch { /* 用兜底选项 */ }
-
-  const raw = Array.isArray(gen?.options)
-    ? gen.options.filter((o) => o && (typeof o === 'string' || o.label))
-    : [];
-  const options = (raw.length >= 2 ? raw : [
-    { label: '加岗并匀出口粮', sub: '安全优先，明天更苦', key: 'a' },
-    { label: '按原编制休息', sub: '保留体力，伤员优先', key: 'b' },
-  ]).slice(0, 3).map((o, i) => (typeof o === 'string'
-    ? { label: o, sub: '', key: String(i) }
-    : { label: String(o.label), sub: String(o.sub || ''), key: String(o.key ?? i) }));
-
-  $('night-lead').textContent = gen?.lead || '火压低了。没人先开口。';
-  kernel.emit('voice:say', { text: '火压低了。后半夜怎么过，明天的口粮怎么带，得在火边定下来。', actorId: '旁白', voiceId: 'narr' });
-  const body = $('night-body');
-  body.innerHTML = '';
-  const picked = await askChoice(body, options, { extraOf: () => '' });
-  const choice = picked.raw;
-  logChoice(act, choice.label, '篝火夜');
-  st().remember('nightChoice', choice.label);
-  markDone(act.id, 'night');
-
-  let res = null;
-  try {
-    res = await callAI({
-      scene: `${act.title}·篝火夜结算`,
-      callType: 'night_resolve',
-      situation: `玩家选择：${choice.label}${choice.sub ? ` — ${choice.sub}` : ''}`,
-      state: publicState(),
-      options: [choice.label],
-      operation: { choice: choice.key, label: choice.label },
-      extraContext: nightContext(),
-    });
-    st().applyEffects(res?.effects);
-    body.innerHTML = '<p id="night-out" class="blk-body"></p>';   // 纸面用墨字，别用给暗底准备的纸色
-    await typeText($('night-out'), res?.narrative || '当夜无事。');
-    st().pushCampLog('篝火夜', res?.narrative || choice.label);
-  } catch (err) {
-    body.innerHTML = `<p class="muted">当夜无话：${escapeHtml(err.message)}</p>`;
-  }
-  await waitBtn('天亮了 · 继续', body);
-  await afterJudge(res || { narrative: `你决定：${choice.label}` }, '篝火之夜', 'h_campfire');
-  return true;
-}
 
 async function finishAct(act) {
   st().pushLog(act.id, act.title);

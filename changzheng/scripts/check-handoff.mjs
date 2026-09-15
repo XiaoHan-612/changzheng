@@ -135,7 +135,11 @@ function checkPortraitDropin() {
   const para = md.slice(anchor).split('\n\n')[0];
   const doc = pick(para, /`([a-z_]+)`（/g);
   const main = flowSrc();
-  const body = main.slice(main.indexOf('const PORTRAIT_FILE'), main.indexOf('function portraitImage'));
+  // 只取这张表本身（到第一个 }; 为止）——**不假设"表在函数之前"**：搬文件时顺序会变，
+  // 靠两个 marker 的位置切片会得到空切片，而空切片会让这条检查静默变绿（拆批 7 时踩过）。
+  const from = main.indexOf('const PORTRAIT_FILE');
+  const body = from < 0 ? '' : main.slice(from, main.indexOf('};', from));
+  if (!body) problems.push('扫描里找不到 PORTRAIT_FILE 表（是扫描失败，不是接线问题）');
   const code = pick(body, /\/assets\/characters\/([a-z_]+)\.png/g);
   const onlyDoc = doc.filter((x) => !code.includes(x));
   if (onlyDoc.length) problems.push('HANDOFF-ART 承诺立绘落盘即生效但 PORTRAIT_FILE 没接线：' + onlyDoc.join(', '));

@@ -22,11 +22,25 @@ const KIND_HANDLED = new Set(['talk', 'fishing', 'school', 'rest', 'share', 'can
 // 只出现在强制链、不挂热点的节点（runForcedChain / finishAct 里单独实现）
 const FORCED_ONLY = new Set(['fishing', 'soup', 'candy', 'sentry', 'path', 'luding', 'night']);
 
-/** 从 main.js 源码里取 CHOICE_SETS 的顶层键（避免为了测试把 UI 模块拆开） */
+/**
+ * 从**整个流程层**源码里取 CHOICE_SETS 的顶层键。
+ *
+ * 批 7 把 main.js 拆成 flow/* 后这张表搬去了 `flow/tables.js`——所以别写死 main.js：
+ * 扫 main.js + flow/*，表搬到哪都找得到。（踩过：写死 main.js 的同类扫描在搬迁后会
+ * "找不到就返回空"，那种沉默才是真麻烦——这里 assert 住，找不到就红。）
+ */
 function choiceSetKeys() {
-  const src = fs.readFileSync(path.join(ROOT, 'public/js/main.js'), 'utf8');
+  const dir = path.join(ROOT, 'public/js');
+  const flowDir = path.join(dir, 'flow');
+  const files = ['main.js'].concat(fs.existsSync(flowDir)
+    ? fs.readdirSync(flowDir).filter((f) => f.endsWith('.js')).map((f) => `flow/${f}`)
+    : []);
+  let src = '';
+  for (const f of files) {
+    try { src += fs.readFileSync(path.join(dir, f), 'utf8') + '\n'; } catch { /* 文件不在就算了 */ }
+  }
   const start = src.indexOf('const CHOICE_SETS = {');
-  assert.ok(start > 0, '找不到 CHOICE_SETS');
+  assert.ok(start > 0, '整个流程层里都找不到 CHOICE_SETS（表搬到别处了？）');
   const body = src.slice(start, src.indexOf('\n};', start));
   return new Set([...body.matchAll(/^  ([a-z_]+): \{/gm)].map((m) => m[1]));
 }

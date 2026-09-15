@@ -105,6 +105,14 @@ export function isDone(actId, key) {
   return !!(S.doneKeys && S.doneKeys[`${actId}:${key}`]);
 }
 
+/** 点亮一条附身线（幂等，由 state 模块判重）；顺手写进营地手记 */
+export function markLine(key) {
+  if (!LINE_NAMES[key]) return;
+  if (st().markLine(key)) {
+    st().pushCampLog('附身线', `点亮「${LINE_NAMES[key]}」（${st().linesDone()}/${LINES_TOTAL}）`);
+  }
+}
+
 /** 附身线的名字（篝火夜的门槛按它算；`LINES_TOTAL` 是总数） */
 export const LINE_NAMES = {
   fishing: '钓鱼分汤',
