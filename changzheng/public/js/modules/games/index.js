@@ -138,7 +138,7 @@ export default {
         console.error(`[games] 玩法「${id}」挂载/运行出错：`, err);
         result = { score: 0, detail: { error: String(err?.message || err) }, summary: '这一局没有完成' };
       }
-      const out = { score: 0, detail: {}, summary: '', ...(result || {}) };
+      const out = { score: 0, detail: {}, summary: '', noAi: !!spec.noAi, ...(result || {}) };
       kernel.emit('game:end', { id, score: Number(out.score) || 0, ms: Date.now() - t0 });
       return out;
     },

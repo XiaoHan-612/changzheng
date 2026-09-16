@@ -26,6 +26,14 @@ const marchBeats = [
 export const SFX_TABLE = {
   // 交互轻响：点击、翻页
   click: { desc: '点一下', ops: [{ kind: 'noise', dur: 0.04, vol: 0.035, cut: 1800, q: 2 }] },
+  // 同事《收拢》用"闷的一声"表示这一处搜空了：低通过滤的短噪声 + 一点低频，别做成打击乐
+  thud: {
+    desc: '闷响（搜空/落空）',
+    ops: [
+      { kind: 'noise', dur: 0.09, vol: 0.05, cut: 420, q: 1.2 },
+      { kind: 'tone', freq: 96, dur: 0.12, vol: 0.04, type: 'sine' },
+    ],
+  },
 
   // 钓鱼：抛竿入水（两段水花 + 一记低音）
   cast: {

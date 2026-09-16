@@ -21,6 +21,28 @@ import { sceneImage, showNpc } from './view.js';
  * 于是一次调用在 `qa:ai` 与 JSONL 日志里都看得见，参数也收在一张表里。
  * 玩法里自己带着 10 秒窗口（candy 的 `AI_WINDOW_MS`）与"没答就用固定内容"的兜底，保持不动。
  */
+/**
+ * 不需要模型复盘的那几支用**固定效果**（卡片标了 `noAi: true` = 纯铺垫，见他们的注册表口径）：
+ * 玩法自己的分与过程已经说明一切，再花一次真调写两句旁白不值当。
+ * 只动士气/体力三档；**不碰信念**——那是"关键抉择"才动的维度（与 minigame_review 的预算口径一致）。
+ */
+export function fixedEffectsFor(op) {
+  const s = Number(op?.score) || 0;
+  if (s >= 0.7) return { 士气: +5, 体力: -3 };
+  if (s >= 0.4) return { 士气: +2, 体力: -5 };
+  return { 士气: -3, 体力: -7 };
+}
+
+/**
+ * 玩法收尾的**唯一分岔**：要模型就调 `minigame_review`，不要模型（`op.noAi`）就落固定效果。
+ * 别把这个判断散回各个 doXxx——散一次就会漏一处（同事那六支标了 noAi 的玩法，
+ * 早先照样每局烧一次真调）。
+ */
+async function reviewOrFixed(op, body = {}) {
+  if (op?.noAi) return { effects: fixedEffectsFor(op), narrative: op.summary || '', _fixed: true };
+  return await callAI({ state: publicState(), ...body, situation: body.situation || op?.summary || '' });
+}
+
 const decideFor = (scene) => (payload = {}) => callAI({
   ...payload,
   scene: payload.scene || scene,
@@ -40,7 +62,7 @@ export async function doSchool() {
   st().remember('tonightPassword', op.detail?.password || '瑞金');
   markLine('school');
   let result;
-  result = await callAI({
+  result = await reviewOrFixed(op, {
     scene: '夜校识字',
     callType: 'minigame_review',
     situation: `识字正确率 ${(op.score * 100) | 0}%`,
@@ -95,7 +117,7 @@ export async function doSentry() {
   st().remember('sentryScore', op.score);
   markLine('sentry');
   let result;
-  result = await callAI({
+  result = await reviewOrFixed(op, {
     scene: '夜岗·哨位',
     callType: 'minigame_review',
     situation:
@@ -123,7 +145,7 @@ export async function doGomoku() {
   showScreen('screen-stage');
   markLine('gomoku');
   let result;
-  result = await callAI({
+  result = await reviewOrFixed(op, {
     scene: '泥地五子棋',
     callType: 'minigame_review',
     situation: op.summary || '两个小鬼下了一盘棋',
@@ -147,7 +169,7 @@ export async function doGrab() {
   const op = await gamesApi().play('snow-grab');
   showScreen('screen-stage');
   let result;
-  result = await callAI({
+  result = await reviewOrFixed(op, {
     scene: '雪山·拽住同伴',
     callType: 'minigame_review',
     situation: op.summary || '在陡坡上拉住同伴',
@@ -174,7 +196,7 @@ export async function doPontoonNight() {
   await say('你', '门板只有这些。往哪一段投，天亮前就得定下来。');
   const op = await gamesApi().play('pontoon-night');
   showScreen('screen-stage');
-  const result = await callAI({
+  const result = await reviewOrFixed(op, {
     scene: '于都河·夜搭浮桥',
     callType: 'minigame_review',
     situation: op.summary || '夜里搭浮桥，把队伍送过河',
@@ -202,7 +224,7 @@ export async function doRallyRiver() {
   await say('你', '渡口还开着。东岸还有人——搜一处，还是渡一趟，天亮之前只够选八次。');
   const op = await gamesApi().play('rally-river');
   showScreen('screen-stage');
-  const result = await callAI({
+  const result = await reviewOrFixed(op, {
     scene: '湘江·东岸收拢',
     callType: 'minigame_review',
     situation: op.summary || '天亮之前，把东岸的人接回来',
@@ -225,7 +247,7 @@ export async function doRoster() {
   await say('你', '（你在数。有些位置，怎么数都空着。）');
   let r = null;
   try {
-    r = await callAI({
+    r = await reviewOrFixed(op, {
       scene: '会宁·数一数熟面孔',
       callType: 'act_review',
       situation: '会师了，清点这一路还认得出来的人',
@@ -264,11 +286,10 @@ export async function doFishing(act, forced) {
   st().remember('fishingBest', Math.max(S.fishingBest || 0, op.score));
   markLine('fishing');
   let result;
-  result = await callAI({
+  result = await reviewOrFixed(op, {
     scene: '钓鱼·咬钩起竿',
     callType: 'minigame_review',
     situation: '钓鱼小游戏结束',
-    state: publicState(),
     operation: { type: 'fishing', ...op },
   });
   st().applyEffects(result.effects);
@@ -299,7 +320,7 @@ export async function doLuding(act) {
   // 战友拉住的那一下，先落到状态里再交给模型写后果
   if (op.detail?.retry) st().applyEffects({ 体力: -10 });
   let result;
-  result = await callAI({
+  result = await reviewOrFixed(op, {
     scene: `${act.title}·飞夺泸定桥`,
     callType: 'minigame_review',
     situation: op.summary || '突击队过桥',
