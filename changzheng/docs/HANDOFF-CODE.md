@@ -296,8 +296,11 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
 0. **电影化三处：序章（批 C）与幕间（批 D）已推送；批 E 的升华代码就位、待现场验收**（2026-09-15 晚）。
    演出统一走 `modules/cinema` 的 `api.play(id)`（`flow/act.js` 里旧的 `runCutscene` 已删除）。
    明天第一件事：真播一遍 `ending-poem`（逐字是否跟音频对齐、速度键、跳过）+ `qa:av` + 联系表加那一页。
-   朗诵素材已在 `public/audio/poem/qilv-changzheng.mp3`（59.3s，不入库），逐句时间轴已量好写进 `data/poem.json`。
-   **批 E** 的原始口径 = 终局升华（`poem` 逐字跟 `voice:progress` 的已播毫秒 + `seal` 钤印，自动播/可跳过/1x·1.5x，失败分支不演）。诗的音频两条路都还没素材（逐句配音清单在 `docs/POEM-TTS.md`，整段录音放 `public/audio/poem/` 并在 `data/poem.json` 填 `audio.full`）——**没有音频也能演**（按 `pace` 逐字）。
+   朗诵素材在 `public/audio/poem/qilv-changzheng.mp3`（59.3s；**2026-09-16 起随仓库走**），
+   逐句时间轴已量好写进 `data/poem.json`。**它同时是"外部来源的演示素材"**：对外发布要换成自有朗读或逐句 TTS，
+   只换文件 + 重新量时间轴，代码不用改（该目录的 `README.md` 有替换步骤）。
+   **批 E** 的原始口径 = 终局升华（`poem` 逐字按"锚点 + 挂钟"推 + `seal` 钤印，自动播/可跳过/1x·1.5x，失败分支不演）。
+   逐句配音清单在 `docs/POEM-TTS.md`（未生成）；**没有音频也能演**（按 `pace` 逐字）。
 1. **真调验证已全覆盖**（2026-09-13）：标准模式一局 76 次调用全 `source=GLM`、无 ERROR；`failure_review` 由 `npm run qa:failure` 单独覆盖（注入"断粮+体力见底"走失败线，断言真调 1 次且渲染出标题/段落/史实要点）。15 类 callType 全部有真调记录。
 2. **契约扩散（部分完成）**：夜校小游戏的内层选项已补 `data-mini-action="answer"`（2026-09-13，此前那一屏没有任何 `data-*` 标记，自动化只能干等）。仍待办：`runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职，建议走 `askChoice`；`runRest` 只有一个「继续」，可直接 `waitContinue`。
 3. **数值平衡（进行中）**：测量口径已建好 —— `npm run qa:playtest` 按人类节奏跑局，输出时长/分幕耗时/五维终值/AI 调用数，结果表落 `docs/PLAYTEST.md`。热点已是一次性（第 20 条）；行军模式失败条件是「体力≤0」或「粮食=0 且体力≤30」，调参待做。

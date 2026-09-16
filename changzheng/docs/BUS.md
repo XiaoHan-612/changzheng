@@ -203,7 +203,7 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | 批 | 内容 | 状态 |
 |---|---|---|
 | A | **地基：语音通道事件-控制**（无可见变化）：契约登记 `voice:start/progress/ended/stop`；语音通道重写成带时长/进度/语速的通道；门面补 `voiceStop()/voiceState()/voiceRates()`；修默认音色分岔 | ✅ 已完成（2026-09-15，提交 `ac644bc`） |
-| B | **诗与素材**：`data/poem.json`（8 句 + 出处 + 落款 + 无声节奏；**诗的唯一真源**）+ `poem:manifest` → `docs/POEM-TTS.md` + 两条音频路线（逐句 TTS / 整段录音，后者不入库）+ 字体缺字补齐（`逶/迤/礴` 重跑 `fonts:build`）+ 单位守卫 `tests/unit/poem.test.js` | ✅ 已完成（2026-09-15，提交 `b60454c`） |
+| B | **诗与素材**：`data/poem.json`（8 句 + 出处 + 落款 + 无声节奏；**诗的唯一真源**）+ `poem:manifest` → `docs/POEM-TTS.md` + 两条音频路线（逐句 TTS / 整段录音，后者 2026-09-16 起随仓库走）+ 字体缺字补齐（`逶/迤/礴` 重跑 `fonts:build`）+ 单位守卫 `tests/unit/poem.test.js` | ✅ 已完成（2026-09-15，提交 `b60454c`；朗诵音频随仓库走：2026-09-16） |
 | C | **完整序章**：`modules/cinema`（描述符 + `player.js` 播放器 + `beats.js` 拍子 + `sequences.js` 编排）+ 序章三段编排（题字 → 路线图 → 出身 → 告别）；`quick` 只留题字一拍；联系表加三页、`qa:motion` 加五条拍子断言；顺手**修好自批 7 起被切成半截的 layout-audit**（它一直在报绿但只体检了标题一屏） | ✅ 已完成（2026-09-15） |
 | D | **幕间过渡**：`flow/act.js` 的 `runCutscene` **已删除**，幕间走 `cinema.play('act-intro', {act, idx, prev, review})`（回望地图 → 本幕空镜 → 本幕题字；上一幕总评两句从原来的 toast 升为字幕）；`marchTransition` 降级为日间/启程的连接件；第一幕不演（序章已演过） | ✅ 已完成（2026-09-15） |
 | E | **终局结算 + 升华**：结算面板照旧，升华为独立整屏（会宁空镜 → 8 句逐字跟音频 → 钤印）；自动播 + 可跳过 + 1x/1.5x；**失败分支不演** | 🟡 代码就位（2026-09-15）：`poem`/`seal` 拍子、`ending-poem` 编排、`flow/end.js` 接线（总评成功之后、研学报告之前）、速度键、朗诵素材与量好的时间轴都在；**还差现场验收**（真播一遍看逐字对齐 / qa:av / 联系表那一页） |

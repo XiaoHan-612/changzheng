@@ -43,7 +43,8 @@ changzheng/
     fonts/              # 五族自托管字体（tools/build-fonts.mjs 生成）
     assets/scenes|characters|events/
     audio/ambient|sfx|cache|voices/           # 环境床 / 操作音 / TTS 缓存 / 预录台词
-    audio/poem/                               # 终局升华的整段朗诵（**不入库**，见该目录 README）
+    audio/poem/                               # 终局升华的整段朗诵（**随仓库走**：2026-09-16 起入库；
+                                              #   是外部来源的演示素材，对外发布要换掉，见该目录 README）
   data/
     acts.json           # 五幕定义（热点、dayScenes、强制链、对决）
     facts.json          # 史实卡 14 张 real/fiction

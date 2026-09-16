@@ -26,6 +26,11 @@ npm start          # http://localhost:3001
   `.env` 与 `runtime-config.json` 已加入 `.gitignore`，不会入库
 - **没有 MOCK 模式**：所有智能判断都走真调。未配置 Key 或调用失败会**明确报错**（界面给原因与「重试」键，
   日志记 `source=ERROR`），**不编造任何兜底文案**；演示前务必先用「设置 → 测试连通」确认
+- **素材全在仓库里**：场景图 / 立绘 / 环境床 / BGM / 音效 / TTS 缓存 / 终局朗诵（`public/audio/poem/`）
+  都随仓库走，clone 下来即可演示，**不用从别处拷任何文件**
+- ⚠️ **开始动手前先读 [`changzheng/docs/HANDOFF.md`](changzheng/docs/HANDOFF.md) §七「注意事项」**——
+  密钥纪律、素材来路（哪些是外部素材、对外发布要换）、同事交接包为什么不进仓库、已经删掉的东西，
+  全部写在那里（**口头约定都已落纸**，只看仓库也不会漏）
 
 ## 目录结构
 
@@ -44,16 +49,16 @@ npm start          # http://localhost:3001
 
 ## 测试
 
-三层尺子：改一处先跑 `dev:check`（约 6 秒、0 次真调），提交前 `verify:fast`，推送与交付前 `verify:full`。
+三层尺子：改一处先跑 `dev:check`（约 13 秒、0 次真调），提交前 `verify:fast`，推送与交付前 `verify:full`。
 
 ```powershell
 cd changzheng
-npm run dev:check     # 开发快检：总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 输入框不吃快捷键 / 终局失败不空屏（约 7 秒）
+npm run dev:check     # 开发快检：总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 输入框不吃快捷键 / 终局失败不空屏 / 升华可跳过（约 13 秒）
 npm run verify:fast   # 提交前那一档：上面这些 + 动效 / 音频 / 素材 / 影音守卫，并行约 30 秒
-npm run verify:full   # 推送与交付前：真调那一档（e2e / av / sandbox / …），分钟级
-npm run test:unit     # 53 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致
+npm run verify:full   # 推送与交付前：真调那一档（e2e / av / failure / loss / smoke），分钟级
+npm run test:unit     # 63 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 玩法守卫
 npm run qa:smoke      # 标题 → 营地 → 一次互动（顺带断言用过的热点当场作废）
-npm run qa:board      # 玩法板体检：玩法逐屏摆上板（板屏壳/数值签/契约标记）+ 三方对账
+npm run qa:board      # 玩法板体检：十支玩法逐屏摆上板（板屏壳/数值签/契约标记）+ 三方对账
 npm run test:e2e      # 五幕真调通关（约 76 次调用）+「不重复结算」等回归断言
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
 npm run qa:ai         # AI 调用体检：预算表 ↔ 字段契约 ↔ 真调日志三方对账
@@ -78,7 +83,7 @@ node make-docx.js     # 输出 ../长征-抉择-设计方案.docx
 | `CONTRIBUTING.md` | **团队协作规范：git 工作流 / 提交身份 / 冲突处理 / 给 AI agent 的规矩** |
 | `changzheng/README.md` | 玩法与交互要点 |
 | `changzheng/docs/ARCHITECTURE.md` | 架构、运行时数据流、设计约束 |
-| `changzheng/docs/HANDOFF.md` | 已完成 / 已知缺口 / **每轮收尾清单** / 接力建议 |
+| `changzheng/docs/HANDOFF.md` | 已完成 / 已知缺口 / **每轮收尾清单** / **§七 注意事项（口头约定落纸：密钥纪律 · 素材来路 · 交接包 · 已删的东西）** |
 | `changzheng/docs/HANDOFF-CODE.md` | **代码接手主文档**：模块地图 / 状态机 / 契约 / 29 条踩过的坑 |
 | `changzheng/docs/DESIGN-SYSTEM.md` | 视觉体系（模板 / 区块 / 动效）与逐批打磨进度 |
 | `changzheng/docs/AUDIO-SYSTEM.md` | 音频系统框架（混音表 / 通道 / 场景声明表 / 三层静音） |

@@ -62,7 +62,7 @@
 | **BGM** | **8 首已就位**（2026-09-16，唯一待产线收口） | `public/audio/bgm/<kind>_bgm.ogg` 八首齐全（`qa:audio` 报「BGM 文件齐全（8 首）」）。按幕与分日自动切换（`scene-table.js`），音量 0.18、人声时闪避——同样是落盘即生效，代码没改 |
 | 预录台词 | **21 条** | `public/audio/voices/*.wav` + 索引 `voice-lines.json` |
 | TTS 缓存 | **20 条** | `public/audio/cache/*.wav`（22050Hz 单声道，2.33MB）。清单 [`TTS-MANIFEST.md`](TTS-MANIFEST.md)，验收 `npm run qa:tts` |
-| **终局升华的整段朗诵** | **1 条（不入库）** | `public/audio/poem/qilv-changzheng.mp3`（《七律·长征(朗诵版)》，59.3s）。八句起止毫秒**是量出来的**、写在 `data/poem.json`；换音频要重新量（见 [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md) §六点五）。该目录 gitignore，换机器演示要一起拷 |
+| **终局升华的整段朗诵** | **1 条（随仓库走，949,376 字节）** | `public/audio/poem/qilv-changzheng.mp3`（《七律·长征(朗诵版)》，59.3s）。八句起止毫秒**是量出来的**、写在 `data/poem.json`；换音频要重新量、对外发布要换掉（见 [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md) §六点五 与该目录 `README.md`）。2026-09-16 起从 gitignore 放出来：clone 下来就有，不用另外拷 |
 | 同伴反应音 | **已撤**（2026-09-14） | 原先 6 条 `audio/reactions/*.wav` 随「自由行军沙盘」一起移除、归档在 `_archive/audio-reactions-sandbox/`；没有任何代码路径引用它们，**别按旧文档去补** |
 
 ## 五、数据与配置（非素材，但属于交付面）

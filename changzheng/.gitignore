@@ -22,7 +22,5 @@ data/replay/
 # 等音频模型按同名导出 Ogg Vorbis 后再入库（代码优先用 .ogg）。
 public/audio/ambient/*.wav
 
-# 终局升华的整段朗诵：网上找的/别人录的音频**不进公开仓库**（仓库是公开的），
-# 本机与演示机照常能播。目录里那份"怎么放"的说明留着（public/audio/poem/README.md）。
-public/audio/poem/*
-!public/audio/poem/README.md
+# 终局升华的整段朗诵（public/audio/poem/）：2026-09-16 起**随仓库一起走**（竞赛交付的演示素材）。
+# 它的来路、时长、逐句时间轴怎么量、要换一版怎么办——都写在 public/audio/poem/README.md 里。

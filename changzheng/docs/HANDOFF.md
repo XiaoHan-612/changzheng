@@ -50,6 +50,7 @@ npm start                   # http://localhost:3001
 | 玩法 | 入口 | 核心循环 | 状态 |
 |------|------|----------|------|
 | 五幕主线（VN） | 标题「研学模式 / 行军模式 / 快速演示」 | 暮色营地探索 → 决策 → 模型裁决 → 史实回响 → 启程 | 完整可通关 |
+| 玩法板上的十支小游戏 | 主线热点 / 强制链按槽进入 | 舞台交代任务 → 板屏做题（时机/判读/对弈…）→ 回舞台结算 | 十支全部就位（2026-09-16），见 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) |
 
 ## 二、已完成
 
@@ -88,7 +89,7 @@ npm start                   # http://localhost:3001
 三层尺子（什么时候跑哪一档，见 [`QA.md`](QA.md) 开头）：
 
 ```powershell
-# ① 改一处就扫一眼：6 秒、0 真调（总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板）
+# ① 改一处就扫一眼：约 13 秒、0 真调（总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 输入 / 失败屏 / 升华 / 无报错）
 npm run dev:check
 # ② 提交前：上面那一套加动效、音频、素材、影音守卫，并行约 30 秒
 npm run verify:fast
@@ -102,21 +103,28 @@ npm run verify:full
 npm run test:e2e     # 五幕真调通关：unit 之外的总验收（~76 次调用），含不重复结算等回归断言
 npm run qa:failure   # 行军模式失败线（failure_review 真调）
 npm run qa:av        # 影音运行时审计：资源 404 / 立绘 / 环境床 / TTS 解码
-npm run test:unit    # 53 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致
+npm run test:unit    # 63 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 玩法守卫
 npm run qa:smoke     # 标题→营地→一次互动→回设置
-npm run qa:board     # 玩法板体检 57 项（8 个玩法的板屏壳 / 数值签 / 契约标记 / 离开清空）
+npm run qa:board     # 玩法板体检 83 项（10 个玩法的板屏壳 / 数值签 / 契约标记 / 离开清空 / 三方对账）
+npm run qa:ai        # 模型口径：策略表 ↔ 服务端 schema ↔ 日志三方对账（0 真调，读 logs/）
+npm run qa:audio     # 音频逐个体检 58 个 + 场景表对账 + 诗的音频对账
+npm run intake:minigames:check   # 十支小游戏源码的缝合点还在吗（幂等检查）
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫：字面量 / 模板 / 纸面 / 动效
 npm run qa:bus       # 总线守卫（模块化规则 + 内核运行时体检）· qa:handoff 交接文档一致性
 ```
 
-当前结果：unit 53/53 · smoke PASS · board 66/66 · motion 15/15 · e2e FULL PASS ·
-failure / loss / smoke PASS · av AUDIT PASS · tokens/frames/tone/handoff 全绿 ·
-`dev:check` 9/9（≈7s，含"调用流链通"）· `layout-audit --width 820` 与 1280 均零布局缺陷
+当前结果（2026-09-16 复跑）：unit 63/63 · smoke PASS · board 83/83 · motion 19/19 · bus 18/18 ·
+e2e FULL PASS（真调）· failure / loss PASS · av AUDIT PASS · audio PASS · ai ✓ ·
+tokens/frames/tone/handoff 全绿 · `dev:check` 10/10（≈13s，含"升华可跳过且不阻塞"）·
+`layout-audit` 1280 与 `--width 820` 各 18 屏、均零布局缺陷
+（**口径**：这些数字每次改完都会变，数字本身不是承诺；`npm run verify:fast` 绿才是"当前这棵树没问题"。）
 
 ## 三、还没做 / 已知缺口（按优先级）
 
 | 优先级 | 缺口 | 说明 |
 |--------|------|------|
+| P0 | **`verify:full`（五幕真调一局）还没跑** | 十支小游戏接完只跑到 `qa:board` + `dev:check`；"整局流程顺不顺"的最终凭据是 `npm run verify:full`（或 `npm run test:e2e`）。**接手第一条就跑它**，见 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) §四 欠账 7 |
+| P1 | 玩法侧四项欠账 | 注入样式没过 token（`qa:tokens` 扫不到 JS 内联 `<style>`）· `miniTruth` F12 可见 · `CHOICE_SETS.cross` 成死代码 · 同事 12 个 `qa-*.mjs` 还没并入 npm——**逐条与建议见 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) §四** |
 | P1 | 契约还差两处 | `runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职（建议走 `askChoice`）；`runRest` 只有一个「继续」，可直接 `waitContinue` |
 | P1 | 数值平衡未调 | 测量口径已建（`npm run qa:playtest` → `docs/PLAYTEST.md`），调参待做 |
 | P1 | ~~视觉批 6~~ | ~~答题/夜间/终局/记录与答辩~~ 已完成；视觉侧只剩「新增内容时按框架补」 |
@@ -128,9 +136,14 @@ failure / loss / smoke PASS · av AUDIT PASS · tokens/frames/tone/handoff 全�
 
 ## 四、接着干的话，从哪儿下手
 
+1. **先跑 `npm run verify:full`**（真调一局五幕）——十支小游戏接进来之后唯一还没验过的一档，
+   也是"流程顺不顺、模块之间接得通不通"的最终凭据（欠账 7）。
 2. **补两处契约**（`runQuiz` / `runRest`）——顺手就能做，做完 `test:e2e` 复验。
 3. **数值平衡**：`qa:playtest` 跑几局看 `docs/PLAYTEST.md` 的曲线，按 HANDOFF-CODE 第 25 条同时改三处
    （钳制表 / 提示词 / 单测）。
+4. **玩法侧欠账四项**（`MINIGAMES-INTAKE.md` §四）：注入样式过 token + 把 `qa:tokens` 扩到 JS 内联样式 ·
+   `miniTruth` 用 `isDevToolsOn()` 包一层 · 删死代码 `CHOICE_SETS.cross` · 同事的 `qa-*.mjs` 改走
+   `__czScreens.mini('<槽>')` 再并入 npm。
 
 ## 五、关键文件
 
@@ -145,30 +158,34 @@ failure / loss / smoke PASS · av AUDIT PASS · tokens/frames/tone/handoff 全�
 
 ```
 server/
-  index.js      路由（/api/decide /api/sim /api/config /api/logs）
-  ai.js         VN 侧：提示词 + 真调 + 重试 + 契约校验
+  index.js      路由（/api/decide /api/config /api/logs /api/tts）
+  ai.js         提示词 + 真调 + 重试 + 契约校验（**调用点只有流程层，玩法不自调**）
   schema.js     响应契约唯一真源（REQUIRED / missingFields / contractStamp）
   logger.js     JSONL 落库（按日文件 + 会话镜像 + 契约戳记）
   config.js     .env / runtime-config.json 双层配置
 public/js/
   kernel/       内核（bus/contracts/plugins/kernel/wiring/resources/snapshot/diag）——见 docs/BUS.md
-  modules/      IP 模块（audio / shell / screens / state / hud；见 docs/BUS.md 的模块表）
-  main.js       主线状态机（幕、营地、强制链、失败结算、玩法宿主 openBoard/mountMini）
+  modules/      IP 模块（audio / shell / screens / state / hud / ai / cinema / games；见 docs/BUS.md 的模块表）
+  main.js       组合根（启动、装配、内核起来之后 emit `app:ready`）——批 7 起只剩 500 余行
+  flow/         流程层（act / camp / games-flow / end / quiz / night / …）：幕、营地、强制链、结算都在这儿
+  modules/cinema/ 电影化演出（序章 / 幕间 / 终局升华）：player + beats + sequences
+  modules/games/  玩法宿主 + 十支薄适配插件（`pluginFrom(src, {...})`，玩法本体在 `games/src/`）
   step.js       交互契约（step/askChoice/choiceButton/waitContinue/markMini）
-  minigames.js  8 个玩法（本地只判手感，结算走 /api/decide）
   ui.js         渲染与浮层（showScreen 按模板选入场动效、板屏清空）
   state.js      资源/好感/失败判定/粮荒（可单测）
   audio/        音频框架（门面 / 混音表 / core / channels）——见 docs/AUDIO-SYSTEM.md
 public/css/     fonts → tokens（唯一值源）→ base → framework（模板+区块+动效）→ components
+public/audio/   环境床 / 音效 / BGM / TTS 缓存 / 预录台词 / 终局朗诵（poem/，随仓库走）
 data/acts.json  五幕定义（热点、dayScenes、强制链、对决）
 data/facts.json 史实卡（real / fiction 分栏）
+data/poem.json  终局升华的诗与落款（**唯一真源**，见 docs/POEM-TTS.md）
 logs/           入库样本 + 运行时日志（见 logs/README.md）
-tests/          unit / e2e（Playwright）/ manual（一次性排查与体检脚本）
+tests/          unit / e2e（Playwright）/ manual（体检脚本）；同事的 12 个玩法体检在 tests/manual/minigames/
 ```
 
 ## 六、每轮收尾清单（**每轮结束都做，做到随时能移交**）
 
-1. **跑验收**：开工到收尾都跑 `npm run dev:check`（约 6 秒、0 真调——改一处就看一眼它绿不绿）；
+1. **跑验收**：开工到收尾都跑 `npm run dev:check`（约 13 秒、0 真调——改一处就看一眼它绿不绿）；
    收尾时按改动涉及的层级跑 `npm run verify:fast`（提交前）与 `npm run verify:full`（推送/交付前，
    真调那一档）；服务端改动后必须看到测试输出 `restarted`（否则跑的是旧进程，绿灯是假的）。
 2. **更新文档**（缺一项都算没做完）：
@@ -185,11 +202,76 @@ tests/          unit / e2e（Playwright）/ manual（一次性排查与体检脚
 
 ## 七、注意事项
 
-- 密钥只在 `.env` 与 `runtime-config.json`，永不进前端
-- 小游戏手感判定算本地逻辑，**智能判断一律走 API**，答辩时按这条口径回答
-- 预置语音只覆盖固定台词；模型自由回复不发声（有意为之，避免成本与不可控）
+> **本节是"口头约定落纸"**：这个项目有一部分东西是靠当面/聊天里定下来的（哪段音频是谁给的、
+> 哪些包没进仓库、哪条红线不能碰）。为了让**只看仓库**的人也知道全部约定，这一节把它们全部写下来。
+> 遇到本节没写、但看起来"应该有人说过"的事，按 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) 的规矩办，
+> 并把结论补回本节——**别让约定只存在于聊天记录里**。
+
+### 七点一、密钥与仓库卫生（红线，不可协商）
+
+- **密钥只在 `.env` 与 `runtime-config.json`，永不进前端**；也**永不进产物**——文档、报告、日志、
+  提交信息里都不许出现 Key 的值（写"去设置里填 Key"可以，贴 Key 不行）。
+- **不入库清单**（`.gitignore` 已挡）：`.env` · `runtime-config.json` · `node_modules/` ·
+  `logs/ai-calls-*.jsonl` 与 `logs/session-full.jsonl` 运行日志 · `tests/e2e/artifacts/` ·
+  `_archive/` 里的位图与音频（`**/*.png|jpg|wav|mp3|ogg`、`data/replay/`）· `_archive/handoff-minigames-*/`（两份同事交接包）·
+  `_archive/audio-toolchain/`（本机音频工具链）。**朗诵音频是例外**：它 2026-09-16 起正式入库。
+- **不许 `git add -f` 绕过 gitignore**——那条清单是安全边界，不是建议。
+- **不许对公共分支 `git push --force`**。
+- **万一密钥真的推上去了：第一动作是去智谱后台轮换（吊销）那个 Key**，然后再收拾历史。
+  先改历史、后轮换的顺序是错的。
+- 推送前核对作者身份：`git log origin/main..main --format='%h %an <%ae> %s'`
+  （提交身份按 `CONTRIBUTING.md` 配；配错了别人 clone 下来会看到一堆陌生作者）。
+
+### 七点二、声音与画面素材的来路（声明清楚，**对外发布要换**）
+
+这一批素材是"找得到的现成素材 + 自产"两条路混着来的，用途是**竞赛内部演示**；
+来源是**对外发布前必须处理的一件事**，所以逐类声明在这里：
+
+| 素材 | 来路 | 对外发布怎么办 |
+|---|---|---|
+| 终局升华的整段朗诵 `public/audio/poem/qilv-changzheng.mp3`（59.3s） | 外部下载的《七律·长征(朗诵版)》录音（原文件名 `M500001cofo42JISSl.mp3`，备份在 `_archive/audio-poem-source/`，不入库） | 换成自有朗读，或走逐句 TTS 那条路；**只换文件 + 重新量时间轴，代码一行不用改**（步骤见该目录 `README.md` 与 [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md) §六点五） |
+| 8 首 BGM / 8 条环境床 / 8 个操作音效 | 外部素材 + 生成（"先按能下载的找"是当时的取舍：演示不卡在素材上） | 同上：文件名对齐就落盘即生效，换文件即可（见 [`ASSETS.md`](ASSETS.md)） |
+| 场景图 21 / 立绘 14 / 事件图 6 | 生图模型产出（prompt 包在 [`../../design/asset-prompts.md`](../../design/asset-prompts.md)） | 属自产，可继续用；重生成走同一份 prompt 包 |
+
+**朗诵音频已经随仓库走**（2026-09-16 起不再被 `.gitignore` 挡）：clone 下来就有、不用另外拷，
+`data/poem.json` 的 `audio.full` 已指向它、八句时间轴是量出来的。
+**红线照旧**：**任何音频都不允许阻塞流程**——放不出来必须静默降级（逐字按 `pace` 走），不许卡住收尾、不许弹错。
+
+### 七点三、同事的两份玩法交接包：**不在仓库里**
+
+- 那两份包（文档 + 完整检出，含 14 支玩法源码）是**私下交付**的 zip，归档在仓库外的
+  `_archive/handoff-minigames-v1/` 与 `_archive/handoff-minigames-v2/`，**被 gitignore 挡着、不进仓库**。
+- **要接的东西已经拷进工程**：玩法源码 → `public/js/modules/games/src/`；他们的说明 → [`docs/minigames/`](minigames/)；
+  他们的自测脚本 → `tests/manual/minigames/`。**要看"哪支游戏接在哪"看 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md)**（插槽对照表），
+  不要照 `docs/minigames/` 里的旧接线法做（那批文档是按他们那条线写的，映射以 intake 页为准）。
+- 同事再给新一版：把文件覆盖进 `src/` → `npm run intake:minigames`（重接缝合点，幂等）→ 核 `id/actions` 有没有变
+  （变了就同步插件、`qa-board` 的 specs 与 `driver.mjs` 的 case）。
+- 他们的 `audio.js` / `data/` / 内核**一律不覆盖我们的**（那是旧分叉）；两份 dev 网页没进工程（见欠账 5）。
+
+### 七点四、已经删掉的东西（别按旧文档去补）
+
+- **自由行军沙盘已删**（2026-09-15，用户叫停），同伴反应音 6 条也随之撤走、归档在 `_archive/audio-reactions-sandbox/`，
+  **没有任何代码路径引用它们**。
+- 入库的日志样本 `logs/sample-full-run.jsonl` 里有 `sim_turn` 记录，那是**当时真调的留档、不是当前能力清单**——
+  本版本的调用面是 **15 类**，`qa:ai` 里有一份 `RETIRED` 白名单专门放它过去（别把它当违约去修）。
+- 旧版 `public/js/minigames.js`（1121 行、8 个玩法）已删除，玩法现在是 `modules/games/` 的插件 + `src/` 里的本体。
+
+### 七点五、口径与说法（答辩/对外）
+
+- **小游戏手感判定算本地逻辑，智能判断一律走 API**——答辩时按这条回答；界面上不说"这是 AI 判的"。
 - **合作与场景口径不进界面**：对外只按"一款普通的长征叙事游戏"呈现。玩家可见的一切
-  （界面文案、页面 `meta`、可复制的研学报告、模型生成内容）不写合作方名称与行业场景，
+  （界面文案、页面 `meta`、可复制的研学报告、模型生成内容）不写合作方名称与行业场景；
   这些口径统一放 [`PITCH.md`](PITCH.md) 与 [`SCORING.md`](SCORING.md)，答辩时口头讲。
-- 日志是运行产物、不入库（只留样本）；要留全量证据就先归档当天的运行日志再只跑那一局
-- 任何"看起来能点但点了没反应"的界面状态都当缺陷修——它会让自动化卡死（2026-09-13 踩过两次）
+- **没有 MOCK 模式**：`/api/decide` 只有 `GLM`（成功）与 `ERROR`（重试用尽）两态，每次调用落 JSONL；
+  答辩要求"可审计的真调用"，`logs/` + 答辩面板就是证据（怎么取全量证据见下一条）。
+- **没有离线能力**：断网即报错（备选预案见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)，**未开发**）。
+- 预置语音只覆盖固定台词；模型自由回复不发声（有意为之，避免成本与不可控）。
+
+### 七点六、演示前的机器与证据
+
+- **演示机**：Node 18+ → `npm install` → 配 Key（写 `.env`，或在游戏内「设置」里填并点「测试连通」，
+  后者落到 `runtime-config.json`）→ `npm start` → `http://localhost:3001`。素材全在仓库里，
+  **不需要从别处拷任何文件**（朗诵音频 2026-09-16 起也随仓库走）。
+- **日志是运行产物、不入库**（只留样本）；要留全量证据：先归档当天的 `logs/ai-calls-<日期>.jsonl`，
+  再只跑那一局，让当天的日志干净可交。
+- 任何"看起来能点但点了没反应"的界面状态都当缺陷修——它会让自动化卡死（2026-09-13 踩过两次）。
