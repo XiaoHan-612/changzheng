@@ -7,6 +7,21 @@
 > 他们那两份交接包（文档 + 完整检出）归档在仓库外的 `_archive/handoff-minigames-v1｜v2/`，
 > 不进 git；要接的东西已经拷进工程（见下表"源码"一列）。
 
+## 〇、接手第一步（要动玩法就先看这里）
+
+```bash
+cd changzheng && npm install && npm start        # http://localhost:3001
+npm run intake:minigames:check                   # 十支源码的缝合点都在吗（幂等检查，0 依赖）
+npm run qa:board                                  # 十支的板屏契约 + 三方对账（0 真调，最能说明"接上了"）
+node tests/e2e/layout-audit.mjs --width 820       # 窄屏版式（点按区 ≥32px 这条已经一处收口，见下）
+```
+
+- **想改玩法手感**：直接改 `public/js/modules/games/src/minigames-*.js`（玩法本体，我们的规则不侵入）；
+  改完跑 `npm run qa:board` + 那支自己的 `tests/manual/minigames/qa-<支>.mjs`。
+- **拿到新一版玩法**：把文件覆盖进 `src/` → `npm run intake:minigames`（会重接缝合点）→ 看它卡片里的
+  `id/actions` 有没有变，变了就同步 `modules/games/<槽>.js`、`qa-board` 的 specs 与 `driver.mjs` 的 case。
+- **想加一支新的**：见第四节末尾"接线七处"，或照 `modules/games/README.md`（宿主契约）+ 本页第一节。
+
 ## 一、插槽对照表（十支都在，`qa:board` 逐条对账）
 
 | 我们的槽（`play(id)` 的 id = `data-mini`） | 落点（位置不变） | 源码（`modules/games/src/`） | 卡片 id | 动作词（`data-mini-action`） |
@@ -51,13 +66,15 @@
 
 | # | 欠账 | 说明 | 建议 |
 |---|---|---|---|
+| 0 | ~~窄屏点按区 <32px~~ **已收口** | 同事版式的按钮 26–30px 高 | 已在 `components.css` 加 `#board-body button { min-height: 32px }`——一处定义，后续新玩法自动合规；`layout-audit --width 820` 现为 0 处问题 |
 | 1 | **注入样式没过 token** | 每支自带 `<style>`（`sminiN-*`，含颜色字面量）——`qa:tokens`/`qa:frames` **扫不到 JS 内联样式**，等于绕过了视觉守卫 | 打磨批：把样式搬进 `components.css` 并按 tokens 改写，同时把 `qa:tokens` 的扫描扩到 JS 内联 `<style>` |
 | 2 | **`miniTruth` 真值可见** | rally 把"哪个方向有人/有敌情"整条写进 `data-*`，F12 能看（那支玩法就是信息判断） | 用 `isDevToolsOn()` 包一层再写 |
 | 3 | **`CHOICE_SETS.cross` 成死代码** | 浮桥改成玩法后，原来的"过河抉择"文字选项没人引用了 | 观察一局确认没回退需求后删掉 |
 | 4 | **同事的 `qa-*.mjs` 还没并入 npm** | 已复制到 `tests/manual/minigames/`，但它们的入口还指着他们的调试台（`/dev/minigame-lab.html`，我们树里没有） | 逐支改成 `__czScreens.mini('<槽>')` 入口，再进 `package.json` |
 | 5 | **两份 dev 网页没进工程** | `playground.html` / `minigame-lab.html` 依赖 16 个我们树里不存在的模块 | 等玩法全接完再定：改造（读我们的 manifest）或弃用 |
 | 6 | **未接入** | `sandtable`（沙盘，用户已叫停）· `soup`/`roster`（不在重做清单）· `stretcher-run`（被 `rally-river` 取代）；`nightschool-entry` 的竞答分支（`pick-quiz`）随入口自动可用 ✓ | — |
-| 7 | **同事文档按旧架构写** | `01/03/04` 那批说"改 `minigames-registry.js` / `main.js` 的 doXxx"，那是他们那条线的接线法；**我们的映射以本页为准** | 已归档在 [`docs/minigames/`](minigames/) |
+| 7 | **还没跑过"整局真调"** | 十支接完只跑到 `qa:board`（板屏契约）+ `dev:check` + 驱动策略静态审过；`verify:full`（五幕真调一局）**尚未跑**，它才是"流程顺畅"的最终凭据 | 接手后第一条就跑 `npm run verify:full`；若某支在真局里卡住，`driver.mjs` 的 `case` 就是加策略的地方 |
+| 8 | **同事文档按旧架构写** | `01/03/04` 那批说"改 `minigames-registry.js` / `main.js` 的 doXxx"，那是他们那条线的接线法；**我们的映射以本页为准** | 已归档在 [`docs/minigames/`](minigames/) |
 
 ## 五、验收（改完玩法跑这套）
 

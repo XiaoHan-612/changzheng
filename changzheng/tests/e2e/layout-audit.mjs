@@ -138,26 +138,33 @@ async function main() {
   await page.waitForTimeout(600);
   await shot(page, '02-camp');
 
-  // 事件卡（浮桥抉择）
+  // 玩法板（真开局）：第一幕的「浮桥」现在是同事重做的 pontoon-night 玩法（原来是一张文字抉择卡），
+  // 所以这里改成拍**真玩法板**——比拍一张抉择卡更值（板屏是玩家要盯几分钟的一屏）。
+  // 抉择屏/回响屏的版式由联系表（qa:screens 的 03-choice / 05-echo）+ e2e 覆盖。
   await page.locator('.hotspot').filter({ hasText: '浮桥' }).click({ force: true });
-  await page.waitForTimeout(700);
-  await shot(page, '03-stage-choice');
-
-  // 选第一项 → 等 continue
-  await page.locator('#ch-opts .blk-choice').first().click({ force: true });
-  await page.waitForTimeout(1500);
-  await shot(page, '04-stage-after-choice');
-
-  // continue → echo
-  if (await page.locator('#btn-continue').count()) {
-    await page.locator('#btn-continue').click({ force: true });
-  }
-  await page.waitForTimeout(500);
-  if (await page.locator('#screen-echo').isVisible().catch(() => false)) {
-    await shot(page, '05-echo');
-    await page.click('#btn-echo-ok');
+  for (let i = 0; i < 40; i++) {                       // 等板屏挂起来（数值签与契约标记都到位）
+    const ok = await page.evaluate(() => !document.getElementById('screen-board').classList.contains('hidden')
+      && !!document.querySelector('#board-body [data-mini-action]'));
+    if (ok) break;
     await page.waitForTimeout(300);
   }
+  await page.waitForTimeout(500);
+  await shot(page, '03-board-pontoon');
+
+  // 玩法进行中的版式：点一下板屏上的第一个动作（不依赖任何 dev 钩子——这一屏是默认状态拍的）
+  await page.locator('#board-body [data-mini-action]').first().click({ force: true }).catch(() => {});
+  await page.waitForTimeout(700);
+  await shot(page, '04-board-after-action');
+  // 打完这一局（走到结算），免得后面的幕推进卡在板屏上
+  for (let i = 0; i < 60; i++) {
+    if (await page.evaluate(() => !document.getElementById('screen-board').classList.contains('hidden') === false)) break;
+    const acts = await page.locator('#board-body [data-mini-action]').count();
+    if (await page.locator('#btn-continue').count()) { await page.locator('#btn-continue').first().click({ force: true }).catch(() => {}); }
+    if (!acts) { await page.waitForTimeout(300); }
+    else { await page.locator('#board-body [data-mini-action]').last().click({ force: true }).catch(() => {}); }
+    await page.waitForTimeout(400);
+  }
+  await page.waitForTimeout(400);
 
   // 启程 → 强制链 → 对决
   for (let i = 0; i < 80; i++) {

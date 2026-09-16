@@ -150,6 +150,8 @@ kernel.emit('flow:act-enter', { actId: 'act4', day: 2, label: '草地' });  // �
 | 6 | **ai 挂总线**：registry（每类预算/温度/端点）+ run（唯一调用实现）+ 事件化（`ai:start/done/fail/verdict`）+ `qa:ai` 度量；**50 处手工 `showThinking` 与 24 处 `bumpAiCount` 收编** | ✅ 已完成（2026-09-15） |
 | 7 | `main.js` → `flow/*` 拆分；`__czScreens` 由内核供出；同步三个源码扫描脚本（check-handoff / av-audit / check-tts） | ✅ 已完成（2026-09-15）：`main.js` 2216 → **535 行（只剩组合根）**，流程拆成 `flow/{kit,view,echo,tables,games-flow,quiz,night,act,end}.js`；dev 门面归内核；三个扫描脚本改成扫整个流程层 |
 
+| F | **接入同事重做的小游戏**：14 支源码收进 `modules/games/src/`（薄适配，四处缝合点：音频→事件 / 数值签→宿主 / 模型→流程层注入 / 收尾→onExit）· 十支按槽替换（老 `minigames.js` 1121 行删除）· 新增 `tools/intake-minigames.mjs`（幂等收料）· 四类新 callType 入 registry/schema | ✅ 已完成（2026-09-16） |
+
 ### 七点五、`flow/*` 模块地图（批 7 收口后的形状）
 
 | 文件 | 回答什么问题 | 不许做的事 |

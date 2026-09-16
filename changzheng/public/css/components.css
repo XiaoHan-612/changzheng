@@ -188,6 +188,11 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .set-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .set-test { margin-top: var(--sp-2); }
 
+/* 玩法板上的可点元素有个**点按区下限**（≥32px，与 layout-audit 的口径一致）。
+   同事那批重做的玩法版式偏紧（按钮 26–30px 高），窄屏上手指点不准——在这里收口而不是逐个改
+   他们注入的样式：一处定义，将来新玩法（含他们后续发来的）自动合规。 */
+#board-body button, #board-body [role="button"] { min-height: 32px; }
+
 /* 过场 */
 .cut-caption-wrap {
   position: relative; z-index: 2; text-align: center;

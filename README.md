@@ -71,6 +71,8 @@ node make-docx.js     # 输出 ../长征-抉择-设计方案.docx
 
 ## 文档索引
 
+- 小游戏这条线（同事重做版怎么进的、怎么加一支）：[`changzheng/docs/MINIGAMES-INTAKE.md`](changzheng/docs/MINIGAMES-INTAKE.md)
+
 | 文档 | 内容 |
 |------|------|
 | `CONTRIBUTING.md` | **团队协作规范：git 工作流 / 提交身份 / 冲突处理 / 给 AI agent 的规矩** |

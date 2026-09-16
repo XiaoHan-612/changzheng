@@ -1,7 +1,7 @@
 # 交接说明（Handoff）
 
 > ⚠️ **本文件是总览。分工交接请看：**
-> [`HANDOFF-CODE.md`](HANDOFF-CODE.md)（代码 agent）· [`HANDOFF-ART.md`](HANDOFF-ART.md)（生图模型）· [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md)（音频/TTS 模型）· [`ASSETS.md`](ASSETS.md)（素材清单）· [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md)（视觉体系与逐批进度）
+> [`HANDOFF-CODE.md`](HANDOFF-CODE.md)（代码 agent）· [`HANDOFF-ART.md`](HANDOFF-ART.md)（生图模型）· [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md)（音频/TTS 模型）· [`ASSETS.md`](ASSETS.md)（素材清单）· [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md)（视觉体系与逐批进度）· **小游戏这条线看 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md)**（插槽表 / 四处缝合点 / 怎么加一支 / 欠账）
 
 > 给接力的模型/同学：这份文档说明**已经做完什么、还差什么、怎么验证、怎么接着干**。
 > 所有自动化测试与守卫当前均为绿色；任何时刻停下都能按 §六 的清单移交。
@@ -21,12 +21,17 @@ npm start                   # http://localhost:3001
 2. **先验连通**：设置 → 测试连通，应显示耗时与 `source=GLM`。
 3. **自动验收**（跑得过就说明环境对了）：`npm run test:unit && npm run qa:smoke`；
    `npm run test:e2e` 是一次完整五幕真调（约 76 次调用、5 分钟），改过代码后必跑。
-4. **人工完整玩一遍的路线**：标题 → 研学模式 → 出身三选一 → 过场 → 营地（点光点：交谈一次、抉择一次）
+4. **要动小游戏**：读 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) —— 十支重做版已经接在**原来的位置上**
+   （第一幕的浮桥、湘江东岸、夜校、分糖、夜岗、五子棋、泸定桥、陡坡、钓鱼前置）。
+   加一支 / 换一版的路子：源码丢进 `public/js/modules/games/src/` → `npm run intake:minigames`
+   （接四处缝合点，幂等）→ 在 `modules/games/<槽>.js` 里一行 `pluginFrom(...)` → `manifest.js` 两行
+   → `qa-board` 的 specs 一行 + `driver.mjs` 一个 case → `npm run qa:board`。
+5. **人工完整玩一遍的路线**：标题 → 研学模式 → 出身三选一 → 过场 → 营地（点光点：交谈一次、抉择一次）
    → 启程 → 知识对决 → 五幕走完。单局 **20–25 分钟**；赶时间选「快速演示」（约 18 分钟），
    重点看这几处：**热点用过即作废**（变灰「已看过」）· 玩法都在**玩法板**上（题名 + 数值签）·
    每步都有**史实回响**（你经历的 / 真实发生过的 / 虚构边界）· 第四幕幕末的**篝火夜**（需点亮 ≥3 条附身线）·
    终局的**研学报告**。
-5. **坏了先看哪儿**：
+6. **坏了先看哪儿**：
    - 界面弹「模型调用失败」→ 点「重试」；连续失败看「设置 → 测试连通」和「记录」里那条 `source=ERROR` 的原因；
    - 一次真调 1.2–6 秒属正常（若换回赛制指定的 `glm-5.1` 约 11 秒/次）；**没有离线能力**，断网即报错（备选方案见 `OFFLINE-REPLAY.md`）；
    - **界面点了没反应、或行为像旧版本** → 先硬刷新一次（`Ctrl+Shift+R`）：浏览器可能还存着旧脚本。
