@@ -37,6 +37,8 @@ export class VoiceChannel {
     this.catalogPromise = null;
     this._rateVal = 1;        // 当前这句的语速档位（1 = 原速）
     this._settle = null;      // 当前这句的 Promise 落地口（stop 也要能落地，别让人死等）
+    this._seq = 0;            // 句序号：每播一句 +1，带在 voice:start/progress/ended 上
+                              // （消费方据此只认自己那句——没有它，上一句的进度会漏给下一句）
     this._progressTimer = null;   // 补齐 timeupdate 的 ~10Hz 进度定时器（只在播的时候活着）
     this._waitTimer = null;       // 兜底等待（防"放不完也不 ended"把流程挂住）
   }
@@ -74,7 +76,7 @@ export class VoiceChannel {
     detach(el);
     try { el.pause(); el.currentTime = 0; } catch { /* ignore */ }
     this.core.duck(false);
-    this.core.report('voice:ended', { interrupted: true });
+    this.core.report('voice:ended', { interrupted: true, seq: this._seq });
     this._settle?.();
     this._settle = null;
   }
@@ -160,9 +162,9 @@ export class VoiceChannel {
    * `voice:start / progress / ended` 三条事件的唯一来源。
    *
    * 三条事件（契约见 kernel/contracts.js）：
-   *   voice:start {durationMs}      开始出声（元数据还没到时为 0）
-   *   voice:progress {t,duration}   ~10Hz；t = 已播毫秒，逐字跟读只认这一个时钟
-   *   voice:ended {interrupted}     播完 / 被打断 / 出错三条路都发
+   *   voice:start {durationMs,seq}      开始出声（元数据还没到时为 0）
+   *   voice:progress {t,duration,seq}   ~10Hz；t = 已播毫秒，逐字跟读只认这一个时钟
+   *   voice:ended {interrupted,seq}     播完 / 被打断 / 出错三条路都发
    *
    * 打断语义：新句开场先停旧句（同时只响一路人声）。注意 `done` 里**只有当前这句**才解除闪避——
    * 否则旧句的收尾回调会把新句的闪避一起解掉（背景在台词中间突然变响，踩过）。
@@ -178,6 +180,8 @@ export class VoiceChannel {
       this.el = el;
       this._rateVal = rate;
       this._settle = resolve;
+      this._seq += 1;
+      const seq = this._seq;
       this.core.duck(true);                 // 台词期间压低背景（BGM 重、环境床轻）
 
       const done = () => {
@@ -188,7 +192,7 @@ export class VoiceChannel {
         this._disarm();
         detach(el);
         this.core.duck(false);
-        this.core.report('voice:ended', { interrupted: false });
+        this.core.report('voice:ended', { interrupted: false, seq });
         resolve();
       };
 
@@ -200,7 +204,7 @@ export class VoiceChannel {
         const b = Math.floor(t / MIX.voice.progressMs);
         if (b === bucket) return;
         bucket = b;
-        this.core.report('voice:progress', { t, duration: durationMs(el) });
+        this.core.report('voice:progress', { t, duration: durationMs(el), seq });
       };
       this._progressTimer = setInterval(tick, MIX.voice.progressMs);
 
@@ -216,7 +220,7 @@ export class VoiceChannel {
       el.onended = done;
       el.onerror = done;
       el.play()
-        .then(() => { if (this.el === el) this.core.report('voice:start', { durationMs: durationMs(el) }); })
+        .then(() => { if (this.el === el) this.core.report('voice:start', { durationMs: durationMs(el), seq }); })
         .catch(done);
     });
   }

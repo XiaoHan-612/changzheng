@@ -132,6 +132,7 @@ await step('内核启动', async () => {
     return {
       booted: st.booted,
       ready: kk.diag.events({ name: 'boot:ready' }).length,
+      appReady: kk.diag.events({ name: 'app:ready' }).length,
       events: kk.diag.count(),
       violations: kind('contract-violation'),
       badDescriptor: kind('bad-descriptor'),
@@ -152,6 +153,8 @@ await step('内核启动', async () => {
   assert(k, '页面加载完了但 window.__czKernel 不在——多半是某个 js 报错让入口没跑起来（先硬刷新清缓存）');
   assert(k.booted, '内核没 boot（main.js 里 kernel.boot() 没跑到？）');
   assert(k.ready >= 1, '没发出 boot:ready —— 事件总线没起来');
+  // 组合根也要报"整页就绪"：脚本与将来的启动期演出都靠它，缺了会让"谁先谁后"变成竞态（坑 54）
+  assert(k.appReady >= 1, '没发出 app:ready —— 组合根没跑到收尾（脚本会早于首屏动手）');
   assert(k.violations === 0, `契约违规 ${k.violations} 条（事件没按 contracts.js 带字段）`);
   assert(k.badDescriptor === 0, `坏描述符 ${k.badDescriptor} 个`);
   assert(k.apiMiss === 0, `取接口失败 ${k.apiMiss} 次`);
@@ -323,6 +326,42 @@ await step('终局失败也不空屏', async () => {
   assert(end.retry, '终局失败时没有「重新结算」的入口');
   assert(end.rel > 0, '终局失败时连本局关系都没渲染（这部分不依赖模型）');
   return '键点得到 · 明说 + 可重试 · 关系照旧';
+});
+
+await step('升华可跳过且不阻塞', async () => {
+  assert(!bail, '上一步没过');
+  // 终章升华是**整屏自动播**（会宁空镜 → 诗八句逐字 → 钤印）：它最长、最像"会卡住流程"的一段，
+  // 所以这里单独验三件事：① 诗真的挂上来了（题字 + 八句 + 语速键）；
+  // ② 「跳过」一跳到底、Promise 很快落地；③ 收尾干净（按钮上的契约标记摘掉，不会让后面的自动化点错东西）。
+  const played = page.evaluate(() => window.__czKernel.api('cinema').play('ending-poem'));
+  const up = Date.now();
+  for (;;) {
+    const ok = await page.evaluate(() => document.querySelectorAll('.poem-line .poem-ch').length >= 56);
+    if (ok) break;
+    if (Date.now() - up > 10000) throw new Error('升华 10 秒内没把诗挂上来（题字/八句/逐字 span 都不在）');
+    await page.waitForTimeout(100);
+  }
+  const form = await page.evaluate(() => ({
+    title: (document.querySelector('.poem-title')?.textContent || '').trim(),
+    lines: document.querySelectorAll('.poem-line').length,
+    chars: document.querySelectorAll('.poem-ch').length,
+    speed: !document.getElementById('btn-cut-speed').classList.contains('hidden'),
+  }));
+  assert(form.lines === 8, `诗应该有 8 句，实际 ${form.lines}`);
+  assert(form.chars >= 56, `八字句的逐字 span 只有 ${form.chars} 个`);
+  assert(form.title.includes('七律'), `诗题不对：${form.title}`);
+  assert(form.speed, '诗那一拍没有露出语速键');
+
+  const t = Date.now();
+  await page.click('#btn-cut-skip');
+  const r = await played;
+  const ms = Date.now() - t;
+  assert(r && r.skipped === true, `跳过之后 play() 没有如实返回：${JSON.stringify(r)}`);
+  assert(ms < 4000, `跳过用了 ${ms}ms——一跳到底必须是"立刻"，不能等它演完`);
+  const clean = await page.evaluate(() => ['btn-cut-next', 'btn-cut-skip', 'btn-cut-speed']
+    .every((id) => !document.getElementById(id).dataset.action));
+  assert(clean, '过场结束后按钮上的 data-action 契约标记没摘干净（会让后面的自动化点错）');
+  return `八句 ${form.chars} 字挂得上 · 跳过 ${ms}ms · 收尾干净`;
 });
 
 await step('全程无报错', async () => {

@@ -2,7 +2,8 @@
 
 > 状态标记：**已有** = 已在仓库且被引用；**备用** = 在盘但暂无接线点；**占位** = 用现有素材/CSS/合成音顶着，不阻塞开发；**待生成** = 需要生图或音频模型产出。
 > 生图规格与 prompt 见 [`design/asset-prompts.md`](../../design/asset-prompts.md)；音频见 [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md)。
-> 数字对账过（2026-09-15）：`scenes = 36`、`characters = 14`、`events = 6`、`ambient = 8`、`voices = 21`、`cache = 20`。
+> 数字对账过（2026-09-16）：`scenes = 39`、`characters = 14`、`events = 6`、`ambient = 8`、**`bgm = 8`**、
+> **`sfx = 8`**、`voices = 21`、`cache = 20`、`poem = 1`（整段朗诵）。
 
 ## 一、场景图（`public/assets/scenes/`，36 张）
 
@@ -19,10 +20,10 @@
 
 > `pond.jpg` 是**备用池塘景**（在用的是 `pond_close.jpg`），保留在盘、无接线点，别当垃圾删。
 > 序章与每幕幕间共用一个过场屏（`#screen-cutscene`）；其中路线图那一拍现在用 `map_route`。
-> **第 2 轮三张图待产**（`map_route_deep.jpg` / `huining_dusk.jpg` / `poem_paper.jpg`，prompt 见
-> [`asset-prompts.md`](../../design/asset-prompts.md) §1）：三张都已接上「落盘即生效」——
-> 流程层用 `sceneImage()` 探测，产完丢进 `public/assets/scenes/` 就自动顶掉现在用的图，**不用改代码**；
-> `qa:assets` 现在会把它们列在「待生成图片」里。
+> **第 2 轮三张图已就位**（2026-09-16）：`map_route_deep.jpg`（序章/幕间的暗调路线图）、
+> `huining_dusk.jpg`（升华收束空镜）、`poem_paper.jpg`（诗页底纹）。三张都走「落盘即生效」——
+> 流程层用 `sceneImage()` 探测，放进目录即自动顶掉旧图、**没有改一行代码**（`qa:assets` 已从
+> 「待生成图片」移到「已就位」）。
 
 ## 二、角色立绘（`public/assets/characters/`，14 张）
 
@@ -57,8 +58,8 @@
 | 类别 | 现状 | 说明 |
 |---|---|---|
 | 环境床 | **8 条已就位**（共 9 种 kind） | `public/audio/ambient/*.ogg`（真 Ogg Vorbis，单声道 44.1kHz、24.4s、116–226KB）。第 9 种 `wind` 是兜底场景、未产出 → 走合成兜底（`qa:audio` 会列出"正在兜底"） |
-| 操作音效 | **合成兜底**（8 个待预录） | `click` · `cast` · `hook` · `echo` · `correct` · `wrong` · `march` · `day`：`sfx-table.js` 有合成配方，把同名 `.ogg` 放进 `public/audio/sfx/` 即顶替合成音（落盘即生效） |
-| **BGM** | **8 首待产（唯一待产线）** | `public/audio/bgm/<kind>_bgm.ogg`，文件名与情绪已定（见 [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md) §六）。**放进目录就自动生效**，代码无需改动；未产出时该场景只放环境床 |
+| 操作音效 | **8 个已就位**（2026-09-16） | `public/audio/sfx/{click,cast,hook,echo,correct,wrong,march,day}.ogg`——同名文件自动顶替 `sfx-table.js` 的合成配方（落盘即生效，代码没改） |
+| **BGM** | **8 首已就位**（2026-09-16，唯一待产线收口） | `public/audio/bgm/<kind>_bgm.ogg` 八首齐全（`qa:audio` 报「BGM 文件齐全（8 首）」）。按幕与分日自动切换（`scene-table.js`），音量 0.18、人声时闪避——同样是落盘即生效，代码没改 |
 | 预录台词 | **21 条** | `public/audio/voices/*.wav` + 索引 `voice-lines.json` |
 | TTS 缓存 | **20 条** | `public/audio/cache/*.wav`（22050Hz 单声道，2.33MB）。清单 [`TTS-MANIFEST.md`](TTS-MANIFEST.md)，验收 `npm run qa:tts` |
 | **终局升华的整段朗诵** | **1 条（不入库）** | `public/audio/poem/qilv-changzheng.mp3`（《七律·长征(朗诵版)》，59.3s）。八句起止毫秒**是量出来的**、写在 `data/poem.json`；换音频要重新量（见 [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md) §六点五）。该目录 gitignore，换机器演示要一起拷 |

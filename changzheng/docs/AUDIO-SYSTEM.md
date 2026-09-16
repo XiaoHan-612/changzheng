@@ -126,9 +126,9 @@ reconcile(): 让 actual 追上 desired —— 该起的起（带淡入）、该�
 
 | 事件 | 载荷 | 谁在用 |
 |---|---|---|
-| `voice:start` | `{ durationMs }`（0 = 元数据还没到） | 终局升华的播放器知道"确有声、多长" |
-| `voice:progress` | `{ t, duration }`，**约 10Hz** | **逐字跟读的唯一时钟**（只认已播毫秒，不自造第二个） |
-| `voice:ended` | `{ interrupted }`（自然播完 / 被打断 / 出错三条路都发） | 收尾一律以它为准，别等 `start` 配对 |
+| `voice:start` | `{ durationMs, seq }`（0 = 元数据还没到；`seq` 是句序号） | 消费方按 `seq` **只认自己那一句**的回声 |
+| `voice:progress` | `{ t, duration, seq }`，**约 10Hz** | 诊断与将来可能的精细同步用它；终局升华**不再逐帧读它**（见下段） |
+| `voice:ended` | `{ interrupted, seq }` | 收尾一律以它为准，别等 `start` 配对 |
 | `voice:stop`（反向） | — | 跳过终局升华时连音频一起停（`audio.voiceStop()`） |
 
 三条实现要点：
@@ -139,6 +139,10 @@ reconcile(): 让 actual 追上 desired —— 该起的起（带淡入）、该�
    12s 硬顶会截断）；**时长未知**时才用 `maxWaitMs = 12s` 兜底。
 3. **语速可调**：`speak({ rate })` 落到元素的 `playbackRate`；档位表是 `mix.js` 的 `MIX.voice.rates = [1, 1.5]`，
    不在表里的值一律回落 1（业务不许随手传没验过的档）。读法走 `kernel.api('audio').voiceRates()`。
+
+**诗的逐字怎么走**（2026-09-16 定稿）：**不逐帧读音频位置**，而是「锚点 + 挂钟 × 语速」——
+逐句窗口取自 `data/poem.json`（量出来的），整体提前 500ms（**文字略早于音频**，用户口径：不追精确、别让人等）。
+音频只当并行的背景轨，没响/中途停都不影响字幕，也就顺手去掉了三类脏数据特判（见 HANDOFF-CODE 坑 55）。
 
 这条通道也是 `.gitignore` 里朗诵音频那条线的前提：**音频缺失时整套流程照走**（`voice:ended` 照发，
 升华退化成固定节奏逐字），红线「任何音频都不允许阻塞流程」不因新功能破例。

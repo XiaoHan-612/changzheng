@@ -11,7 +11,8 @@
  */
 export const EVENTS = {
   // ── 内核自身 ──
-  'boot:ready': { note: '内核启动完成（所有已注册模块的 init 都跑过）', fields: ['at'] },
+  'boot:ready': { note: '内核启动完成（所有已注册模块的 init 都跑过）。**注意它不等于整页就绪**：组合根还要取配置/数据、绑事件，最后才摆标题屏', fields: ['at'] },
+  'app:ready': { note: '组合根（main.js）准备完毕：配置与数据都取到、事件都绑好、首屏已摆。脚本要"整页就绪"等这一条（等 boot:ready 会在组合根摆首屏之前就动手，把刚起的过场顶掉）', fields: ['at'] },
 
   // ── 屏与流程 ──
   'screen:show': { note: '切到某屏。各屏自己订阅 screen:hide 清理自己的 DOM（不许越界清别人）', fields: ['id'] },
@@ -39,9 +40,9 @@ export const EVENTS = {
   'game:end': { note: '玩法结束（带结果分；玩法内部规则仍归玩法自己）', fields: ['id'], optional: ['score', 'ms'] },
   'ai:feed': { note: '一条调用摘要（答辩面板的调用流）：谁发起调用谁发它，列表与渲染在别处——数据源唯一', fields: ['entry'] },
   'voice:say': { note: '播一句台词；text 与 file 至少给一个（file 直给时跳过目录与 TTS 解析）；rate 是语速档位（见 audio 模块 api 的 voiceRates()）', fields: [], optional: ['text', 'actorId', 'voiceId', 'file', 'rate'] },
-  'voice:start': { note: '语音开始出声。durationMs 为 0 = 还没读到元数据（以 voice:progress 里的 duration 为准）；起播就失败或没播完就被停掉的，不会有 start，直接给 ended', fields: ['durationMs'] },
-  'voice:progress': { note: '语音播放进度（约 10Hz 节流）：t = 已播毫秒。逐字跟读全项目只认这一个时钟（不自造第二个）', fields: ['t', 'duration'] },
-  'voice:ended': { note: '语音收尾：自然播完 / 被打断 / 出错三条路都发（interrupted 区分后两者），消费方以它为准收尾，别等 start 配对', fields: [], optional: ['interrupted'] },
+  'voice:start': { note: '语音开始出声。durationMs 为 0 = 还没读到元数据（以 voice:progress 里的 duration 为准）；起播就失败或没播完就被停掉的，不会有 start，直接给 ended。seq 是这一句的序号（每条 voice:* 同源），消费方按它只认自己那一句', fields: ['durationMs', 'seq'] },
+  'voice:progress': { note: '语音播放进度（约 10Hz 节流）：t = 已播毫秒，seq 与同句的 start 一致。逐字跟读全项目只认这一个时钟（不自造第二个）', fields: ['t', 'duration', 'seq'] },
+  'voice:ended': { note: '语音收尾：自然播完 / 被打断 / 出错三条路都发（interrupted 区分后两者），消费方以它为准收尾，别等 start 配对', fields: ['seq'], optional: ['interrupted'] },
   'voice:stop': { note: '请求停当前台词（跳过终局升华要连音频一起停）；没在播时无副作用', fields: [] },
   'audio:toggle-mute': { note: '请求切换静音（状态由 audio 模块持有，UI 不自己记）', fields: [] },
   'audio:muted': { note: '静音状态变了（audio 模块回执；UI 据此更新图标与提示）', fields: ['on'] },

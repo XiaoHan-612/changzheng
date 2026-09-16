@@ -1,5 +1,5 @@
 # 音频体检报告
-> 由 `npm run qa:audio` 生成 · 共 50 个文件（ambient 8 · bgm 0 · cache 20 · voices 21 · poem 1）
+> 由 `npm run qa:audio` 生成 · 共 58 个文件（ambient 8 · bgm 8 · cache 20 · voices 21 · poem 1）
 | 文件 | 容器 | 采样 | 声道 | 时长 | 体积 | HTTP | MIME | 可解码 |
 |---|---|---|---|---|---|---|---|---|
 | `public/audio/ambient/depart_river.ogg` | vorbis | 44100 | 1 | 24.4s | 117 KB | 200 | audio/ogg | ✅ |
@@ -10,6 +10,14 @@
 | `public/audio/ambient/snow_wind.ogg` | vorbis | 44100 | 1 | 24.4s | 225 KB | 200 | audio/ogg | ✅ |
 | `public/audio/ambient/xiangjiang_wind.ogg` | vorbis | 44100 | 1 | 24.4s | 149 KB | 200 | audio/ogg | ✅ |
 | `public/audio/ambient/zunyi_rain.ogg` | vorbis | 44100 | 1 | 24.4s | 226 KB | 200 | audio/ogg | ✅ |
+| `public/audio/bgm/depart_bgm.ogg` | vorbis | 44100 | 2 | 95.4s | 797 KB | 200 | audio/ogg | ✅ |
+| `public/audio/bgm/grass_bgm.ogg` | vorbis | 44100 | 2 | 119.3s | 533 KB | 200 | audio/ogg | ✅ |
+| `public/audio/bgm/huining_bgm.ogg` | vorbis | 44100 | 2 | 99.4s | 440 KB | 200 | audio/ogg | ✅ |
+| `public/audio/bgm/jinsha_bgm.ogg` | vorbis | 44100 | 2 | 99.4s | 853 KB | 200 | audio/ogg | ✅ |
+| `public/audio/bgm/luding_bgm.ogg` | vorbis | 44100 | 2 | 89.5s | 1.10 MB | 200 | audio/ogg | ✅ |
+| `public/audio/bgm/snow_bgm.ogg` | vorbis | 44100 | 2 | 109.4s | 1.47 MB | 200 | audio/ogg | ✅ |
+| `public/audio/bgm/xiangjiang_bgm.ogg` | vorbis | 44100 | 2 | 89.4s | 211 KB | 200 | audio/ogg | ✅ |
+| `public/audio/bgm/zunyi_bgm.ogg` | vorbis | 44100 | 2 | 99.4s | 1.38 MB | 200 | audio/ogg | ✅ |
 | `public/audio/cache/0bdf512ca91f7803_narr.wav` | wav | 22050 | 1 | 1.4s | 60 KB | 200 | audio/wav | ✅ |
 | `public/audio/cache/1dfdfaad5acddddd_narr.wav` | wav | 22050 | 1 | 1.8s | 77 KB | 200 | audio/wav | ✅ |
 | `public/audio/cache/554e34ea8555b08a_narr.wav` | wav | 22050 | 1 | 7.2s | 309 KB | 200 | audio/wav | ✅ |

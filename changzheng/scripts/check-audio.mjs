@@ -191,11 +191,6 @@ async function main() {
   } else if (new Set(Object.values(DEFAULT_VOICE)).size !== 1) {
     problems.push(`默认音色不一致：服务端 '${DEFAULT_VOICE.server}'、前端 '${DEFAULT_VOICE.client}'、脚本 lib '${DEFAULT_VOICE.scripts}' —— sha1 会算出不同文件名，TTS 缓存永远命中不了`);
   }
-  for (const r of byDir('bgm')) {
-    if (!Object.values(mapOf(read('public/js/audio/channels/bgm.js'), BGM_ENTRY)).some((u) => path.basename(u) === r.file)) {
-      problems.push(`${r.url} 没有任何 BGM_FILE 映射指向它 → 永远播不到`);
-    }
-  }
   // 终局升华的诗：放进 poem/ 的文件必须被 data/poem.json 指到（否则白放）；逐句配音缺了只提示不报错
   for (const r of byDir('poem')) {
     if (!refs.poemFiles.has(r.file)) {
@@ -243,6 +238,13 @@ async function main() {
   const AMBIENT_KIND = /ambient:\s*'([a-z_]+)'/g;
   const BGM_KIND = /bgm:\s*'([a-z_]+)'/g;
   const mapOf = (src, re) => Object.fromEntries([...src.matchAll(re)].map((m) => [m[1], m[2]]));
+  // BGM 文件必须被 BGM_FILE 映射指到（这一段原先写在 mapOf 定义**之前**：那时 bgm/ 是空的，
+  // 循环体一次没跑过，所以"用了还没初始化的 const"一直没暴露——2026-09-15 BGM 一落盘就炸）
+  for (const r of byDir('bgm')) {
+    if (!Object.values(mapOf(read('public/js/audio/channels/bgm.js'), BGM_ENTRY)).some((u) => path.basename(u) === r.file)) {
+      problems.push(`${r.url} 没有任何 BGM_FILE 映射指向它 → 永远播不到`);
+    }
+  }
   const tableSrc = read('public/js/audio/scene-table.js');
   const ambientMap = mapOf(read('public/js/audio/channels/ambient.js'), AMBIENT_ENTRY);
   const bgmMap = mapOf(read('public/js/audio/channels/bgm.js'), BGM_ENTRY);

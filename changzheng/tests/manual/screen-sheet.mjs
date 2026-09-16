@@ -321,15 +321,45 @@ const BATCHES = {
         await p.evaluate(() => window.__czScreens.end());
         for (let i = 0; i < 90; i++) {
           if (await p.locator('#end-report:not(.hidden)').count()) break;
+          // 终局流程里夹着升华（六十秒的自动播）：这一屏要的是**报告**，
+          // 所以顺手把过场跳过——不然干等一分钟，而且拍到的还是诗
+          if (await p.locator('#btn-cut-skip').isVisible().catch(() => false)) {
+            await p.click('#btn-cut-skip').catch(() => {});
+          }
           await p.waitForTimeout(400);
         }
         await p.waitForTimeout(600);
       },
     },
-    // 记录 / 答辩：两个浮层面板（都是现成入口）
-    { name: '06-logs', setup: async (p) => { await p.evaluate(() => window.__czScreens.logs()); await p.waitForTimeout(500); } },
+    // 终章升华（电影化的第三处）：直接放这一段——它不调模型，纯本地诗与音频
     {
-      name: '07-defense',
+      name: '06-poem',
+      // ⚠️ **待修**（2026-09-15 交接）：这一页在联系表里拍到的是**钤印那一拍**而不是诗。
+      // 游戏里的升华是好的（qa:av 真调一局 PASS、dev:check 有断言、探针逐个验过：逐字跟得上、
+      // 1.5× 与跳过都对），只有联系表这一页另有蹊跷：这一页里诗那一拍似乎**没有渲染**（lines 恒为 0），
+      // 下一步的查法——在这一条里挂 `p.on('console')` 与 `p.on('response')`，看
+      // ① 有没有 `[cinema] 拍子「poem」演出时出错`；② `/api/data/poem` 的返回码。
+      // 结论没查清之前，这一行别删、也别当成"已验收"。
+      // 新开一页 + 先起一局到营地，再演升华（这一页就是"打完一局之后"的样子）。
+      // 取图**看时钟不看音频**：逐句窗口是从录音量出来的（11.4–20.8s 是第 1、2 句），
+      // 所以"第 18 秒按快门"拿到的一定是"前两句逐字、其余留白"那一帧，不受 headless 音频快慢影响。
+      fresh: true,
+      setup: async (p) => {
+        await p.waitForFunction(() => window.__czKernel?.diag?.events?.({ name: 'app:ready' })?.length > 0, null, { timeout: 20000 });
+        await intoCamp(p);
+        await p.evaluate(() => window.__czKernel.api('cinema').play('ending-poem'));
+        await p.waitForTimeout(18000);
+        console.log('  06-poem 现场：', JSON.stringify(await p.evaluate(() => ({
+          lines: document.querySelectorAll('.poem-line').length,
+          on: document.querySelectorAll('.poem-ch.on').length,
+          seal: !!document.querySelector('.poem-seal'),
+        }))));
+      },
+    },
+    // 记录 / 答辩：两个浮层面板（都是现成入口）
+    { name: '07-logs', setup: async (p) => { await p.evaluate(() => window.__czScreens.logs()); await p.waitForTimeout(500); } },
+    {
+      name: '08-defense',
       setup: async (p) => {
         await p.click('#btn-logs-close', { force: true }).catch(() => {});
         await p.waitForTimeout(300);

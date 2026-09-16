@@ -32,7 +32,7 @@
 | `npm run qa:playtest` | 自动试玩：人类节奏下的单局时长与资源曲线（`--mode/--strategy/--runs/--speed/--doc`） | PLAYTEST DONE，`docs/PLAYTEST.md` 落表 |
 | `npm run qa:loss` | 行军模式减员定点验证（注入断粮 → 走到高风险抉择 → 必须失去一个人） | LOSS CHECK PASS |
 | `npm run qa:av` | **影音运行时审计**：资源 404、营地全景/舞台图/立绘是否用对、环境床与语音是否真播放、TTS 音频能否解码、音效链路、**无声率与 TTS 缺口**；4xx 会分流成「文件在磁盘上却失败」（故障）与「声明了但素材未产出」（信息，如未产出的 BGM/音效）；另断言**同时播放峰值 ≤1**（防叠音与孤儿音频）与**语音三条事件真的在流**（`voice:start/progress/ended`，`ended` 不落单、载荷是数字——终局升华的逐字跟读靠它，见 AUDIO-SYSTEM §六点一） | AV AUDIT PASS，问题列表为空；缺口清单落 `docs/TTS-GAPS.md` |
-| `npm run qa:audio` | **音频逐个体检**（49 个）：容器 vs 扩展名、HTTP 200、MIME、浏览器逐条解码、"能否被代码路径引用到"，外加**框架一致性**（门面唯一、无旧 API 残留、无绕开框架的 `new Audio`/音量写法、**切场景只走声明表**）、**场景表对账**（场景表 kind ↔ 文件映射 ↔ 磁盘文件，缺 BGM/正在兜底都会列出来）、**默认音色一致性**（服务端 / 前端门面 / 脚本 lib 三处 `DEFAULT_VOICE`，分岔则 TTS 缓存永远命中不了）与**诗的音频对账**（`public/audio/poem/` 里的文件必须被 `data/poem.json` 指到；`audio.full` 声明了就必须在——逐句配音缺了只提示不报错，因为"没有音频也能演"） | AUDIO PASS，报告落 `docs/AUDIO-REPORT.md` |
+| `npm run qa:audio` | **音频逐个体检**（58 个）：容器 vs 扩展名、HTTP 200、MIME、浏览器逐条解码、"能否被代码路径引用到"，外加**框架一致性**（门面唯一、无旧 API 残留、无绕开框架的 `new Audio`/音量写法、**切场景只走声明表**）、**场景表对账**（场景表 kind ↔ 文件映射 ↔ 磁盘文件，缺 BGM/正在兜底都会列出来）、**默认音色一致性**（服务端 / 前端门面 / 脚本 lib 三处 `DEFAULT_VOICE`，分岔则 TTS 缓存永远命中不了）与**诗的音频对账**（`public/audio/poem/` 里的文件必须被 `data/poem.json` 指到；`audio.full` 声明了就必须在——逐句配音缺了只提示不报错，因为"没有音频也能演"） | AUDIO PASS，报告落 `docs/AUDIO-REPORT.md` |
 | `npm run qa:inspect` | 素材体检：格式/尺寸/时长/重复（含立绘） | 素材体检通过 |
 | `npm run qa:bus` | **总线守卫**：静态六条（模块间不许 import / 订阅只写描述符 / 事件先登记 / 模块必须在清单 / 状态写入只在 store / state 纯函数先 import）+ 运行时体检（内核启动、事件在流、契约违规 0、事件流可导出 JSONL、统一摆屏入口可用） | 静态与运行时全 ✓ |
 | `npm run qa:handoff` | 交接文档与代码契约一致（场景/环境床/TTS/立绘） | 可以交接 |

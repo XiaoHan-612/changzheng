@@ -35,6 +35,8 @@ for (let i = 0; i < 20; i++) {
 check('无 pageerror', errs.length ? errs.join(' | ').slice(0, 120) : '0', '0');
 check('内核句柄存在', st ? 'yes' : 'no', 'yes');
 check('内核已启动', st?.booted === true ? 'yes' : 'no', 'yes');
+// 组合根的收尾信号：`booted` 之后它还要取配置/数据、摆首屏，脚本要等的是 `app:ready`（坑 54）
+check('整页就绪（app:ready）', await page.evaluate(() => (window.__czKernel.diag.events({ name: 'app:ready' }).length > 0) ? 'yes' : 'no'), 'yes');
 
 const flow = await page.evaluate(() => {
   const k = window.__czKernel;

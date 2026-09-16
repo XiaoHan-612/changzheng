@@ -231,8 +231,19 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
   .poem-ch { opacity: 1; transition: none; }
 }
 
-/* 钤印收束（seal 拍子）：印章 + 落款，居中 */
+/* 钤印收束（seal 拍子）：一枚朱红大印 + 落款 + 一行日期，居中。
+   与回响屏那枚 `.blk-seal` 小圆章是同一套视觉语言（朱红描边 / display 字体 / 静态 -8°），
+   但尺寸与容字量不同——那枚是角标，这枚是整屏的收束，字只放两个。 */
 .poem-seal { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); }
+.poem-seal-stamp {
+  display: grid; place-items: center; width: 104px; height: 104px;
+  border: 2px solid var(--seal); border-radius: var(--radius);
+  box-shadow: inset 0 0 0 3px var(--seal-veil), inset 0 0 22px var(--seal-veil);   /* 都用颜色 token：--seal-ring 是 box-shadow 值，不是颜色 */
+  color: var(--seal-bright); font-family: var(--font-display);
+  font-size: var(--fs-h1); letter-spacing: 0.06em;
+  transform: rotate(-8deg);
+}
+.poem-seal-line { font-family: var(--font-display); font-size: var(--fs-h1); color: var(--paper); letter-spacing: var(--ls-title); }
 .cut-actions { display: flex; gap: var(--sp-3); justify-content: center; margin-top: var(--sp-4); }
 
 /* 会话与提示 */

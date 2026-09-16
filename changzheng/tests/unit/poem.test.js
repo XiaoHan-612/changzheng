@@ -17,6 +17,8 @@ test('诗：题、作者、出处、落款都得有（升华屏逐条要显示�
     assert.ok(String(poem[k] || '').trim(), `poem.json 缺 ${k}`);
   }
   assert.ok(String(poem.seal?.line || '').trim(), 'poem.json 缺 seal.line');
+  // 印章只放两个字：回响屏那枚小圆章是 56px，五个字会溢出成一堆碎片（2026-09-15 联系表实拍踩到）
+  assert.equal([...(poem.seal?.stamp || '')].length, 2, 'poem.json 的 seal.stamp 必须是两个字');
 });
 
 test('诗：八句、每句七字、两句一联（七律的形制）', () => {

@@ -92,18 +92,20 @@ export const BEATS = {
     },
   },
   /**
-   * 诗句逐字 —— **跟音频的已播毫秒走**（终局升华那一段）。
+   * 诗句逐字 —— **按量出来的时间轴估个量，文字比音频略早**（终局升华那一段）。
    *
-   * 时间基准只有两个来源，都写在 `revealByClock` 里：
-   *   · 有整段朗诵（`audio.full`）：跟 `voice:progress` 的 t（批 A 建立的那条时钟），逐句窗口取
-   *     `lines[].startMs/endMs`（**量出来的**，见 docs/HANDOFF-AUDIO 第六点五节）；
-   *   · 没有音频：按 `pace` 合成一条时间轴，用挂钟推——**没声音也照演**（红线：音频不许阻塞流程）。
-   * 两条路只差"现在几点了"，逐字逻辑同一份。
+   * 口径（用户定的）：**不必精确对齐**，文字稍快一点没关系——宁可字先出，别让人等。
+   * 所以：逐句窗口取 `data/poem.json` 里量出来的 `startMs/endMs`，整体提前 `POEM_LEAD_MS`，
+   * 逐字用**挂钟**推（音频只是并行的背景轨，起播早晚、响没响都不影响字幕节奏）。
+   * 这样也顺手去掉了逐帧读音频位置的三种脏数据特判（旧元素 currentTime 让整首两秒读完、
+   * 音频停住则永不结束、别的句子的回声漏进来——见 HANDOFF-CODE 坑 55）。
    */
   poem: {
     kind: 'poem',
     holdMs: () => 2400,                 // 读完之后的一点余韵
     speeds: [1, 1.5],                   // 可加速：播放器据此露出速度键（档位值来自 audio/mix.js）
+    /** 收尾：把这首朗诵停掉——它的尾巴不该盖到钤印那一拍上 */
+    cleanup() { kernel.emit('voice:stop', {}); },
     async render(ctx, b) {
       const poem = await fetchPoem();
       if (!poem) { ctx.cap.textContent = ''; return; }
@@ -123,41 +125,38 @@ export const BEATS = {
       }));
       ctx.cap.textContent = '';
 
-      const full = poem.audio?.full;
-      const plan = timelineOf(poem);                    // [{ i, startMs, endMs }]
-      let clock;                                        // () => 已播毫秒
-      if (full) {
-        const file = `/audio/poem/${full}`;
-        kernel.emit('voice:say', { file, rate: ctx.rate || 1 });
-        await sleep(650);
-        const v = ctx.voice();
-        if (v.startedAt) {
-          clock = () => ctx.voice().t;                  // 跟音频（唯一时钟）
-        } else {
-          ctx.cap.textContent = '（这段朗诵没放出来，改按字读）';
-          clock = wallClock(ctx.rate);                 // 文件缺失/静音：退化成固定节奏
-          ctx.after(1200, () => { if (!ctx.gone()) ctx.cap.textContent = ''; });
-        }
-      } else {
-        clock = wallClock(ctx.rate);
-      }
-      for (const row of rows) row.chs.forEach((c) => { c.classList.remove('on'); });
+      // 时间轴：有量出来的逐句窗口就用它（换音频要重新量），没有就按 pace 合成一条；
+      // 两种都按语速折算，并整体提前 POEM_LEAD_MS（文字略早于音频——用户口径）
+      const rate = ctx.rate || 1;
+      const plan = timelineOf(poem, rate);
       const end = plan.length ? plan[plan.length - 1].endMs : 0;
-      await revealByClock(ctx, plan, rows, clock, end);
+      ctx.beat.querySelectorAll('.poem-ch').forEach((c) => c.classList.remove('on'));
+      // 配音只当背景轨：起播早晚都无所谓，逐字不等它、也不读它
+      if (poem.audio?.full) ctx.say({ file: `/audio/poem/${poem.audio.full}`, rate });
+      console.info(`[cinema] 诗 ${lines.length} 句 · 时间轴 0–${Math.round(end)}ms · ${rate}× · 文字比音频早 ${POEM_LEAD_MS}ms`);
+      await revealByAnchor(ctx, plan, rows, performance.now(), rate, end);
     },
   },
 
-  /** 钤印收束：落款 + "两万五千里"（沿用回响屏那枚印章的样式，视觉口径一处管） */
+  /**
+   * 钤印收束：**印章（两个字）+ 落款（"两万五千里"）+ 一行日期**。
+   *
+   * 别直接复用回响屏那枚 `.blk-seal`：它是 56×56 的**小圆章**（回响卡上的角标），
+   * 五个字塞进去会溢出成一堆碎片（2026-09-15 联系表实拍踩到）。这里用同一套视觉语言
+   * （朱红描边 + display 字体 + 静态 -8°）另做一枚大印，字只放两个。
+   */
   seal: {
     kind: 'seal',
-    holdMs: (b) => b.holdMs ?? 3000,
+    holdMs: (b) => b.holdMs ?? 3200,
     async render(ctx, b) {
       const poem = await fetchPoem().catch(() => null);
       ctx.stage.style.backgroundImage = 'none';
-      const word = b.word || poem?.seal?.line || '两万五千里';
+      const stamp = b.stamp || poem?.seal?.stamp || '长征';
+      const line = b.word || poem?.seal?.line || '两万五千里';
       const note = b.note || poem?.seal?.note || '';
       ctx.beat.innerHTML = `<div class="poem-seal">
-        <div class="blk-seal echo-seal">${escapeHtml(word)}</div>
+        <div class="poem-seal-stamp">${escapeHtml(stamp)}</div>
+        <p class="poem-seal-line">${escapeHtml(line)}</p>
         ${note ? `<p class="foot-note">${escapeHtml(note)}</p>` : ''}
       </div>`;
       ctx.cap.textContent = '';
@@ -165,41 +164,52 @@ export const BEATS = {
   },
 };
 
-/** 有音频就用**量出来的**逐句窗口；没有就按 pace 合成一条（每条 = 字数 × msPerChar + 句间停顿） */
-function timelineOf(poem) {
+/**
+ * 诗的时间轴：有量好的逐句窗口就用它（**换音频要重新量**，见 docs/HANDOFF-AUDIO 第六点五节），
+ * 没有就按 `pace` 合成一条（每条 = 字数 × msPerChar + 句间停顿）。
+ * 单位是"音频毫秒"，按语速折算后与"挂钟 × 语速"同一刻度。
+ */
+/** 文字比音频早多少（估量口径：不追精确，宁可字先出——用户定的） */
+const POEM_LEAD_MS = 500;
+
+function timelineOf(poem, rate = 1) {
   const lines = poem.lines || [];
   const paced = lines.every((l) => !Number.isFinite(l.startMs) || !Number.isFinite(l.endMs));
   const msPerChar = Number(poem.pace?.msPerChar) || 210;
   const gap = Number(poem.pace?.lineGapMs) || 500;
   const hold = Number(poem.pace?.holdTitleMs) || 1400;
+  const lead = (ms) => Math.max(0, ms - POEM_LEAD_MS);        // 提前，但不许负
   let t = paced ? hold : 0;
   return lines.map((l) => {
-    if (!paced) return { i: l.i, startMs: l.startMs, endMs: l.endMs };
-    const dur = [...String(l.text)].length * msPerChar;
+    if (!paced) return { i: l.i, startMs: lead(l.startMs) / rate, endMs: lead(l.endMs) / rate };
+    const dur = ([...String(l.text)].length * msPerChar) / rate;
     const row = { i: l.i, startMs: t, endMs: t + dur };
-    t += dur + gap;
+    t += dur + gap / rate;
     return row;
   });
 }
 
-/** 挂钟（无音频时的时钟）：已过毫秒 × 语速 */
-function wallClock(rate) {
-  const t0 = Date.now();
-  return () => (Date.now() - t0) * (Number(rate) || 1);
-}
-
 /**
- * 逐字显现：**只跟时间**。每 60ms 问一次"现在几点了"，把已经该出现的字挂上 `.on`。
- * 一路走到最后一句的终点再停（音频提前断了也不至于永远转下去）。
+ * 逐字显现：**只跟时间**（`锚点 + 挂钟 × 语速`）。
+ *
+ * 一句口径：**锚点 + 挂钟 × 语速**。时间轴是"估个量"，音频只是背景轨——
+ * 没响、响一半停了，逐字照走（红线"任何音频都不许阻塞流程"自然满足），
+ * 也不用再特判逐帧读位置那三种脏数据（见 HANDOFF-CODE 坑 55）。
+ * @param {number} anchor performance.now() 锚点（这一拍开始那一刻）
+ * @param {number} rate 语速档位
  */
-async function revealByClock(ctx, plan, rows, clock, endMs) {
+async function revealByAnchor(ctx, plan, rows, anchor, rate, endMs) {
+  const at = () => (performance.now() - anchor) * rate;
   for (;;) {
     if (ctx.gone()) {
-      // 点按 = "剩下的直接读完"（一次点按就把八句给全，停一拍再走）；跳过 = 立即收摊
-      if (!ctx.skipped?.()) rows.forEach((r) => r.chs.forEach((c) => c.classList.add('on')));
+      // 三种收手要分清：跳过 = 立即收摊；换语速 = 直接交给下一次演出（**不要**把字补完，
+      // 否则点"更快"会先整段闪一下再从头演）；点按 = 剩下的字直接读完，停一拍再走。
+      if (!ctx.skipped?.() && !ctx.restarting?.()) {
+        rows.forEach((r) => r.chs.forEach((c) => c.classList.add('on')));
+      }
       return;
     }
-    const ms = clock() || 0;
+    const ms = at();
     for (const line of plan) {
       const row = rows[line.i - 1];
       if (!row) continue;

@@ -93,6 +93,9 @@ async function boot() {
   offerResume();
   showScreen('screen-title');
   setTopbar(false);
+  // 整页就绪：到这一步才是"玩家/脚本可以动手"的状态（脚本等 booted 会早于这里动手——
+  // 而这里还会 showScreen('screen-title')，那一下会把刚演起来的过场顶掉，见 HANDOFF-CODE 坑 54）
+  kernel.emit('app:ready', { at: Date.now() });
 }
 
 /** 有未完成的局就露出「继续上一局」（状态由 sessionStorage 保存） */

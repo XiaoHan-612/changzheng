@@ -32,18 +32,69 @@ const DEFAULT_HOLD_MS = 1500;
  * 语音通道的回声：由描述符的 `voice:*` 订阅喂进来（通道不认识播放器，见 kernel/contracts.js）。
  * `t` / `duration` 是**逐字跟音频的唯一时钟**（批 A 建立）：诗那一拍只认它，不自造第二个时钟。
  */
-const voice = { playing: false, startedAt: 0, endedAt: 0, t: 0, duration: 0 };
+const voice = { playing: false, startedAt: 0, endedAt: 0, t: 0, duration: 0, seq: 0 };
+/** 最近一次"通道在播哪一句"（seq 由通道给，见 kernel/contracts.js） */
 export function onVoiceStart(p = {}) {
   voice.playing = true;
   voice.startedAt = Date.now();
   voice.t = 0;
   voice.duration = Number(p.durationMs) || 0;
+  voice.seq = Number(p.seq) || 0;
 }
 export function onVoiceProgress(p = {}) {
   voice.t = Number(p.t) || 0;
   if (Number(p.duration)) voice.duration = Number(p.duration);
+  if (Number(p.seq)) voice.seq = Number(p.seq);
 }
-export function onVoiceEnd() { voice.playing = false; voice.endedAt = Date.now(); }
+export function onVoiceEnd(p = {}) {
+  voice.playing = false;
+  voice.endedAt = Date.now();
+  if (Number(p.seq)) voice.seq = Number(p.seq);
+}
+
+/**
+ * 演一句台词，拿回**这一句自己**的句柄（按 `seq` 认领，见下）。
+ *
+ * 为什么按 seq 认领：`voice:say` 发出去之后，回声是总线上的公共信号，谁都能听见——
+ * 上一句的进度、别的拍子的回声都可能漏进"我现在播到哪了"的判断里。**句柄只认自己那一句**：
+ * 发出去之后第一条 start 的 seq 就是它，别的 seq 一律当噪声；没有 start（文件缺/静音/被拒播）
+ * 就在 grace 后如实说"这一句没响"——**不阻塞**是硬口径，任何一句都不许把流程挂住。
+ *
+ * 用法只有两种（够用就好，别再加读表接口）：
+ *   `await line.started()`  这一句起播了吗（false = 没响，调用方自己决定退化成什么节奏）
+ *   `line.playing()` / `await line.ended()`  它还在响吗 / 等它响完
+ * @returns {{seq:number|null, started:()=>Promise<boolean>, playing:()=>boolean, ended:()=>Promise<void>, silent:()=>boolean}}
+ */
+export function say(payload, { graceMs = VOICE_GRACE_MS } = {}) {
+  const seq0 = voice.seq;
+  kernel.emit('voice:say', { ...payload });
+  const d = { seq: null, silent: false, started: false };
+  return {
+    seq: () => d.seq,
+    /** 这一句起播了吗：起播 → true；宽限期内一直没起播（或先收到 ended）→ false 且记为 silent */
+    async started() {
+      const until = Date.now() + graceMs;
+      for (;;) {
+        if (voice.seq !== seq0 && voice.seq > 0) {
+          d.seq = voice.seq;
+          d.started = voice.playing;
+          d.silent = !voice.playing;
+          return d.started;
+        }
+        if (Date.now() >= until) { d.silent = true; return false; }
+        await sleep(60);
+      }
+    },
+    /** 还在响吗（只认自己那一句） */
+    playing() { return d.seq != null && voice.seq === d.seq && voice.playing; },
+    /** 等它响完（自己那一句的 ended） */
+    async ended(capMs = VOICE_CAP_MS) {
+      const capAt = Date.now() + capMs;
+      while (this.playing() && Date.now() < capAt) await sleep(80);
+    },
+    silent() { return d.silent; },
+  };
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -59,6 +110,15 @@ const reduceMotion = () => typeof matchMedia === 'function' && matchMedia('(pref
 let running = '';      // 正在播的编排 id（'' = 没在播）
 let gen = 0;           // 代次：换拍子 / 播放结束 / 屏被清掉都会 +1，让过期的定时器写入作废
 let timers = [];       // 本模块起的定时器（屏被清掉或换拍子时统一清）
+/**
+ * 正在跑的那一段（单飞保护）。
+ *
+ * 为什么要有：两段 `play()` 同时跑会**互相覆盖**——后一段把同一个容器重写过一遍，
+ * 前一段的拍子循环还在往下走（它只认自己的 `gen` 与 `skipped`），于是屏幕上出现"前一段的钤印
+ * 盖在后一段的诗上"。正常流程是单线的，但体检脚本/将来新流程可能撞上，所以这里显式互斥：
+ * 新的一段进来时，先把上一段**干净地停掉**（等同按了跳过）再开。
+ */
+let active = null;     // { id, cancel, done }
 
 function clearTimers() { timers.forEach(clearTimeout); timers = []; }
 
@@ -96,6 +156,11 @@ export async function play(id, opts = {}) {
     console.error('[cinema] 过场屏的容器不在（index.html 被改过？）');
     return { id, beats: 0, skipped: false };
   }
+  if (active) {                          // 上一段还在跑：先停掉它（见上面的单飞说明）
+    console.warn(`[cinema] 上一段「${active.id}」还没演完就又开了一段「${id}」——先把它停掉`);
+    active.cancel();
+    await active.done.catch(() => {});
+  }
 
   running = id;
   gen += 1;
@@ -111,6 +176,7 @@ export async function play(id, opts = {}) {
   // 交互：点按推进（下一句 / 屏上任意处）+ 跳过（一跳到底）
   let skipped = false;
   let waitClick = null;
+  const myRun = { id, cancel: () => { skipped = true; tap(); }, done: null };
   let aborted = false;                       // 这一拍被点按/跳过了（正在跑的 render 靠它收手）
   const tap = () => {
     aborted = true;
@@ -148,6 +214,8 @@ export async function play(id, opts = {}) {
   };
 
   let n = 0;
+  let prevImpl = null;                        // 上一拍的实现（在下一拍开始前调它的 cleanup）
+  myRun.done = (async () => {                 // 让"下一段"能等到这一段真的收尾
   for (const beat of seq) {
     if (skipped) break;
     const impl = beatOf(beat.kind);
@@ -156,6 +224,9 @@ export async function play(id, opts = {}) {
     while (again && !skipped) {
     again = false;
     n += 1;
+    // 上一拍收尾（它自己要停的东西自己停：比如诗那一拍的长音频不该盖到钤印上）
+    try { prevImpl?.cleanup?.(ctx); } catch { /* 收尾出错不拖垮播放 */ }
+    prevImpl = impl;
     applySpeedBtn(beat.speeds || impl.speeds);
     clearTimers();
     const myGen = gen;
@@ -168,7 +239,11 @@ export async function play(id, opts = {}) {
       rate,
       extra: opts.ctx || {},
       voice: () => ({ ...voice }),
+      /** 演一句并拿回这一句的时钟（句级，不认别人的回声） */
+      say: (payload, opts) => say(payload, opts),
       skipped: () => skipped,
+      // "正在重来"（换语速）与"被点按中断"是两件事：前者要立刻重演，后者才该把剩下的字补完
+      restarting: () => again,
       after(ms, fn) {
         const t = setTimeout(() => { if (!gone && !skipped && gen === myGen) fn(); }, Math.max(0, ms));
         timers.push(t);
@@ -192,6 +267,8 @@ export async function play(id, opts = {}) {
       console.error(`[cinema] 拍子「${beat.kind}」演出时出错（继续往下演）：`, err);
     }
     if (skipped) break;
+    // 换语速要"立刻重演"，别先走完停留（不然点了"更快"会先停一拍再从头来）
+    if (again) { f.cap.textContent = ''; f.beat.innerHTML = ''; continue; }
 
     // 字幕：减动效直接给全文；点按先把剩下的一次性显示完，再一次点按才走（老行为，别改）
     const text = String(beat.text || '');
@@ -204,15 +281,11 @@ export async function play(id, opts = {}) {
     // 配音：交给语音通道（它在播什么、播多久只有它知道），这里只等它的回声
     let voiceWait = Promise.resolve();
     if (beat.voice?.text || beat.voice?.file) {
-      const t0 = Date.now();
-      voice.startedAt = 0;
-      kernel.emit('voice:say', { ...beat.voice });
+      const line = ctx.say(beat.voice);
       voiceWait = (async () => {
-        await sleep(VOICE_GRACE_MS);
         // 宽限内没开播 = 这一拍没有声（文件缺 / 静音 / 命中不了缓存）——继续往下演
-        if (skipped || !voice.startedAt || voice.startedAt < t0) return;
-        const capAt = Date.now() + VOICE_CAP_MS;
-        while (voice.playing && !skipped && Date.now() < capAt) await sleep(80);
+        if (!(await line.started()) || skipped) return;
+        await line.ended();
       })();
     }
 
@@ -233,6 +306,7 @@ export async function play(id, opts = {}) {
   }
 
   // ── 收尾：清定时器、摘契约标记、回到干净状态 ──
+  try { prevImpl?.cleanup?.({ ...f, reduce, rate }); } catch { /* 同上 */ }
   clearTimers();
   if (f.next) { f.next.onclick = null; delete f.next.dataset.action; }
   if (f.skip) { f.skip.onclick = null; delete f.skip.dataset.action; }
@@ -241,6 +315,9 @@ export async function play(id, opts = {}) {
   f.screen.onclick = null;
   f.cap.classList.remove('typing');
   running = '';
+  })();
+  active = myRun;
+  try { await myRun.done; } finally { if (active === myRun) active = null; }
   return { id, beats: n, skipped };
 }
 
@@ -252,6 +329,10 @@ export const voiceLive = () => voice.playing;
 /** 屏自清：离开过场屏时清掉本模块写进去的东西（`screens.own('screen-cutscene', …)` 登记的就是它） */
 export function clearCutscene() {
   const f = frame();
+  // 屏都走了，正在演的那一段要**干净收手**（等同按了跳过），而不是继续往后演拍子——
+  // 否则"过场被别的屏顶掉"之后，剩下几拍还会一个个渲染到这个已经藏起来的屏上，
+  // 看起来就像"诗刚挂上就跳到了钤印"（2026-09-15 联系表实拍踩到，见 HANDOFF-CODE 坑 54）。
+  if (active) active.cancel();
   gen += 1;                              // 让还在飞的定时器写入作废
   clearTimers();
   running = '';

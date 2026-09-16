@@ -41,10 +41,10 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 **事件图 6 张 2026-09-15 接线**（此前闲置）：3 张当各幕过场空镜（`acts.json` 的 `cutAlt`）、
 2 张当失败结算屏底图（`flow/end.js` 按失败类型换），剩 `ev_village.jpg` 备用。
 
-**第 2 轮（进行中）**：3 张图 + 一批音频，prompt 见
-[`design/asset-prompts.md`](../../design/asset-prompts.md) 的「第 2 轮」。三张图都是"现有图能顶、但产出了明显更好"：
-暗调路线图（现在用 `map_route`，满屏太亮、代码里要压暗一档）、升华收束空镜（现在复用 `huining_pano`）、
-诗页底纹（现在诗屏是纯黑场）。**音频那批（8 首 BGM + 8 个操作音效）优先级更高**，它们落盘即生效。
+**第 2 轮（已完成，2026-09-16）**：3 张图 + 16 条音频全部就位——
+暗调路线图 `map_route_deep`、升华收束空镜 `huining_dusk`、诗页底纹 `poem_paper`，
+以及 8 首 BGM 与 8 个操作音效。**三张图与全部音频都是"落盘即生效"，没有改一行代码就接上了**
+（图走 `sceneImage()` 探测，音频走同名文件顶替；`qa:assets` 与 `qa:audio` 都能核）。
 
 ## 四、落盘即生效（不用改代码）
 
@@ -74,9 +74,9 @@ photorealistic, 3d render, neon, cyberpunk, lens flare, text, letters, watermark
 | `xiangjiang_bridge.jpg` | 「护送伤员过封锁」抉择 |
 | `zunyi_street.jpg` | 「一封密信」抉择 |
 | `huining_crowd.jpg` | 会宁「数一数熟面孔」 |
-| `map_route_deep.jpg` | **第 2 轮待产**：序章与每幕幕间「路线图」那一拍的暗调底图（没产出时用 `map_route.jpg`） |
-| `huining_dusk.jpg` | **第 2 轮待产**：终章升华的收束空镜（没产出时用 `huining_pano.jpg`） |
-| `poem_paper.jpg` | **第 2 轮待产**：诗页底纹（没产出时是纯黑场） |
+| `map_route_deep.jpg` | 序章与每幕幕间「路线图」那一拍的暗调底图（2026-09-16 就位，顶掉原来的 `map_route`） |
+| `huining_dusk.jpg` | 终章升华的收束空镜（2026-09-16 就位，顶掉原来的 `huining_pano`） |
+| `poem_paper.jpg` | 诗页底纹（2026-09-16 就位，诗屏不再纯黑） |
 
 本表即"落盘即生效"的完整清单（**21 行**，场景目录另有 15 张由数据显式引用的近景/抉择图，不在本表）；
 `qa:handoff` 会逐行核对"文档承诺自动生效"与"代码确实预热"是否一致。

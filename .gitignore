@@ -30,3 +30,6 @@ _archive/**/*.wav
 # 音频素材同理（mp3 是 2026-09 起为整段朗诵放开的一种容器）
 _archive/**/*.mp3
 _archive/**/*.ogg
+
+# 本机的音频生成工具链（soundfile/cffi 的 whl + make_audio2.py）：产出用的，别入源码库
+_oggpkg/
