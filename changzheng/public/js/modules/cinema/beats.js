@@ -119,6 +119,7 @@ export const BEATS = {
           + chars(l.text).map((ch) => `<span class="poem-ch">${escapeHtml(ch)}</span>`).join('')
           + `<span class="poem-ch">${escapeHtml(l.punct || '')}</span></p>`).join('')}</div>
       </div>`;
+      const titleEl = ctx.beat.querySelector('.poem-title');
       const rows = [...ctx.beat.querySelectorAll('.poem-line')].map((el) => ({
         el,
         chs: [...el.querySelectorAll('.poem-ch')],
@@ -131,9 +132,19 @@ export const BEATS = {
       const plan = timelineOf(poem, rate);
       const end = plan.length ? plan[plan.length - 1].endMs : 0;
       ctx.beat.querySelectorAll('.poem-ch').forEach((c) => c.classList.remove('on'));
+      // 题字跟音频念到它时再淡入（`audio.titleMs` 量的是录音里"《七律·长征》"起声的毫秒）。
+      // 没标就立即显示——老录音没有这条标注时行为不变，不靠猜。
+      const titleMs = Number(poem.audio?.titleMs);
+      if (Number.isFinite(titleMs) && titleMs > 0 && !ctx.reduce) {
+        ctx.after(Math.max(0, titleMs / rate - POEM_LEAD_MS), () => {
+          if (!ctx.gone() && titleEl) titleEl.classList.add('on');
+        });
+      } else if (titleEl) {
+        titleEl.classList.add('on');
+      }
       // 配音只当背景轨：起播早晚都无所谓，逐字不等它、也不读它
       if (poem.audio?.full) ctx.say({ file: `/audio/poem/${poem.audio.full}`, rate });
-      console.info(`[cinema] 诗 ${lines.length} 句 · 时间轴 0–${Math.round(end)}ms · ${rate}× · 文字比音频早 ${POEM_LEAD_MS}ms`);
+      console.info(`[cinema] 诗 ${lines.length} 句 · 时间轴 0–${Math.round(end)}ms · ${rate}× · 题字 ${Number.isFinite(titleMs) ? titleMs + 'ms' : '立即'} · 文字比音频早 ${POEM_LEAD_MS}ms`);
       await revealByAnchor(ctx, plan, rows, performance.now(), rate, end);
     },
   },
@@ -214,7 +225,9 @@ async function revealByAnchor(ctx, plan, rows, anchor, rate, endMs) {
       const row = rows[line.i - 1];
       if (!row) continue;
       const span = Math.max(1, line.endMs - line.startMs);
-      const n = ms <= line.startMs ? 0 : Math.ceil(Math.min(1, (ms - line.startMs) / span) * (row.chs.length - 1));
+      // 注意别写成 `* (chs.length - 1)`：那样每句的**最后一个字（标点）永远不会亮**
+      // （ratio 到 1 时也只是 len-1，第 len 个字永远差一个）——2026-09-16 联系表采样 `on:7` 暴露
+      const n = ms <= line.startMs ? 0 : Math.min(row.chs.length, Math.ceil((Math.min(1, (ms - line.startMs) / span)) * row.chs.length));
       row.chs.forEach((c, i) => { c.classList.toggle('on', i < n); });
     }
     if (ms > endMs + 700) return;

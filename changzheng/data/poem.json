@@ -8,7 +8,8 @@
   "audio": {
     "full": "qilv-changzheng.mp3",
     "voiceId": "narr",
-    "note": "full = 整段朗诵的文件名（放 public/audio/poem/ 之后填）；填了它就不走逐句配音，时间轴以 lines[].startMs/endMs 为准。时间轴是**量出来的**：用 tests/manual 的一次性探针在浏览器里解码音频、按静音分段（详见 docs/HANDOFF-AUDIO 第六点五节）。放了文件却没填、或填了文件不在，npm run qa:audio 都会报"
+    "titleMs": 2300,
+    "note": "full = 整段朗诵的文件名（放 public/audio/poem/ 之后填）；填了它就不走逐句配音，时间轴以 lines[].startMs/endMs 为准。titleMs = 录音里念出诗题的起始毫秒（能量包络量出：2300ms），题字跟它淡入；不填则题字立即显示。时间轴是**量出来的**：用 tests/manual 的一次性探针在浏览器里解码音频、按静音分段（详见 docs/HANDOFF-AUDIO 第六点五节）。放了文件却没填、或填了文件不在，npm run qa:audio 都会报"
   },
   "pace": {
     "msPerChar": 210,

@@ -1,4 +1,4 @@
-﻿/* ───────── 材质：纸的两种档位（唯一定义处）─────────
+/* ───────── 材质：纸的两种档位（唯一定义处）─────────
    大片纸（面板/纸卷/手记/回响/侧栏/玩法板）：带纸纹与折痕；
    小片纸（按钮/选项/纸签/卡片）：只上色与描边，省性能。 */
 /* 大片纸：纸纹 + 折痕 + 纸边收口（一处定义，容器类共享） */
@@ -217,7 +217,10 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .poem-title {
   font-family: var(--font-kai); font-size: var(--fs-h2); color: var(--gold);
   letter-spacing: 0.22em; margin-bottom: var(--sp-4);
+  /* 题字跟音频念到它时才淡入（poem.json 的 audio.titleMs）；没标就立即显示（.on 由 beats 挂） */
+  opacity: 0; transition: opacity var(--dur-slow) var(--ease-out);
 }
+.poem-title.on { opacity: 1; }
 .poem-title span { font-size: var(--fs-micro); color: var(--paper-dim); letter-spacing: 0.12em; margin-left: var(--sp-3); }
 .poem-body { display: flex; flex-direction: column; gap: var(--sp-2); }
 .poem-line {
@@ -228,6 +231,7 @@ select.set-input option { background: var(--paper-0); color: var(--ink-0); }
 .poem-ch.on { opacity: 1; }
 /* 减动效：整段直显（逐字跟着音频这件事只影响"什么时候出现"，不掺音画同步） */
 @media (prefers-reduced-motion: reduce) {
+  .poem-title { opacity: 1; transition: none; }
   .poem-ch { opacity: 1; transition: none; }
 }
 
