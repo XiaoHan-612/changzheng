@@ -31,6 +31,12 @@ export const CALL_POLICY = {
   npc_chat: { label: '人物交谈', maxTokens: 900, temperature: 0.8 },
   share_judge: { label: '分粮裁决', maxTokens: 900, temperature: 0.7 },
   minigame_review: { label: '玩法复盘', maxTokens: 900, temperature: 0.75 },
+  // 同事玩法的四类小调用：回复都很短（一句氛围 / 一手棋 / 一课三个字 / 三道题），
+  // 且玩法那边自带 10 秒窗口——预算给紧一点，慢了就让它走固定内容（见 HANDOFF-CANDY 的口径）
+  candy_scene: { label: '分糖·开场氛围', maxTokens: 260, temperature: 0.85 },
+  gomoku_move: { label: '五子棋·对手落子', maxTokens: 300, temperature: 0.6 },
+  school_lesson: { label: '夜校·定今晚三个字', maxTokens: 700, temperature: 0.7 },
+  school_quiz: { label: '夜校·出三道题', maxTokens: 900, temperature: 0.7 },
   branch_judge: { label: '抉择裁决', maxTokens: 1200, temperature: 0.75 },
   quiz_generate: { label: '出题', maxTokens: 900, temperature: 0.9 },
   quiz_answer_ai: { label: 'AI 作答', maxTokens: 400, temperature: 0.6 },

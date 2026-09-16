@@ -32,7 +32,7 @@ fs.mkdirSync(ART, { recursive: true });
 
 const acts = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/acts.json'), 'utf8'));
 // 批 7：main.js 在往 flow/* 拆——期望值从**整个流程层**静态解析，搬文件不必改这里
-const flowFiles = ['main.js', 'minigames.js']
+const flowFiles = ['main.js']        // 玩法已收进 modules/games/（各支 src/），扫流程层就够
   .concat(fs.existsSync(path.join(ROOT, 'public/js/flow'))
     ? fs.readdirSync(path.join(ROOT, 'public/js/flow')).filter((f) => f.endsWith('.js')).map((f) => `flow/${f}`)
     : []);
@@ -278,7 +278,9 @@ async function main() {
   // 8) 无声率：把 /api/tts 未命中的台词分类——固定台词（可预生成）vs AI 自由文本（结构性无声）
   const fixedSources = [
     mainSrc,
-    fs.readFileSync(path.join(ROOT, 'public/js/minigames.js'), 'utf8'),
+    // 玩法台词现在住在 modules/games/src/*（同事那条线），一并算进"固定台词"的判定源
+    ...fs.readdirSync(path.join(ROOT, 'public/js/modules/games/src')).filter((f) => f.endsWith('.js'))
+      .map((f) => fs.readFileSync(path.join(ROOT, 'public/js/modules/games/src', f), 'utf8')),
     fs.readFileSync(path.join(ROOT, 'public/js/ui.js'), 'utf8'),
     fs.readFileSync(path.join(ROOT, 'data/tts-lines.json'), 'utf8'),
   ].join('\n');

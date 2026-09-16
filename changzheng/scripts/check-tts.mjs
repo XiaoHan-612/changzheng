@@ -54,7 +54,7 @@ async function main() {
   const lines = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/tts-lines.json'), 'utf8')).lines || [];
   // 可达性：台词文本必须真的出现在前端代码或史实卡里，
   // 否则文件生成了也不会被请求（真调暴露过：清单与代码文本不一致 → 21/24 白做）
-  const flowFiles = ['main.js', 'minigames.js', 'ui.js', 'step.js', 'audio.js']
+  const flowFiles = ['main.js', 'ui.js', 'step.js', 'audio.js']
     .concat(fs.existsSync(path.join(ROOT, 'public/js/flow'))
       ? fs.readdirSync(path.join(ROOT, 'public/js/flow')).filter((f) => f.endsWith('.js')).map((f) => `flow/${f}`)
       : []);

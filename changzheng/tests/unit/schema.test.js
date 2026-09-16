@@ -6,8 +6,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { REQUIRED, missingFields, contractStamp } from '../../server/schema.js';
 
-test('契约表覆盖 15 类 callType', () => {
-  assert.equal(Object.keys(REQUIRED).length, 15);
+test('契约表覆盖每一类调用（与策略表一一对应）', () => {
+  // 不写死条数：加一类调用（如同事玩法带来的 candy_scene / gomoku_move / school_lesson / school_quiz）
+  // 不该让这条测试红——真正要守的是"字段契约与预算策略表一一对应"，那条在 qa:ai 里；
+  // 这里只兜"契约表没被清空、也没有空字段定义"。
+  const types = Object.entries(REQUIRED);
+  assert.ok(types.length >= 15, `契约表只剩 ${types.length} 类，像是被误删了`);
+  for (const [t, fields] of types) {
+    assert.ok(Array.isArray(fields) && fields.length > 0, `${t} 的字段契约是空的`);
+  }
 });
 
 test('缺必需字段会被点名', () => {

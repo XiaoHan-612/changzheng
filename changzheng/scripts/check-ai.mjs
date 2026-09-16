@@ -78,8 +78,12 @@ for (const l of logs) {
   byType.set(t, r);
 }
 
-// 落地但策略表里没登记的类（说明有调用绕过了 ask()）——这是最该拦的漂移
-const strayTypes = [...byType.keys()].filter((t) => !policyTypes.includes(t));
+// 落地但策略表里没登记的类（说明有调用绕过了 ask()）——这是最该拦的漂移。
+// 例外：**已删功能的留档**（入库样本 logs/sample-full-run.jsonl 是当时真调的记录，按约定保留原样，
+// 见 docs/LOG-AUDIT.md 与 HANDOFF「96 条、覆盖当时全部 16 类」）。它们不是"现在绕过了 ask()"，
+// 只是历史，所以列在白名单里；**新出现的**任何类型仍然会红。
+const RETIRED = new Set(['sim_turn']);       // 自由行军沙盘（2026-09-15 删除）
+const strayTypes = [...byType.keys()].filter((t) => !policyTypes.includes(t) && !RETIRED.has(t));
 if (strayTypes.length) problems.push(`日志里出现了策略表没登记的调用：${strayTypes.join('、')}（绕过了 modules/ai？）`);
 const budgetOff = logs.filter((l) => l.budgetTokens && (l.budgetTokens < 300 || l.budgetTokens > 4000));
 if (budgetOff.length) problems.push(`有 ${budgetOff.length} 条记录的额度越界（收口失效）`);

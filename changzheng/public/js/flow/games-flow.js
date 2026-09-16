@@ -12,6 +12,20 @@ import { kernel } from '../kernel/index.js';
 import { S, st, gamesApi, callAI, step, waitBtn, publicState, logShare, markLine, markDone } from './kit.js';
 import { COMPANIONS } from '../data.js';
 import { sceneImage, showNpc } from './view.js';
+
+/**
+ * 玩法要用模型时的**唯一通道**：调用与记账都留在流程层，玩法只描述"要判什么"。
+ *
+ * 为什么不让玩法自己发请求：预算/温度/重试/账目都归 `modules/ai`（见 docs/BUS.md 的口径），
+ * 玩法那边（同事单独开发的那条线）原来是自己 `POST /api/decide`——现在改成调这个回调，
+ * 于是一次调用在 `qa:ai` 与 JSONL 日志里都看得见，参数也收在一张表里。
+ * 玩法里自己带着 10 秒窗口（candy 的 `AI_WINDOW_MS`）与"没答就用固定内容"的兜底，保持不动。
+ */
+const decideFor = (scene) => (payload = {}) => callAI({
+  ...payload,
+  scene: payload.scene || scene,
+  state: payload.state || publicState(),
+});
 import { afterJudge } from './echo.js';
 
 export async function doSchool() {
@@ -21,7 +35,7 @@ export async function doSchool() {
   showNpc('文化教员', { role: '夜校', mood: '耐心' });
   setStagePanel('');                                  // 玩法不在纸卷里，正文区留空
   await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
-  const op = await gamesApi().play('school');
+  const op = await gamesApi().play('nightschool', { params: { decide: decideFor('夜校识字') } });
   showScreen('screen-stage');                         // 结算回到对白屏：人物 + 叙事 + 继续
   st().remember('tonightPassword', op.detail?.password || '瑞金');
   markLine('school');
@@ -48,7 +62,7 @@ export async function doCandy() {
   setPortrait('红小鬼', '16岁小战士', '鬼', '倔强', '/assets/characters/xiaogui.png');
   setStagePanel('');
   await say('红小鬼', '我兜里有三颗糖。你说，给谁？');
-  const op = await gamesApi().play('candy');
+  const op = await gamesApi().play('candy-share', { params: { decide: decideFor('分糖') } });
   showScreen('screen-stage');
   st().remember('sugarPlan', op.detail || null);
   markLine('candy');
@@ -76,7 +90,7 @@ export async function doSentry() {
   setPortrait('哨兵', '夜哨', '哨', '警觉');
   setStagePanel('');
   await say('哨兵', '后半夜归你。听不清就再听一遍，别急着开枪。');
-  const op = await gamesApi().play('sentry', { params: { password: S.tonightPassword } });
+  const op = await gamesApi().play('sentry-watch', { params: { password: S.tonightPassword } });
   showScreen('screen-stage');
   st().remember('sentryScore', op.score);
   markLine('sentry');
@@ -105,7 +119,7 @@ export async function doGomoku() {
   setPortrait('两个小鬼', '泥地上的棋', '棋', '专注', '/assets/characters/xiaogui.png');
   setStagePanel('');
   await say('红小鬼', '石子当子，泥地当盘。你要是输了，可不许说没吃饱。');
-  const op = await gamesApi().play('gomoku');
+  const op = await gamesApi().play('mud-gomoku', { params: { decide: decideFor('泥地五子棋') } });
   showScreen('screen-stage');
   markLine('gomoku');
   let result;
@@ -130,7 +144,7 @@ export async function doGrab() {
   setPortrait('你', '年轻战士', '你', '咬牙');
   setStagePanel('');
   await say('你', '他的手在滑。前面的雪是硬的，下面是空的。');
-  const op = await gamesApi().play('grab');
+  const op = await gamesApi().play('snow-grab');
   showScreen('screen-stage');
   let result;
   result = await callAI({
@@ -145,6 +159,61 @@ export async function doGrab() {
   st().pushCampLog('陡坡', op.summary || '');
   await waitBtn('继续');
   await afterJudge(result, '风雪中的手', 'h_xueshan');
+}
+
+/**
+ * 于都河 · 夜搭浮桥（第一幕的开场玩法，接在原来的「浮桥」抉择位上）。
+ * 玩法自己判断"搭满即渡"，模型只做一句复盘——`operation.type='pontoon'` 供服务端换 schema 用。
+ */
+export async function doPontoonNight() {
+  step('pontoon', 'minigame');
+  showScreen('screen-stage');
+  setStageBanner('于都河 · 夜渡', sceneImage('/assets/scenes/depart_bridge.jpg', '/assets/scenes/depart_pano.jpg'));
+  setPortrait('你', '年轻战士', '你', '沉着');
+  setStagePanel('');
+  await say('你', '门板只有这些。往哪一段投，天亮前就得定下来。');
+  const op = await gamesApi().play('pontoon-night');
+  showScreen('screen-stage');
+  const result = await callAI({
+    scene: '于都河·夜搭浮桥',
+    callType: 'minigame_review',
+    situation: op.summary || '夜里搭浮桥，把队伍送过河',
+    state: publicState(),
+    operation: { type: 'pontoon', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || result.scene_text || '');
+  st().pushCampLog('浮桥', op.summary || '');
+  await waitBtn('继续');
+  await afterJudge(result, '门板与浮桥', 'h_depart');
+}
+
+/**
+ * 湘江东岸 · 收拢（第一幕湘江的新玩法：八刻的时间账——搜一处 / 渡一趟）。
+ * 位置按 [`HANDOFF-RALLY.md`](../../docs/minigames/逐支交接包/HANDOFF-RALLY.md) §七：
+ * 新增一个 `kind:"rally"` 的热点，**不动** `escort`（那支是"护送伤员"，与这一支是两个位置）。
+ */
+export async function doRallyRiver() {
+  step('rally', 'minigame');
+  showScreen('screen-stage');
+  setStageBanner('湘江东岸 · 收拢', sceneImage('/assets/scenes/xiangjiang_wreck.jpg', '/assets/scenes/xiangjiang_pano.jpg'));
+  setPortrait('你', '年轻战士', '你', '沉着');
+  setStagePanel('');
+  await say('你', '渡口还开着。东岸还有人——搜一处，还是渡一趟，天亮之前只够选八次。');
+  const op = await gamesApi().play('rally-river');
+  showScreen('screen-stage');
+  const result = await callAI({
+    scene: '湘江·东岸收拢',
+    callType: 'minigame_review',
+    situation: op.summary || '天亮之前，把东岸的人接回来',
+    state: publicState(),
+    operation: { type: 'rally', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || result.scene_text || '');
+  st().pushCampLog('收拢', op.summary || '');
+  await waitBtn('继续');
+  await afterJudge(result, '天亮之前', 'h_xiangjiang');
 }
 
 /** 会宁 · 数一数熟面孔（读关系与牺牲名单） */
@@ -185,12 +254,12 @@ export async function doFishing(act, forced) {
   setPortrait('老班长', '炊事班长', '班', '专注', '/assets/characters/laoban.png');
   setStagePanel('');
   await say('老班长', '鱼钩是缝衣针弯的。手上稳着点，别掰断。');
-  await gamesApi().play('needle');
+  await gamesApi().play('bendhook');
   showScreen('screen-stage');
 
   setStageBanner('金色的鱼钩 · 起竿', '/assets/scenes/pond_close.jpg');
   await say('老班长', '漂相看真了再起竿。晃是假的，沉才是口。', 'laoban_hook');
-  const op = await gamesApi().play('fishing');
+  const op = await gamesApi().play('goldenhook');
   showScreen('screen-stage');
   st().remember('fishingBest', Math.max(S.fishingBest || 0, op.score));
   markLine('fishing');
@@ -224,7 +293,7 @@ export async function doLuding(act) {
   showNpc('突击队长', { role: '红四团', mood: '决绝' });
   setStagePanel('');
   await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
-  const op = await gamesApi().play('luding');
+  const op = await gamesApi().play('luding-chain');
   showScreen('screen-stage');
   st().remember('ludingResult', op.detail || null);
   // 战友拉住的那一下，先落到状态里再交给模型写后果

@@ -18,9 +18,9 @@ const acts = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/acts.json'), 'utf8
 
 // 由 main.js 实现的热点类型；改玩法时要同步这张表
 const KIND_HANDLED = new Set(['talk', 'fishing', 'school', 'rest', 'share', 'candy', 'sentry',
-  'gomoku', 'grab', 'roster', 'choice', 'fire', 'march']);
+  'gomoku', 'grab', 'roster', 'choice', 'fire', 'march', 'pontoon', 'rally']);
 // 只出现在强制链、不挂热点的节点（runForcedChain / finishAct 里单独实现）
-const FORCED_ONLY = new Set(['fishing', 'soup', 'candy', 'sentry', 'path', 'luding', 'night']);
+const FORCED_ONLY = new Set(['fishing', 'soup', 'candy', 'sentry', 'path', 'luding', 'night', 'pontoon']);
 
 /**
  * 从**整个流程层**源码里取 CHOICE_SETS 的顶层键。

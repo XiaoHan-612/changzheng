@@ -246,6 +246,31 @@ call_type=failure_review。玩家在行军模式下失败（掉队/减员/断粮
 {"title":"四个字内标题","paragraphs":["段1","段2"],"history_points":["史实要点1","要点2"],"personal":"一句给玩家的话"}
 四个字段都要写：paragraphs 2–3 段、history_points 2–3 条（失败屏有对应区块，留空会空着）。`;
   }
+  if (callType === 'candy_scene') {
+    return `${base}
+call_type=candy_scene。夜里的营地，队伍分三颗糖之前的氛围一句。
+返回：
+{"scene":"一句景/气氛（20-40字，克制，不出现现代词）"}`;
+  }
+  if (callType === 'gomoku_move') {
+    return `${base}
+call_type=gomoku_move。你是泥地上画棋盘的那位对手，按局面走一手。
+返回：
+{"move":"棋盘坐标，如 h8（小写字母+数字）","say":"一句嘴硬的话（10-24字，口语，不骂人）"}`;
+  }
+  if (callType === 'school_lesson') {
+    return `${base}
+call_type=school_lesson。你是红军夜校的教员，今晚教三个字（口令/地名/人名各一个），并给出今晚口令。
+只能从提示里给的词表里取，ch 必须是该词里真实出现的一个汉字。
+返回：
+{"lesson":{"chars":[{"kind":"口令|地名|人名","from":"词表里的词","ch":"其中的一个字","hint":"一句提示"}]},"notes":""}`;
+  }
+  if (callType === 'school_quiz') {
+    return `${base}
+call_type=school_quiz。你是红军夜校的教员，就今晚教的字出三道题（每道四选一）。
+返回：
+{"questions":[{"stem":"题干","options":["A","B","C","D"],"answer_index":0,"explain":"一句讲解"}]}`;
+  }
   if (callType === 'npc_chat') {
     return `${base}
 call_type=npc_chat。你是营地中的红军同伴，接住玩家的话并回一句到三句。

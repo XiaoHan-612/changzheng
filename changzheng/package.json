@@ -40,6 +40,8 @@
     "qa:handoff": "node scripts/check-handoff.mjs",
     "tts:manifest": "node scripts/tts-manifest.mjs",
     "poem:manifest": "node scripts/poem-manifest.mjs",
+    "intake:minigames": "node tools/intake-minigames.mjs",
+    "intake:minigames:check": "node tools/intake-minigames.mjs --check",
     "check:glm": "node scripts/check-glm.mjs",
     "reset:logs": "node scripts/reset-logs.mjs"
   },

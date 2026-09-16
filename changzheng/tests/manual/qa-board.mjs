@@ -57,14 +57,17 @@ const visible = (sel) => page.locator(sel).first().isVisible().catch(() => false
 
 // 每个玩法：板屏壳 + 数值签 + 玩法关键元素 + 第一步交互
 const specs = {
-  needle: { title: '弯针成钩', stat: '进度', kick: '[data-mini-action="bend"]', after: '[data-mini-action="bend"]' },
-  fishing: { title: '金色的鱼钩', stat: '鱼篓', kick: '[data-mini-action="cast"]', after: '[data-mini-action="hook"]' },
-  school: { title: '夜校识字', stat: '第', kick: '#school-opts [data-mini-action="answer"]', after: '#school-opts [data-mini-action="answer"]' },
-  candy: { title: '分糖', stat: '还剩', kick: '[data-mini-action="candy"]', after: '[data-mini-action="target"]' },
-  sentry: { title: '夜岗', stat: '信号', kick: '[data-mini-action="answer"]', after: '[data-mini-action="answer"]' },
-  gomoku: { title: '泥地五子棋', stat: '手数', kick: '[data-mini-action="cell"]', after: '[data-mini-action="cell"]' },
-  luding: { title: '飞夺泸定桥', stat: '时间', kick: '[data-mini-action="left"]', after: '[data-mini-action="jump"]' },
-  grab: { title: '陡坡 · 拽住他', stat: '机会', kick: '[data-mini-action="grab"]', after: '[data-mini-action="grab"]' },
+  bendhook: { title: '弯针成钩', stat: '火候', kick: '[data-mini-action="heat"]', after: '[data-mini-action="heat"]' },
+  goldenhook: { title: '金色的鱼钩', stat: '竿', kick: '[data-mini-action="cast"]', after: '[data-mini-action="cast"]' },
+  // 夜校：入口选中后由子玩法接管（动作词整套换掉），所以 after 只验"点完仍可交互"
+  nightschool: { title: '夜校 · 两条路（选择入口）', stat: '识字', kick: '[data-mini-action="pick-lamp"]', after: '[data-mini-action]' },
+  'candy-share': { title: '分糖 · 红小鬼的三颗糖', stat: '糖', kick: '[data-mini-action="ask"]', after: '[data-mini-action="ask"]' },
+  'sentry-watch': { title: '夜岗 · 五个信号', stat: '信号', kick: '[data-mini-action="answer"]', after: '[data-mini-action="answer"]' },
+  'mud-gomoku': { title: '泥地五子棋', stat: '手数', kick: '[data-mini-action="level"]', after: '[data-mini-action="level"]' },
+  'luding-chain': { title: '飞夺泸定桥 · 攀链', stat: '位置', kick: '[data-mini-action="start"]', after: '[data-mini-action]' },
+  'snow-grab': { title: '陡坡 · 拽住他', stat: '他离你', kick: '[data-mini-action="leg"]', after: '[data-mini-action="throw"]' },
+  'pontoon-night': { title: '夜搭浮桥', stat: '夜色', kick: '[data-mini-action="mode-boat"]', after: '[data-mini-action="mode-boat"]' },
+  'rally-river': { title: '收拢', stat: '天光', kick: '[data-mini-action="search"]', after: '[data-mini-action="search"]' },
 };
 
 for (const [name, spec] of Object.entries(specs)) {

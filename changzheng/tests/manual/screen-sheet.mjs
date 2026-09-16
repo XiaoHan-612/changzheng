@@ -244,7 +244,16 @@ const BATCHES = {
   ],
   4: [
     // 玩法板五屏共用 tpl-board：都走 __czScreens.mini（玩法都在幕深处，跑一整幕太贵）
-    { name: '01-needle', setup: async (p) => { await intoCamp(p); await jump(p, 'screen-board', 'mini', 'needle'); } },
+    { name: '01-bendhook', setup: async (p) => { await intoCamp(p); await jump(p, 'screen-board', 'mini', 'bendhook'); } },
+    { name: '02-goldenhook', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'goldenhook'); } },
+    { name: '03-nightschool', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'nightschool'); } },
+    { name: '04-candy-share', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'candy-share'); } },
+    { name: '05-sentry-watch', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'sentry-watch'); } },
+    { name: '06-mud-gomoku', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'mud-gomoku'); } },
+    { name: '07-luding-chain', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'luding-chain'); } },
+    { name: '08-snow-grab', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'snow-grab'); } },
+    { name: '09-pontoon-night', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'pontoon-night'); } },
+    { name: '10-rally-river', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'rally-river'); } },
     { name: '02-fishing', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'fishing'); } },
     { name: '03-school', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'school'); } },
     { name: '04-candy', setup: async (p) => { await jump(p, 'screen-board', 'mini', 'candy'); } },

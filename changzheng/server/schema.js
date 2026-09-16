@@ -15,6 +15,12 @@ export const REQUIRED = {
   npc_chat: ['reply'],
   share_judge: ['effects', 'narrative', 'choice'],
   minigame_review: ['effects', 'narrative'],
+  // ↓ 同事重做的玩法带来的四类（它们原来自行 POST /api/decide；现在由 flow 层经 modules/ai 发起）：
+  //   字段是各自解析处真正要读的键（candy 读 .scene / gomoku 读 .move / 夜校读 .lesson、.questions）
+  candy_scene: ['scene'],
+  gomoku_move: ['move'],
+  school_lesson: ['lesson'],
+  school_quiz: ['questions'],
   branch_judge: ['effects', 'scene_text|narrative'],
   quiz_generate: ['question', 'options', 'answer_index'],
   quiz_answer_ai: ['answer_index'],

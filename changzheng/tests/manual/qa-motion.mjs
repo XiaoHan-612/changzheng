@@ -95,43 +95,34 @@ check('微视差已绑定', await page.evaluate(() => {
   return before !== el.style.transform || getComputedStyle(el).transitionProperty.includes('transform') ? '是' : '否';
 }), '是');
 
-// ④ 舞台：点"浮桥"热点（走到真正的抉择屏，交谈屏的快捷问句不算）→ 正文墨显 + 选项逐条入场
-await page.locator('.hotspot').filter({ hasText: '浮桥' }).click({ force: true });
-for (let i = 0; i < 30; i++) {
-  if (await page.locator('#ch-opts .blk-choice').count()) break;
-  await page.waitForTimeout(400);
+// ④ 舞台与选项：**第一幕的「浮桥」现在是玩法了**（同事重做的 pontoon-night，接在 forced 链上），
+//    所以原来"点浮桥 → 抉择屏"这条路径没了。这几条改走**可达且等价**的入口：
+//    · 板屏入场（tpl-board → sheet-rise）+ 数值签 + 契约标记：走 pontoon-night（真开局）
+//    · 面板墨显（tpl-panel → ink-in）+ 选项逐条入场（askChoice 的 anim-stagger）：走篝火夜屏
+//    （抉择屏那两屏的动效由 screen-sheet 的实拍 + e2e 真调一局覆盖——它们现在只在深幕可达）
+await page.evaluate(() => window.__czScreens?.mini?.('pontoon-night'));
+check('玩法板入场（纸卷上滑）', await waitForAnim('#screen-board .tpl-body', 'sheet-rise 0s'), 'sheet-rise 0s');
+await page.evaluate(() => window.__czScreens.show('screen-camp'));
+await page.waitForTimeout(200);
+await page.evaluate(() => window.__czScreens.night());
+for (let i = 0; i < 40; i++) {
+  if (await page.locator('#night-body .blk-choice').count()) break;
+  await page.waitForTimeout(300);
 }
-check('舞台入场（纸卷上滑）', await waitForAnim('#screen-stage .sheet', 'sheet-rise 0s'), 'sheet-rise 0s');
-check('正文墨显', await waitForAnim('#stage-panel', 'ink-in 0s'), 'ink-in 0s');
-await waitForAnim('#ch-opts .blk-choice', 'ink-in 0s');
+check('面板墨显（夜间）', await waitForAnim('#screen-night .panel', 'ink-in 0s'), 'ink-in 0s');
+await waitForAnim('#night-body .blk-choice', 'ink-in 0s');
 check('选项第 1 条延迟', await page.evaluate(() => {
-  const c = document.querySelector('#ch-opts > *');
+  const c = document.querySelector('#night-body .blk-choice');
   return c ? getComputedStyle(c).animationDelay : '(缺选项)';
 }), '0s');
 check('选项第 2 条延迟', await page.evaluate(() => {
-  const c = document.querySelector('#ch-opts > *:nth-child(2)');
+  const c = document.querySelector('#night-body .blk-choice:nth-child(2)');
   return c ? getComputedStyle(c).animationDelay : '(缺选项)';
 }), '0.06s');
+await page.evaluate(() => window.__czScreens.show('screen-camp'));
+await page.waitForTimeout(200);
 
-// ⑤ 回响：印章钤印 + 两栏逐条入场
-await page.locator('#ch-opts .blk-choice').first().click({ force: true });
-for (let i = 0; i < 40; i++) {
-  if (await page.locator('#btn-continue').count()) break;
-  await page.waitForTimeout(400);
-}
-await page.locator('#btn-continue').click({ force: true }).catch(() => {});
-for (let i = 0; i < 40; i++) {                        // 回响层打开前可能还有一次裁决
-  if (await page.locator('#screen-echo').isVisible().catch(() => false)) break;
-  await page.waitForTimeout(300);
-}
-await page.waitForTimeout(400);
-check('回响印章钤印', await waitForAnim('#screen-echo .echo-seal', 'seal-stamp 0.12s'), 'seal-stamp 0.12s');
-check('回响两栏逐条', await waitForAnim('#screen-echo .echo-grid > *:nth-child(2)', 'ink-in 0.06s'), 'ink-in 0.06s');
-
-// ⑤b 玩法板：tpl-board 的入场（这一屏批四才真接上，之前没有任何页面用它）
-await page.evaluate(() => window.__czScreens?.mini?.('needle'));
-await page.waitForTimeout(300);
-check('玩法板入场（纸卷上滑）', await animOf('#screen-board .tpl-body'), 'sheet-rise 0s');
+// ⑤b（原玩法板入场检查）已并入 ④：那时它借 needle 的板屏，现在 ④ 直接用真玩法开局，重复了。
 
 // ⑥ 减动效偏好：位移类全部关掉，只留淡入（这是文档写明的降级口径）
 await page.emulateMedia({ reducedMotion: 'reduce' });

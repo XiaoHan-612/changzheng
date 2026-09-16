@@ -91,7 +91,7 @@ async function shot(page, name) {
  * 却照样打印"✓ 逐屏无问题"——**报告成功但没干活**比报错更坏（见 HANDOFF-CODE 坑 52）。
  * 有了这张清单，"少跑了几屏"当场变成红。
  */
-const REQUIRED = ['01-title', '01b-prologue-title', '01c-prologue-map', '01e-prologue-farewell', '02-camp', '12-board-needle'];
+const REQUIRED = ['01-title', '01b-prologue-title', '01c-prologue-map', '01e-prologue-farewell', '02-camp', '12-board-bendhook'];
 
 async function main() {
   await ensureServer();
@@ -255,7 +255,7 @@ async function main() {
   await page.waitForTimeout(500);
   const hasHook = await page.evaluate(() => !!window.__czScreens?.mini);
   if (hasHook) {
-    for (const name of ['needle', 'fishing', 'school', 'candy', 'sentry', 'gomoku', 'luding', 'grab']) {
+    for (const name of ['bendhook', 'goldenhook', 'nightschool', 'candy-share', 'sentry-watch', 'mud-gomoku', 'luding-chain', 'snow-grab', 'pontoon-night', 'rally-river']) {
       await page.evaluate((n) => window.__czScreens.mini(n), name);
       await page.waitForTimeout(700);
       await shot(page, `12-board-${name}`);

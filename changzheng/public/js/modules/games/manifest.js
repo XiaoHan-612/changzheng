@@ -9,23 +9,27 @@
  * 契约与检查单见同目录 `README.md`；`npm run dev:check` 会核对
  * "清单里的玩法都真的能挂上、契约标记齐全"。
  */
-import needle from './needle.js';
-import fishing from './fishing.js';
-import school from './school.js';
-import candy from './candy.js';
-import sentry from './sentry.js';
-import gomoku from './gomoku.js';
-import luding from './luding.js';
-import grab from './grab.js';
+import bendhook from './bendhook.js';
+import goldenhook from './goldenhook.js';
+import nightschool from './nightschool.js';
+import candyShare from './candy-share.js';
+import sentryWatch from './sentry-watch.js';
+import mudGomoku from './mud-gomoku.js';
+import ludingChain from './luding-chain.js';
+import snowGrab from './snow-grab.js';
+import pontoonNight from './pontoon-night.js';
+import rallyRiver from './rally-river.js';
 // ↑ 同事的新玩法往这里加：import 一行 + 下面 GAMES 里一行。
 
 export const GAMES = {
-  needle,
-  fishing,
-  school,
-  candy,
-  sentry,
-  gomoku,
-  luding,
-  grab,
+  bendhook,
+  goldenhook,
+  nightschool,
+  'candy-share': candyShare,
+  'sentry-watch': sentryWatch,
+  'mud-gomoku': mudGomoku,
+  'luding-chain': ludingChain,
+  'snow-grab': snowGrab,
+  'pontoon-night': pontoonNight,
+  'rally-river': rallyRiver,
 };

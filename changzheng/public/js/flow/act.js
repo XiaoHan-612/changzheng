@@ -25,7 +25,7 @@ import {
 import { sceneImage, showNpc, renderJourney, updateDusk, bindLantern } from './view.js';
 import { afterJudge, showEcho } from './echo.js';
 import { CHOICE_SETS, REPEATABLE_HOTSPOTS } from './tables.js';
-import { doFishing, doSchool, doCandy, doSentry, doGomoku, doGrab, doRoster, doLuding, doSoup, doShare } from './games-flow.js';
+import { doFishing, doSchool, doCandy, doSentry, doGomoku, doGrab, doRoster, doLuding, doSoup, doShare, doPontoonNight, doRallyRiver } from './games-flow.js';
 import { runQuiz } from './quiz.js';
 import { runNightChoice, nightContext } from './night.js';
 import { runFailure, runEnding } from './end.js';
@@ -186,6 +186,7 @@ export async function runForcedChain(act) {
       else if (fid === 'sentry') { await doSentry(); markDone(act.id, 'sentry'); }
       else if (fid === 'path') { await runPathOnImage(); markDone(act.id, 'path'); }
       else if (fid === 'luding') { await doLuding(act); markDone(act.id, 'luding'); }
+      else if (fid === 'pontoon') { await doPontoonNight(); markDone(act.id, 'pontoon'); }
       else { await doChoice(act, fid); markDone(act.id, fid); }
     }
     if (act.quiz && !isDone(act.id, 'quiz')) {
@@ -694,6 +695,8 @@ export const HOTSPOT_HANDLERS = {
   sentry: () => doSentry(),
   gomoku: () => doGomoku(),
   grab: () => doGrab(),
+  pontoon: () => doPontoonNight(),
+  rally: () => doRallyRiver(),
   roster: () => doRoster(),
   choice: async (act, h) => {
     await doChoice(act, h.action);

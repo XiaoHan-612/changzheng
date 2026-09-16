@@ -31,7 +31,7 @@ function checkFiles() {
  */
 function flowSrc() {
   const dir = path.join(ROOT, 'public/js');
-  const files = ['main.js', 'minigames.js', 'ai-client.js', 'ui.js', 'step.js'];
+  const files = ['main.js', 'ai-client.js', 'ui.js', 'step.js'];
   for (const sub of ['flow', 'modules/games', 'modules/ai', 'modules/shell', 'modules/hud', 'modules/screens', 'modules/state', 'modules/audio', 'kernel']) {
     const d = path.join(dir, sub);
     if (!fs.existsSync(d)) continue;

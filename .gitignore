@@ -32,4 +32,8 @@ _archive/**/*.mp3
 _archive/**/*.ogg
 
 # 本机的音频生成工具链（soundfile/cffi 的 whl + make_audio2.py）：产出用的，别入源码库
-_oggpkg/
+_archive/audio-toolchain/
+
+# 同事的小游戏交接包（v1 = 文档 + 单支源码 / v2 = 含完整检出）：本地参考，不进源码历史。
+# 真正要接进工程的东西已经拷进 changzheng/public/js/modules/games/src/ 与 changzheng/docs/minigames/。
+_archive/handoff-minigames-*/

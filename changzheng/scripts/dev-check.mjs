@@ -15,7 +15,7 @@
  * 用法：
  *   npm run dev:check            快检（默认无头）
  *   npm run dev:check -- --headed   开个窗口看着跑
- *   npm run dev:check -- --mins=gomoku,grab   玩法板那一步换一批（默认抽查 needle / sentry）
+ *   npm run dev:check -- --mins=gomoku,grab   玩法板那一步换一批（默认抽查 bendhook / sentry-watch）
  *   node scripts/dev-check.mjs --port=3399
  */
 import { spawnSync } from 'node:child_process';
@@ -83,6 +83,8 @@ await step('单元测试', () => {
 });
 
 await step('文档与代码一致', () => {
+  runCli('玩法收料', ['tools/intake-minigames.mjs', '--check'],
+    { hint: '同事的玩法源码没接上缝合点（跑 npm run intake:minigames）' });
   runCli('文档一致性', ['scripts/check-handoff.mjs'], { hint: '文档写的与实际不符（命令、路径、事件表）' });
   return '命令表/模块地图对得上';
 });
@@ -234,10 +236,10 @@ await step('开局到营地', async () => {
 
 await step('玩法板挂得上', async () => {
   assert(!bail, '上一步没过');
-  // 抽查两个代表，不是全量八个：needle 有分步状态、sentry 有数值签与多处置键，
+  // 抽查两个代表，不是全量十个：bendhook 有分步状态、sentry-watch 有数值签与多处置键，
   // 这两条足以看出"宿主 + 契约标记 + 板屏壳"有没有被碰坏。全量（8 个 / 57 项）在 qa:board。
   const mins = (process.argv.find((a) => a.startsWith('--mins=')) || '').split('=')[1];
-  const ids = mins ? mins.split(',').map((s) => s.trim()).filter(Boolean) : ['needle', 'sentry'];
+  const ids = mins ? mins.split(',').map((s) => s.trim()).filter(Boolean) : ['bendhook', 'sentry-watch'];
   const results = [];
   for (const id of ids) {
     await page.evaluate((n) => window.__czScreens.mini(n), id);

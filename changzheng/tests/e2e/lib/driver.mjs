@@ -71,50 +71,31 @@ export async function tap(page, sel) {
 export async function applyMiniAction(page, s) {
   const a = s.miniActions || [];
   const has = (x) => a.includes(x);
+  // 玩法策略：同事重做的十支，动作词见各自卡片（`modules/games/src/minigames-*.js`）。
+  // 统一写法——给一个"越靠后段越优先"的动作序，能点就点一下，都没有就等一会儿：
+  // 每支的节奏不同（有的要反复加热、有的要先选难度、有的要先抛竿），
+  // 但"总是推进最靠后的那一步"对它们都通用（比写十条各自的分支更不容易漂）。
+  const prefer = async (list, tag) => {
+    for (const a of list) {
+      if (has(a)) { await tap(page, `[data-mini-action="${a}"]`); return `${tag}-${a}`; }
+    }
+    await page.waitForTimeout(180);
+    return '';
+  };
   switch (s.mini) {
-    case 'fishing':
-      if (has('cast')) { await tap(page, '[data-mini-action="cast"]'); return 'fish-cast'; }
-      if (has('hook')) { await tap(page, '[data-mini-action="hook"]'); return 'fish-hook'; }
-      await page.waitForTimeout(250);
-      return '';
-    case 'needle':
-      if (has('bend')) { await tap(page, '[data-mini-action="bend"]'); return 'needle'; }
-      await page.waitForTimeout(220);
-      return '';
-    case 'candy':
-      if (has('candy') && has('target')) {
-        await tap(page, '[data-mini-action="candy"]');
-        await page.waitForTimeout(40);
-        await tap(page, '[data-mini-action="target"]');
-        return 'candy-give';
-      }
-      if (has('confirm')) { await tap(page, '[data-mini-action="confirm"]'); return 'candy-ok'; }
-      await page.waitForTimeout(80);
-      return '';
-    case 'sentry':
-      if (has('answer')) { await tap(page, '[data-mini-action="answer"]'); return 'sentry'; }
-      await page.waitForTimeout(120);
-      return '';
-    case 'school':
-      if (has('answer')) { await tap(page, '[data-mini-action="answer"]'); return 'school'; }
-      await page.waitForTimeout(200);
-      return '';
-    case 'gomoku':
-      if ((s.miniState === 'player' || s.miniState === 'awaiting') && has('cell')) {
-        await tap(page, '[data-mini-action="cell"]');
-        return 'gomoku-move';
-      }
-      await page.waitForTimeout(220);
-      return '';
-    case 'luding':
-      if (has('jump')) await tap(page, '[data-mini-action="jump"]');
-      if (has('right')) await tap(page, '[data-mini-action="right"]');
-      await page.waitForTimeout(320);
-      return 'luding';
-    case 'grab':
-      if (has('grab')) { await tap(page, '[data-mini-action="grab"]'); return 'grab'; }
-      await page.waitForTimeout(420);
-      return '';
+    case 'bendhook': return prefer(['done', 'bend-tip', 'bend-body', 'heat'], 'bendhook');
+    case 'goldenhook': return prefer(['reel', 'hook', 'cast', 'recast'], 'fish');
+    // 夜校：入口（nightschool）选中后会**自己**把 data-mini 换成子玩法的 id，两种都要认
+    case 'nightschool':
+    case 'nightschool-entry': return prefer(['pick-quiz', 'pick-lamp'], 'school-pick');
+    case 'nightschool-quiz': return prefer(['answer'], 'school-quiz');
+    case 'candy-share': return prefer(['confirm', 'give', 'keep', 'ask'], 'candy');
+    case 'sentry-watch': return prefer(['answer', 'lamp'], 'sentry');
+    case 'mud-gomoku': return prefer(['again', 'next', 'resign', 'urge', 'place', 'spectate', 'fair', 'handicap', 'level'], 'gomoku');
+    case 'luding-chain': return prefer(['cover', 'lay', 'cling', 'start'], 'luding');
+    case 'snow-grab': return prefer(['pull', 'throw', 'bare', 'leg', 'foot0', 'foot1', 'foot2'], 'grab');
+    case 'pontoon-night': return prefer(['reinforce', 'anchor', 'seg', 'lamp', 'mode-plank', 'mode-boat'], 'pontoon');
+    case 'rally-river': return prefer(['ferry', 'callout', 'search'], 'rally');
     default:
       await page.waitForTimeout(250);
       return '';

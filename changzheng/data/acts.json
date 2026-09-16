@@ -14,11 +14,11 @@
       "theme": "为什么出发",
       "hotspots": [
         { "id": "mother", "label": "母亲", "sub": "告别", "x": 20, "y": 55, "kind": "talk", "npc": "母亲", "img": "/assets/scenes/depart_crowd.jpg" },
-        { "id": "bridge", "label": "浮桥", "sub": "过河抉择", "x": 48, "y": 58, "kind": "choice", "action": "cross" },
+        { "id": "bridge", "label": "浮桥", "sub": "夜搭浮桥", "x": 48, "y": 58, "kind": "pontoon" },
         { "id": "rest", "label": "背囊旁", "sub": "歇一会儿", "x": 72, "y": 50, "kind": "rest" },
         { "id": "march", "label": "北岸", "sub": "继续行军 →", "x": 90, "y": 48, "kind": "march" }
       ],
-      "forced": ["cross"],
+      "forced": ["pontoon"],
       "quiz": true,
       "facts": ["h_depart"]
     },
@@ -39,7 +39,7 @@
         { "id": "medic", "label": "卫生员", "sub": "包扎伤口", "x": 52, "y": 68, "kind": "talk", "npc": "卫生员", "img": "/assets/scenes/xiangjiang_night.jpg" },
         { "id": "stretcher", "label": "担架上的伤员", "sub": "听他说一句", "x": 30, "y": 68, "kind": "talk", "npc": "担架伤员", "img": "/assets/scenes/xiangjiang_wreck.jpg" },
         { "id": "rest", "label": "背囊", "sub": "休息", "x": 78, "y": 48, "kind": "rest" },
-        { "id": "march", "label": "北岸小路", "sub": "行军 →", "x": 90, "y": 50, "kind": "march" }
+        { "id": "march", "label": "北岸小路", "sub": "行军 →", "x": 90, "y": 50, "kind": "march" }, { "id": "rally", "label": "东岸还有人", "sub": "八刻：搜一处 / 渡一趟", "x": 8, "y": 66, "kind": "rally" }
       ],
       "forced": ["escort"],
       "quiz": true,
