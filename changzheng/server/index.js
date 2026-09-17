@@ -4,7 +4,7 @@ import fs from 'fs';
 import zlib from 'zlib';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { CONFIG, saveRuntimeConfig } from './config.js';
+import { CONFIG, saveRuntimeConfig, assertSafeApiUrl } from './config.js';
 import { callGlm51, probeGlm } from './ai.js';
 import { readSessionLogs, clearSessionLogs } from './logger.js';
 
@@ -16,6 +16,20 @@ const CODE_STAMP = Math.max(...fs.readdirSync(__dirname).filter((f) => f.endsWit
   .map((f) => fs.statSync(path.join(__dirname, f)).mtimeMs));
 const app = express();
 app.use(express.json({ limit: '1mb' }));
+
+/**
+ * 「只允许本机」的守门人：给设置、日志这类**本机运维接口**用。
+ *
+ * 为什么需要：演示机常常开在会场/办公室的局域网里，而 `/api/config` 能读到掩码后的 Key 与接口、
+ * `/api/logs` 能读到整局的行为日志、`/api/logs/clear` 还能把证据清掉——这些只该由坐在机器前面的人碰。
+ * 判据是 TCP 层的 remoteAddress（`::ffff:127.0.0.1` 是 IPv4 映射写法，一并认）。
+ */
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+function localOnly(req, res, next) {
+  const addr = req.socket?.remoteAddress || '';
+  if (LOOPBACK.has(addr)) return next();
+  res.status(403).json({ ok: false, error: '该接口只允许本机访问（127.0.0.1 / ::1）' });
+}
 
 // 文本响应 gzip（无第三方依赖）：只压缩 >1KB 的 text/json/js/css/svg
 app.use((req, res, next) => {
@@ -64,17 +78,17 @@ app.post('/api/decide', async (req, res) => {
   }
 });
 
-app.get('/api/logs', (_req, res) => {
+app.get('/api/logs', localOnly, (_req, res) => {
   const logs = readSessionLogs();
   res.json({ ok: true, count: logs.length, logs });
 });
 
-app.post('/api/logs/clear', (_req, res) => {
+app.post('/api/logs/clear', localOnly, (_req, res) => {
   clearSessionLogs();
   res.json({ ok: true, count: 0 });
 });
 
-app.get('/api/config', (_req, res) => {
+app.get('/api/config', localOnly, (_req, res) => {
   const models = ['glm-5.1', 'glm-5.3-flash', 'glm-4-plus', 'glm-4-air', 'glm-4-flash'];
   if (!models.includes(CONFIG.GLM_MODEL)) models.unshift(CONFIG.GLM_MODEL);
   res.json({
@@ -113,18 +127,20 @@ app.post('/api/tts', (req, res) => {
 });
 
 // 设置：切换模型 / API Key / 接口
-app.post('/api/config', (req, res) => {
+app.post('/api/config', localOnly, (req, res) => {
   try {
     const { model, apiKey, apiUrl, reasoningEffort } = req.body || {};
     const patch = {};
     if (typeof model === 'string') patch.GLM_MODEL = model.trim();
-    if (typeof apiUrl === 'string' && apiUrl.trim()) patch.GLM_API_URL = apiUrl.trim();
+    // 改接口地址要过安全闸（https + host 白名单）：这是"本机已保存过的那个"唯一的改动入口，
+    // 不加的话上面那些限制都能被"先存一个自己的地址"绕过去
+    if (typeof apiUrl === 'string' && apiUrl.trim()) patch.GLM_API_URL = assertSafeApiUrl(apiUrl.trim());
     if (typeof apiKey === 'string') patch.GLM_API_KEY = apiKey.trim();
     if (typeof reasoningEffort === 'string') patch.GLM_REASONING_EFFORT = reasoningEffort.trim();
     const info = saveRuntimeConfig(patch);
     res.json({ ok: true, ...info });
   } catch (err) {
-    res.status(500).json({ ok: false, error: String(err.message || err) });
+    res.status(400).json({ ok: false, error: String(err.message || err) });
   }
 });
 
@@ -161,10 +177,13 @@ app.use((req, res) => {
   res.status(404).json({ ok: false, error: `not found: ${req.method} ${req.path}` });
 });
 
-app.listen(CONFIG.PORT, () => {
+// 本机默认只绑 127.0.0.1：演示机常常在会场/公司局域网里，默认不该让整个网段都能打开它。
+// 需要对外（例如手机看效果）就 `HOST=0.0.0.0 npm start`，自己清楚在做什么。
+const HOST = process.env.HOST || '127.0.0.1';
+app.listen(CONFIG.PORT, HOST, () => {
   console.log('══════════════════════════════════════════════');
   console.log('  《长征·抉择》正式工程 v0.1');
-  console.log(`  地址: http://localhost:${CONFIG.PORT}`);
+  console.log(`  地址: http://localhost:${CONFIG.PORT}　（只监听 ${HOST}）`);
   console.log(`  模型: ${CONFIG.GLM_MODEL}`);
   console.log(`  模式: ${CONFIG.GLM_API_KEY ? '真实调用 ' + CONFIG.GLM_MODEL : '⚠ 未配置 GLM_API_KEY（调用会报错并写日志）'}`);
   console.log('══════════════════════════════════════════════');

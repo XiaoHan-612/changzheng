@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, applyEffects, unlockFact } from '../../public/js/state.js';
-import { markLineDone, linesDoneCount, canNight, apPerDay, dayScene, checkFailure, resolveLoss } from '../../public/js/state.js';
+import { markLineDone, linesDoneCount, canNight, apPerDay, dayScene, checkFailure, resolveLoss, checkVillageUnlock, pickEndingId } from '../../public/js/state.js';
 
 // 减员判定：由作者标注的风险 + 当前资源决定（行军模式的主要代价来源）
 const LOSS_CS = {
@@ -86,17 +86,22 @@ test('好感可增减且钳制', () => {
   assert.equal(s.好感_老班长, 0);
 });
 
-test('附身线：幂等计数 + 篝火夜门槛 ≥3', () => {
+test('附身线：幂等计数 + 篝火夜门槛（自愿 ≥2；强制链不计）', () => {
   const s = createState();
   assert.equal(linesDoneCount(s), 0);
   assert.equal(canNight(s), false);
+  // 强制链：只记 linesDone，不进 voluntary，不解锁夜间
   assert.equal(markLineDone(s, 'fishing'), true);
   assert.equal(markLineDone(s, 'fishing'), false);
   markLineDone(s, 'candy');
-  assert.equal(canNight(s), false);
   markLineDone(s, 'sentry');
   assert.equal(linesDoneCount(s), 3);
-  assert.equal(canNight(s), true);
+  assert.equal(canNight(s, 2), false);
+  // 营地自愿：计入门槛
+  markLineDone(s, 'school', { voluntary: true });
+  assert.equal(canNight(s, 2), false);
+  markLineDone(s, 'gomoku', { voluntary: true });
+  assert.equal(canNight(s, 2), true);
 });
 
 test('行动点：读取 acts 的 apPerDay，缺省 2', () => {
@@ -140,4 +145,23 @@ test('失败判定：体力归零、断粮见底；研学模式不触发', () =>
 
   const study = { ...createState(), mode: 'study', 体力: 0, 粮食: 0 };
   assert.equal(checkFailure(study), null);
+});
+
+test('民心 ≥60 解锁老乡支线（幂等）', () => {
+  const s = createState();
+  assert.equal(checkVillageUnlock(s), false);
+  s.民心 = 59;
+  assert.equal(checkVillageUnlock(s), false);
+  s.民心 = 60;
+  assert.equal(checkVillageUnlock(s), true);
+  assert.equal(s.villageUnlocked, true);
+  assert.equal(checkVillageUnlock(s), false);
+});
+
+test('本地结局倾向：损失/夜间/信念映射到四结局', () => {
+  const base = createState();
+  assert.equal(pickEndingId(base), '同行');
+  assert.equal(pickEndingId({ ...base, losses: [{ who: 'a' }, { who: 'b' }, { who: 'c' }] }), '未竟');
+  assert.equal(pickEndingId({ ...base, nightChoice: '加岗并匀出口粮' }), '守望');
+  assert.equal(pickEndingId({ ...base, 信念: 80, losses: [] }), '星火');
 });

@@ -18,6 +18,7 @@
 import {
   createState, applyEffects, applyStarvation, checkFailure, addLoss, resolveLoss,
   unlockFact, markLineDone, linesDoneCount, canNight, loadState, saveState,
+  checkVillageUnlock, pickEndingId,
 } from '../../state.js';
 
 let S = null;            // 唯一的持有者（模块级变量，不挂描述符）
@@ -81,7 +82,14 @@ export default {
     /** 模型给的资源变化（内部走 state.js 的钳制表）；返回人类可读的变化清单 */
     applyEffects(effects, label = '资源变化') {
       let changes = [];
-      apply(label, (s) => { changes = applyEffects(s, effects); }, Object.keys(effects || {}));
+      let unlockedVillage = false;
+      apply(label, (s) => {
+        changes = applyEffects(s, effects);
+        unlockedVillage = checkVillageUnlock(s);
+      }, Object.keys(effects || {}));
+      if (unlockedVillage) {
+        changes = [...(changes || []), '老乡支线解锁'];
+      }
       return changes;
     },
 
@@ -95,12 +103,26 @@ export default {
       apply('进入营地日', (s) => {
         s.day = day; s.ap = ap; s.maxAp = maxAp;
         s.restCount = 0; s.phase = 'camp'; s.行动日志 = [];
-      }, ['day', 'ap', 'maxAp', 'restCount', 'phase', '行动日志']);
+        s.fireTalkUsed = 0; s.fireShareUsed = 0;
+      }, ['day', 'ap', 'maxAp', 'restCount', 'phase', '行动日志', 'fireTalkUsed', 'fireShareUsed']);
     },
 
     /** 休息次数 +1（体力恢复递减用） */
     bumpRest() {
       apply('休息', (s) => { s.restCount = (s.restCount || 0) + 1; }, ['restCount']);
+    },
+
+    /** 篝火 talk/share 当日限 1 次；true=本日还能用 */
+    trySpendFire(kind) {
+      let ok = false;
+      apply('篝火次数', (s) => {
+        const key = kind === 'share' ? 'fireShareUsed' : 'fireTalkUsed';
+        const n = s[key] || 0;
+        if (n >= 1) return;
+        s[key] = n + 1;
+        ok = true;
+      }, ['fireTalkUsed', 'fireShareUsed']);
+      return ok;
     },
 
     /** 写一个字段（简单场景用；复杂场景请加语义动作，别让调用方拼字段名） */
@@ -137,13 +159,15 @@ export default {
     },
     isDone(actId, key) { return !!(S?.doneKeys && S.doneKeys[`${actId}:${key}`]); },
 
-    markLine(key) {
+    markLine(key, opts = {}) {
       let added = false;
-      apply('点亮附身线', (s) => { added = markLineDone(s, key); }, ['linesDone']);
+      apply('点亮附身线', (s) => { added = markLineDone(s, key, opts); }, ['linesDone', 'voluntaryLines']);
       return added;
     },
     linesDone() { return linesDoneCount(S); },
-    canNight(need = 3) { return canNight(S, need); },
+    canNight(need = 2) { return canNight(S, need); },
+    /** 本地结局倾向（模型失败时兜底 + prompt 提示） */
+    pickEnding() { return pickEndingId(S); },
 
     unlockFact(id) {
       let added = false;

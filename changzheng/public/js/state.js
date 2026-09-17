@@ -25,6 +25,7 @@ export function createState() {
     fishingBest: 0,
     // 附身线：点亮几条，决定篝火夜是否解锁
     linesDone: [],
+    voluntaryLines: [],
     sugarPlan: null,
     sentryScore: 0,
     ludingResult: null,
@@ -40,7 +41,34 @@ export function createState() {
     mode: 'study',
     losses: [],
     failure: null,
+    // 篝火 talk/share 当日已用次数（v0.3：防无限刷好感）
+    fireTalkUsed: 0,
+    fireShareUsed: 0,
+    // 民心阈值解锁老乡线（DESIGN §4：民心解锁老乡支线）
+    villageUnlocked: false,
   };
+}
+
+/** 民心 ≥ 60 解锁老乡支线（幂等；返回是否本局首次解锁） */
+export function checkVillageUnlock(state) {
+  if (!state || state.villageUnlocked) return false;
+  if ((state.民心 ?? 0) >= 60) {
+    state.villageUnlocked = true;
+    return true;
+  }
+  return false;
+}
+
+/** 按本地状态推一个 ending_id（模型失败时兜底；也作为 prompt 偏好提示） */
+export function pickEndingId(state) {
+  if (!state) return '同行';
+  const faith = state.信念 ?? 50;
+  const losses = (state.losses || []).length;
+  const night = state.nightChoice || '';
+  if (losses >= 3 || (state.体力 ?? 50) < 25) return '未竟';
+  if (night.includes('加岗') || night.includes('安全')) return '守望';
+  if (faith >= 75 && losses === 0) return '星火';
+  return '同行';
 }
 
 /** 成败判定：仅在行军模式生效 */
@@ -178,20 +206,35 @@ export function unlockFact(state, factId) {
   return true;
 }
 
-/** 记一条附身线（幂等） */
-export function markLineDone(state, id) {
+/**
+ * 记一条附身线（幂等）。
+ * @param {{voluntary?: boolean}} [opts] voluntary=true 表示营地自愿玩过（计入篝火夜门槛）；
+ *   强制链重播不算——否则 act4 强制跑 fishing/candy/sentry 会自动点亮 3 条，门槛形同虚设。
+ */
+export function markLineDone(state, id, opts = {}) {
   if (!id) return false;
   if (!Array.isArray(state.linesDone)) state.linesDone = [];
-  if (state.linesDone.includes(id)) return false;
-  state.linesDone.push(id);
-  return true;
+  const added = !state.linesDone.includes(id);
+  if (added) state.linesDone.push(id);
+  if (opts.voluntary) {
+    if (!Array.isArray(state.voluntaryLines)) state.voluntaryLines = [];
+    if (!state.voluntaryLines.includes(id)) {
+      state.voluntaryLines.push(id);
+      return true;
+    }
+  }
+  return added;
 }
 
 export function linesDoneCount(state) {
   return Array.isArray(state.linesDone) ? state.linesDone.length : 0;
 }
 
-/** 篝火夜门槛：点亮 need 条附身线后可进夜间议事 */
-export function canNight(state, need = 3) {
-  return linesDoneCount(state) >= need;
+export function voluntaryLinesCount(state) {
+  return Array.isArray(state.voluntaryLines) ? state.voluntaryLines.length : 0;
+}
+
+/** 篝火夜门槛：营地**自愿**点亮 need 条附身线后可进夜间议事（强制链不计） */
+export function canNight(state, need = 2) {
+  return voluntaryLinesCount(state) >= need;
 }

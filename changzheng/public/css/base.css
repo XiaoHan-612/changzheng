@@ -18,8 +18,8 @@ body {
 /* 工具类 */
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
-.sm, .muted.sm { font-size: 12px; }
-.eyebrow { font-size: var(--fs-micro); letter-spacing: 0.28em; color: var(--gold); margin-bottom: var(--sp-3); }
+.sm, .muted.sm { font-size: 13px; }
+.eyebrow { font-size: var(--fs-label); letter-spacing: 0.28em; color: var(--gold); margin-bottom: var(--sp-3); }
 .empty { color: var(--ink-2); font-style: normal; }
 .type, .typing { min-height: 1.8em; }
 

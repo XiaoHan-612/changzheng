@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js';
+import { CONFIG, assertSafeApiUrl } from './config.js';
 import { logAiCall } from './logger.js';
 import { missingFields } from './schema.js';
 import { normalizeEffects } from './balance.js';
@@ -9,15 +9,35 @@ import { normalizeEffects } from './balance.js';
 /**
  * 设置页「测试连通」专用：单次探测，不写日志、不重试。
  * 允许传入未保存的表单值（model / apiKey / apiUrl / reasoningEffort）。
+ *
+ * ⚠️ 两处收口（本地演示的对外面）：
+ *   ① Key **只用请求体里显式传来的那把**，不回退服务器已保存的 `CONFIG.GLM_API_KEY` ——
+ *      否则局域网里的任何人都能拿演示机的 Key 打一次真调用（额度与日志都被别人花掉）。
+ *   ② apiUrl 过 `assertSafeApiUrl`：只认 https，host 在白名单（见 config.js）。
  */
 export async function probeGlm({ model, apiKey, apiUrl, reasoningEffort, timeoutMs = 25000 } = {}) {
+  const model0 = (model || '').trim() || CONFIG.GLM_MODEL;
+  const key = (apiKey || '').trim();
+  if (!key) {
+    return {
+      ok: false,
+      latencyMs: 0,
+      model: model0,
+      error: '连通测试需要在请求里显式带上 apiKey（不回退服务器已保存的 Key）——把 Key 填进输入框再测一次',
+    };
+  }
+  let url = '';
+  try {
+    url = assertSafeApiUrl((apiUrl || '').trim() || CONFIG.GLM_API_URL);
+  } catch (err) {
+    return { ok: false, latencyMs: 0, model: model0, error: String(err?.message || err) };
+  }
   const cfg = {
-    model: (model || '').trim() || CONFIG.GLM_MODEL,
-    key: (apiKey || '').trim() || CONFIG.GLM_API_KEY,
-    url: (apiUrl || '').trim() || CONFIG.GLM_API_URL,
+    model: model0,
+    key,
+    url,
     effort: reasoningEffort === undefined ? CONFIG.GLM_REASONING_EFFORT : reasoningEffort,
   };
-  if (!cfg.key) return { ok: false, latencyMs: 0, model: cfg.model, error: '未配置 API Key' };
 
   const t0 = Date.now();
   const ac = new AbortController();
@@ -83,7 +103,6 @@ export async function callGlm51(payload) {
     situation = '',
     state = {},
     options = [],
-    systemPrompt,
     extraContext,
     operation = null,
     callType = 'minigame_review',
@@ -98,7 +117,10 @@ export async function callGlm51(payload) {
   const temper = Math.min(1.2, Math.max(0, Number.isFinite(Number(temperature)) ? Number(temperature) : 0.75));
 
   const startTime = Date.now();
-  const system = systemPrompt || buildSystemPrompt(callType, scene, operation);
+  // systemPrompt **一律由服务端按 callType 生成**：早先这里是 `payload.systemPrompt || …`，
+  // 等于把"模型的人格与护栏"交给调用方随手覆盖（护栏、JSON 输出要求、数值上限都在 system 里）。
+  // 前端与脚本本来就没有任何地方传它，所以收掉这个口子不影响任何现有调用。
+  const system = buildSystemPrompt(callType, scene, operation);
   const userMessage = buildUserMessage({ scene, situation, state, options, extraContext, operation, callType, agent });
 
   // 没有 Key 就直接报错：不做任何"假演示"

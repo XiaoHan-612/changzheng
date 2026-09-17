@@ -24,14 +24,16 @@ export function sceneImage(primary, fallback) {
   if (!primary) return fallback;
   // 别叫 st：外层 `st()` 是取 state 模块的助手，同名会互相遮蔽（历史上真撞过一次，改名 cached）
   const cached = _imgState.get(primary);
-  if (cached === true) return primary;
+  if (cached === true || cached === 'pending') return primary;
   if (cached === false) return fallback;
+  // 探测中：**返回 primary**（乐观）。原先先回 fallback，导致「新图第一次进场景永远是旧图/兜底」，
+  // 刷新才对——玩家以为素材坏了（v0.3 P0-5）。失败会在 onerror 记 false，下一次再走兜底。
   const img = new Image();
   img.onload = () => _imgState.set(primary, true);
   img.onerror = () => _imgState.set(primary, false);
   img.src = primary;
-  _imgState.set(primary, false); // 探测完成前先用兜底，避免白屏
-  return fallback;
+  _imgState.set(primary, 'pending');
+  return primary || fallback;
 }
 
 /** 启动时预热候选素材，进入场景时就能立刻用上新图 */

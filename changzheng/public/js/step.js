@@ -180,3 +180,35 @@ function esc(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+/**
+ * 游戏内二选一确认（取代浏览器 `confirm`：风格统一、不阻塞主线程同步 API、移动端可用）。
+ * @param {string} message
+ * @param {{yes?: string, no?: string, yesSub?: string, noSub?: string}} [opts]
+ * @returns {Promise<boolean>}
+ */
+export function askConfirm(message, opts = {}) {
+  const { yes = '确定', no = '再想想', yesSub = '', noSub = '' } = opts;
+  return new Promise((resolve) => {
+    const mask = document.createElement('div');
+    mask.className = 'confirm-mask';
+    mask.innerHTML = `<div class="confirm-box" role="dialog" aria-modal="true">
+      <p class="confirm-msg">${esc(message)}</p>
+      <div class="confirm-row">
+        <button type="button" class="btn cut-btn" data-action="confirm-no">${esc(no)}${yesSub || noSub ? `<span class="muted sm" style="display:block;margin-top:4px">${esc(noSub)}</span>` : ''}</button>
+        <button type="button" class="btn cut-btn" data-action="confirm-yes">${esc(yes)}${yesSub ? `<span class="muted sm" style="display:block;margin-top:4px">${esc(yesSub)}</span>` : ''}</button>
+      </div>
+    </div>`;
+    const close = (ok) => {
+      mask.remove();
+      resolve(ok);
+    };
+    const buttons = mask.querySelectorAll('.confirm-row button');
+    buttons[0].onclick = () => close(false);
+    buttons[1].onclick = () => close(true);
+    document.body.appendChild(mask);
+    mask.addEventListener('click', (e) => { if (e.target === mask) close(false); });
+    mask.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(false); });
+    buttons[1].focus();
+  });
+}

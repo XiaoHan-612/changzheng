@@ -586,6 +586,17 @@ export function runGoldenHook(container, opts = {}) {
     let waitT = 0, jump = null, jumpT = 0, tickT = 0;
     let landAnim = 0, landFrom = null;
     let resolved = false;
+    /** 只结一次账：正常玩完走 finish()，容器被拆走也要结 —— 否则内层 Promise 永远挂着，
+     *  局内的 canvas / 定时器 / 闭包全被钉住（多局就是一路泄漏）。见 sentry 的同款写法。 */
+    function settleOnce(result) {
+      if (resolved) return;
+      resolved = true;
+      resolve(result);
+    }
+    /** 中途被拆走：形状与各支一致（score 0 · detached · aborted），别改分与 detail 的形状 */
+    function settleDetached() {
+      settleOnce({ score: 0, detail: { outcome: 'none', why: 'detached', aborted: true }, summary: '' });
+    }
     let tensionView = 0;                       // 竿弯曲用这个，慢慢跟上张力，不硬切
     tensionOf = () => tensionView;
 
@@ -733,7 +744,6 @@ export function runGoldenHook(container, opts = {}) {
 
     function finish() {
       if (resolved) return;
-      resolved = true;
       let sum = 0;
       for (const r of rods) {
         if (!r || !r.landed) continue;
@@ -748,7 +758,7 @@ export function runGoldenHook(container, opts = {}) {
         : landed === 3
           ? `三尾都上了岸：${names.join('、')}。这天晚上，伤员们终于喝上了一顿有油花的汤。`
           : `${landed} 尾上岸：${names.join('、')}。汤是稀的，老班长说自己已经吃过了。`;
-      resolve({
+      settleOnce({
         score: Math.round(score * 100) / 100,
         detail: {
           rods: rods.map((r) => ({
@@ -801,7 +811,7 @@ export function runGoldenHook(container, opts = {}) {
     /* ── 主循环 ── */
     let raf = 0; let last = 0;
     function loop(t) {
-      if (!document.body.contains(container)) { ac.abort(); cancelAnimationFrame(raf); return; }
+      if (!document.body.contains(container)) { ac.abort(); cancelAnimationFrame(raf); settleDetached(); return; }
       const dt = last ? Math.min((t - last) / 1000, 0.05) : 0;
       last = t;
       step(dt);

@@ -63,6 +63,7 @@
         </div>
         <div class="title-actions">
           <button type="button" id="btn-continue-run" class="btn primary lg hidden">继续上一局</button>
+          <button type="button" id="btn-jump-huining" class="btn lg">直达会宁 · 验收</button>
           <button type="button" id="btn-judge" class="btn gold lg dev-only">评委演示</button>
           <button type="button" id="btn-how" class="btn ghost lg">怎么玩</button>
           <button type="button" id="btn-settings2" class="btn ghost lg">设置</button>
@@ -130,17 +131,17 @@
       </div>
     </section>
 
-    <section id="screen-cutscene" class="screen hidden tpl-title">
+    <!-- 过场：全屏放映（不是纸卡）。底图/题字/路线/诗都由 cinema 拍子写进 #cut-stage / #cut-beat -->
+    <section id="screen-cutscene" class="screen hidden tpl-title cut-theater">
       <div class="cut-stage" id="cut-stage"></div>
+      <div class="cut-veil" aria-hidden="true"></div>
       <div class="cut-caption-wrap">
-        <!-- 拍子的舞台：题字卡 / 路线图 由 modules/cinema 的拍子写进来（字幕在下面那一行） -->
         <div id="cut-beat"></div>
         <div class="cut-caption" id="cut-caption"></div>
         <div class="cut-actions">
-          <button type="button" id="btn-cut-next" class="btn primary">下一句 ▸</button>
-          <!-- 语速：只有声明了 speeds 的拍子（终章的诗）才露出，默认 hidden -->
-          <button type="button" id="btn-cut-speed" class="btn ghost hidden">1.5× 语速</button>
-          <button type="button" id="btn-cut-skip" class="btn ghost">跳过</button>
+          <button type="button" id="btn-cut-next" class="btn cut-btn">下一句 ▸</button>
+          <button type="button" id="btn-cut-speed" class="btn cut-btn hidden">1.5× 语速</button>
+          <button type="button" id="btn-cut-skip" class="btn cut-btn">跳过</button>
         </div>
       </div>
     </section>
@@ -202,6 +203,7 @@
           <span class="blk-kicker" id="board-kicker">玩法</span>
           <h2 class="blk-title md flush" id="board-title">—</h2>
           <div class="blk-stat-row" id="board-stats"></div>
+          <button type="button" id="btn-board-abandon" class="btn ghost sm board-abandon" data-action="board-abandon">放弃本局</button>
         </header>
         <div class="board-body" id="board-body"></div>
       </article>

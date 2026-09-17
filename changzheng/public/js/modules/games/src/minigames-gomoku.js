@@ -1115,9 +1115,17 @@ export function runMudGomoku(container, opts = {}) {
       kvEl.hidden = !bits.length;      // 没有局面可报时不要留一条空行
     }
 
+    /** 只给 renderSay 用：who 是内部常量，text 可能来自模型（`renderSay('深色', m.say)`） */
+    function escSay(s) {
+      return String(s).replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
     function renderSay(who, text) {
       // sayEl 是叶子容器（没有要保留的子元素）→ 写 innerHTML 是安全的
-      sayEl.innerHTML = text ? `<span class="who">${who}：</span>${text}` : '';
+      // ⚠️ 但**内容**要转义：text 可能是模型写的那句话，写什么都不能当标签执行；
+      // 其余调用点传的都是纯文本，过一遍没有副作用。
+      sayEl.innerHTML = text ? `<span class="who">${escSay(who)}：</span>${escSay(text)}` : '';
       // 没人说话时**不要留一个空白纸框**（开局屏 / 收尾屏最容易看到这个空洞）
       sayEl.hidden = !text;
       // 也暴露给自动化：验"模型写的那句真的到了玩家眼前"（qt-gomoku E8 靠它）

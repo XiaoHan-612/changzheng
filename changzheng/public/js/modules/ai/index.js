@@ -64,11 +64,30 @@ function note(callType, ok, ms) {
   metrics.set(callType, m);
 }
 
-/** 等 UI 给出「重试／跳过」。UI 不在（或没人听）时按"跳过"处理，绝不让流程悬着 */
-function waitVerdict(id) {
+/** 等 UI 给出「重试／跳过」。UI 不在（或没人听）时按"跳过"处理，绝不让流程悬着。
+ *
+ *  超时是**必须**的：`ai:fail` 只是广播，谁在听、面板有没有真的挂出来，这里管不着
+ *  （quiet 之外的调用如果碰上 shell 没订阅/屏被顶掉，就再也没人来裁决）。
+ *  早先只把 resolve 挂进 pending、注释写着"UI 不在就按跳过"，实际没有任何兜底：
+ *  一次失败就能把整局钉在这里（`await ask()` 永不落地 → 流程锁不释放）。
+ *  超时按"跳过"结账，与玩家点跳过同一条路（返回 `_error:true`），流程照常往下走。 */
+function waitVerdict(id, timeoutMs = 45000) {
   return new Promise((resolve) => {
-    pending = { id, resolve };
+    settlePending(false, { except: id });            // 旧的还没裁决就被新一次等待顶掉 → 先把旧的按"跳过"结掉
+    const timer = setTimeout(() => settlePending(false, { only: id }), timeoutMs);
+    pending = { id, resolve, timer };
   });
+}
+
+/** 把当前待裁决的那一次结掉（`only`/`except` 用来防止误伤另一次调用） */
+function settlePending(retry, { only = '', except = '' } = {}) {
+  if (!pending) return;
+  if (only && pending.id !== only) return;
+  if (except && pending.id === except) return;
+  const { resolve, timer } = pending;
+  pending = null;
+  if (timer) clearTimeout(timer);
+  resolve(retry);
 }
 
 export default {
@@ -85,10 +104,15 @@ export default {
 
   /** UI 说"重试"就再来一次；说"跳过"就把错误交给调用方 */
   onVerdict(p) {
-    if (!pending || (p?.id && p.id !== pending.id)) return;
-    const { resolve } = pending;
-    pending = null;
-    resolve(!!p?.retry);
+    if (!pending) return;
+    // 面板上的 id 与当前等的那次对不上（旧面板的迟到点击、或上一次已超时）：
+    // 先把当前的按"跳过"结掉再去接，**不能像原来那样直接 return**——
+    // 那样这条裁决被丢掉、当前这次还悬着（这正是"卡死"的另一半）。
+    if (p?.id && p.id !== pending.id) {
+      settlePending(false, { only: pending.id });
+      return;
+    }
+    settlePending(!!p?.retry, { only: pending.id });
   },
 
   api: {

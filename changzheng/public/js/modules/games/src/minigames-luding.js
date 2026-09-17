@@ -277,6 +277,18 @@ export function runLudingChain(container, opts = {}) {
     let outcome = null;
     let why = '';
     let over = false;
+    let settled = false;               // 内层 Promise 结过账没有（正常结算 / 中途被拆走都算）
+    /** 只结一次账：正常玩完走 finish()，容器被拆走也要结 —— 否则内层 Promise 永远挂着，
+     *  局内的 svg / 帧循环 / 闭包全被钉住（多局就是一路泄漏）。见 sentry 的同款写法。 */
+    function settleOnce(result) {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    }
+    /** 中途被拆走：形状与各支一致（score 0 · detached · aborted），别改分与 detail 的形状 */
+    function settleDetached() {
+      settleOnce({ score: 0, detail: { outcome: 'none', why: 'detached', aborted: true }, summary: '' });
+    }
     let fb = '';
     let raf = 0;
     let last = performance.now();
@@ -585,7 +597,7 @@ export function runLudingChain(container, opts = {}) {
           : `${TT} 秒（局内）到了，火封住桥面 —— 过到 ${Math.round(m)} 米，剩下 ${alive} 个人退回西岸。`;
       play(kind === 'crossed' ? 'win' : 'lose');
       render(true);
-      resolve({
+      settleOnce({
         score: Number(clamp(score, 0, 1).toFixed(3)),
         detail: {
           outcome: kind, why, dead: deadN, alive,
@@ -915,7 +927,7 @@ export function runLudingChain(container, opts = {}) {
     };
     ctl.signal.addEventListener('abort', teardown);
     const guard = setInterval(() => {
-      if (!document.body.contains(container)) { teardown(); clearInterval(guard); }
+      if (!document.body.contains(container)) { teardown(); clearInterval(guard); settleDetached(); }
     }, 500);
 
     render(true);

@@ -633,6 +633,18 @@ export function runSandTableGame(container, opts = {}) {
     let scouted = [];
     let deepest = 0;              // 走到最北的地方（失败时给分用）
     let resolved = false;
+    let finishTimer = 0;           // 结算动画的排定定时器 id（0 = 还没排定）；拆容器时要清掉
+    /** 只结一次账：正常玩完走 finish()（它比最后一步晚 0.7–0.9s），容器被拆走也要结 ——
+     *  否则内层 Promise 永远挂着，canvas / 定时器 / 闭包全被钉住。见 sentry 的同款写法。 */
+    function settleOnce(result) {
+      if (resolved) return;
+      resolved = true;
+      resolve(result);
+    }
+    /** 中途被拆走：形状与各支一致（score 0 · detached · aborted），别改分与 detail 的形状 */
+    function settleDetached() {
+      settleOnce({ score: 0, detail: { outcome: 'none', why: 'detached', aborted: true }, summary: '' });
+    }
     let status = '沙盘摊开了。先派侦察兵，还是先动身？';
     let statusCls = '';
     let fx = [];                  // 扬起来的沙
@@ -915,7 +927,6 @@ export function runSandTableGame(container, opts = {}) {
     /* ── 结算 ── */
     function finish() {
       if (resolved) return;
-      resolved = true;
       const reached = phase === 'crossed';
       let score;
       if (reached) {
@@ -930,7 +941,7 @@ export function runSandTableGame(container, opts = {}) {
         : phase === 'broken'
           ? `沙盘推演：在${byId.get(cur).name}硬拼，主力打光了，没能过江。`
           : `沙盘推演：行军点用尽，停在${byId.get(cur).name}，没能过江。`;
-      setTimeout(() => resolve({
+      finishTimer = setTimeout(() => settleOnce({
         score: Math.round(score * 100) / 100,
         detail: {
           reached,
@@ -1106,7 +1117,7 @@ export function runSandTableGame(container, opts = {}) {
     /* ── 主循环：离开板屏就自己停 ── */
     let raf = 0; let last = 0;
     function loop(ts) {
-      if (!document.body.contains(container)) { ac.abort(); cancelAnimationFrame(raf); return; }
+      if (!document.body.contains(container)) { ac.abort(); cancelAnimationFrame(raf); clearTimeout(finishTimer); settleDetached(); return; }
       const dt = last ? Math.min((ts - last) / 1000, 0.05) : 0;
       last = ts;
       const t = ts / 1000;

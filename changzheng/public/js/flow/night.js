@@ -1,10 +1,10 @@
 /**
- * flow/night —— **篝火夜**（点亮 ≥3 条附身线后解锁的幕末夜间议事）。
+ * flow/night —— **篝火夜**（营地**自愿**点亮 ≥2 条附身线后解锁；强制链不计）。
  *
  * 从 main.js 搬出来（批 7 二·4）：选项由模型现场生成、结算也由模型写，是"关键抉择"里
  * 唯一给信念正向增长的地方（口径见 server/balance.js）。
  */
-import { $, showScreen, typeText, escapeHtml } from '../ui.js';
+import { $, showScreen, typeText, escapeHtml, registerLiveTyping } from '../ui.js';
 import { askChoice } from '../step.js';
 import { kernel } from '../kernel/index.js';
 import { S, st, callAI, step, waitBtn, logChoice, markDone, isDone, publicState, LINE_NAMES, LINES_TOTAL } from './kit.js';
@@ -17,8 +17,9 @@ import { afterJudge } from './echo.js';
 export async function runNightChoice(act) {
   step('night', 'choice');
   if (isDone(act.id, 'night')) return false;
-  if (!st().canNight(3)) {
-    st().pushCampLog('系统', `附身线不足三条（${st().linesDone()}/${LINES_TOTAL}），今夜没有议事。`);
+  // 门槛：营地自愿玩过 ≥2 条（强制链自动点亮的不算——否则门槛假）
+  if (!st().canNight(2)) {
+    st().pushCampLog('系统', `篝火夜需要自愿点亮 2 条附身线（当前 ${st().linesDone()} 条里自愿的还不够）。今夜静一些。`);
     return false;
   }
 
@@ -71,7 +72,8 @@ export async function runNightChoice(act) {
     });
     st().applyEffects(res?.effects);
     body.innerHTML = '<p id="night-out" class="blk-body"></p>';   // 纸面用墨字，别用给暗底准备的纸色
-    await typeText($('night-out'), res?.narrative || '当夜无事。');
+    const t = registerLiveTyping(typeText($('night-out'), res?.narrative || '当夜无事。'));
+    try { await t.promise; } finally { registerLiveTyping(null); }
     st().pushCampLog('篝火夜', res?.narrative || choice.label);
   } catch (err) {
     body.innerHTML = `<p class="muted">当夜无话：${escapeHtml(err.message)}</p>`;

@@ -7,6 +7,7 @@ runtime-config.json
 
 # 测试运行产物
 tests/e2e/artifacts/
+logs/shots/
 
 # 日志是运行产物：逐日变动会把 diff 冲成噪音，8MB 轮转还会把当天最早的记录裁掉。
 # 仓库里只留 logs/sample-full-run.jsonl 一份真实全程样本（见 logs/README.md）。

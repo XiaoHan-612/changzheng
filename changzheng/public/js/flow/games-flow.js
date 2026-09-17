@@ -37,8 +37,31 @@ export function fixedEffectsFor(op) {
  * 玩法收尾的**唯一分岔**：要模型就调 `minigame_review`，不要模型（`op.noAi`）就落固定效果。
  * 别把这个判断散回各个 doXxx——散一次就会漏一处（同事那六支标了 noAi 的玩法，
  * 早先照样每局烧一次真调）。
+ *
+ * **中途放弃/拆屏**（`detail.aborted` / `why:detached`）：不调模型、不改资源，
+ * 返回短旁白；调用方应跳过 afterJudge/markLine（见 `isAborted`）。
  */
+export function isAborted(op) {
+  return !!(op?.detail?.aborted || op?.detail?.why === 'detached' || op?.detail?.why === 'abandoned');
+}
+
+/** 放弃/拆屏时的统一短收尾：不点亮附身线、不弹回响 */
+function abortedOut(result) {
+  return !!(result?._aborted);
+}
+
+/** 玩家放弃或容器被拆走：短旁白收束；返回 'aborted' 供调用方跳过 markDone */
+async function finishAborted() {
+  await say('叙事', '这一局没有打完。');
+  st().pushCampLog('系统', '中途放弃了这一局');
+  await waitBtn('继续');
+  return 'aborted';
+}
+
 async function reviewOrFixed(op, body = {}) {
+  if (isAborted(op)) {
+    return { effects: {}, narrative: '这一局没有打完。', _aborted: true, factId: null };
+  }
   if (op?.noAi) return { effects: fixedEffectsFor(op), narrative: op.summary || '', _fixed: true };
   return await callAI({ state: publicState(), ...body, situation: body.situation || op?.summary || '' });
 }
@@ -59,8 +82,9 @@ export async function doSchool() {
   await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
   const op = await gamesApi().play('nightschool', { params: { decide: decideFor('夜校识字') } });
   showScreen('screen-stage');                         // 结算回到对白屏：人物 + 叙事 + 继续
+  if (isAborted(op)) { return finishAborted(); }
   st().remember('tonightPassword', op.detail?.password || '瑞金');
-  markLine('school');
+  markLine('school', { voluntary: true });
   let result;
   result = await reviewOrFixed(op, {
     scene: '夜校识字',
@@ -76,8 +100,8 @@ export async function doSchool() {
   await afterJudge(result, '行军中的文化学习', 'h_nightschool');
 }
 
-/** 红小鬼 · 分糖：三颗糖，AI 逐颗判定 */
-export async function doCandy() {
+/** 红小鬼 · 分糖：三颗糖，AI 逐颗判定。`fromForced` 时不算自愿附身线 */
+export async function doCandy(fromForced = false) {
   step('candy', 'minigame');
   showScreen('screen-stage');
   setStageBanner('分糖', sceneImage('/assets/scenes/sugar_close.jpg', '/assets/scenes/camp_pano.jpg'));
@@ -86,8 +110,9 @@ export async function doCandy() {
   await say('红小鬼', '我兜里有三颗糖。你说，给谁？');
   const op = await gamesApi().play('candy-share', { params: { decide: decideFor('分糖') } });
   showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
   st().remember('sugarPlan', op.detail || null);
-  markLine('candy');
+  markLine('candy', { voluntary: !fromForced });
   let result;
   result = await callAI({
     scene: '分糖·红小鬼',
@@ -104,8 +129,8 @@ export async function doCandy() {
   await afterJudge(result, '行军中的分享', 'h_share');
 }
 
-/** 哨兵 · 夜岗：五信号判断，夜校口令在此生效 */
-export async function doSentry() {
+/** 哨兵 · 夜岗：五信号判断，夜校口令在此生效。`fromForced` 时不算自愿附身线 */
+export async function doSentry(fromForced = false) {
   step('sentry', 'minigame');
   showScreen('screen-stage');
   setStageBanner('夜岗', sceneImage('/assets/scenes/sentry_night.jpg', '/assets/scenes/camp_pano.jpg'));
@@ -114,14 +139,17 @@ export async function doSentry() {
   await say('哨兵', '后半夜归你。听不清就再听一遍，别急着开枪。');
   const op = await gamesApi().play('sentry-watch', { params: { password: S.tonightPassword } });
   showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
   st().remember('sentryScore', op.score);
-  markLine('sentry');
+  markLine('sentry', { voluntary: !fromForced });
   let result;
   result = await reviewOrFixed(op, {
     scene: '夜岗·哨位',
     callType: 'minigame_review',
     situation:
-      `五个信号处置 ${op.detail.hits}/${op.detail.total}`
+      // detail 用可选链兜底：玩法被中途拆走时 detail 里没有 hits/total（shape 是 detached），
+      // 直接取属性会得到 "undefined/undefined" 这种 Prompt——顺手写死成 0/0
+      `五个信号处置 ${op.detail?.hits ?? 0}/${op.detail?.total ?? 0}`
       + (S.tonightPassword ? `，夜校口令「${S.tonightPassword}」用上了` : '，未学过口令只能硬扛'),
     state: publicState(),
     operation: { type: 'sentry', ...op.detail },
@@ -143,7 +171,8 @@ export async function doGomoku() {
   await say('红小鬼', '石子当子，泥地当盘。你要是输了，可不许说没吃饱。');
   const op = await gamesApi().play('mud-gomoku', { params: { decide: decideFor('泥地五子棋') } });
   showScreen('screen-stage');
-  markLine('gomoku');
+  if (isAborted(op)) { return finishAborted(); }
+  markLine('gomoku', { voluntary: true });
   let result;
   result = await reviewOrFixed(op, {
     scene: '泥地五子棋',
@@ -168,6 +197,7 @@ export async function doGrab() {
   await say('你', '他的手在滑。前面的雪是硬的，下面是空的。');
   const op = await gamesApi().play('snow-grab');
   showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
   let result;
   result = await reviewOrFixed(op, {
     scene: '雪山·拽住同伴',
@@ -196,6 +226,7 @@ export async function doPontoonNight() {
   await say('你', '门板只有这些。往哪一段投，天亮前就得定下来。');
   const op = await gamesApi().play('pontoon-night');
   showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
   const result = await reviewOrFixed(op, {
     scene: '于都河·夜搭浮桥',
     callType: 'minigame_review',
@@ -224,6 +255,7 @@ export async function doRallyRiver() {
   await say('你', '渡口还开着。东岸还有人——搜一处，还是渡一趟，天亮之前只够选八次。');
   const op = await gamesApi().play('rally-river');
   showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
   const result = await reviewOrFixed(op, {
     scene: '湘江·东岸收拢',
     callType: 'minigame_review',
@@ -247,7 +279,10 @@ export async function doRoster() {
   await say('你', '（你在数。有些位置，怎么数都空着。）');
   let r = null;
   try {
-    r = await reviewOrFixed(op, {
+    // 这一处**没有玩法板**（会宁清点是纯叙事），所以没有 op 可复盘：直接走 act_review。
+    // 早先这里照抄了隔壁收拢那一段的 `reviewOrFixed(op, …)`，而 op 在本函数根本不存在 →
+    // 一点就 ReferenceError，被下面的 catch 变成「清点失败」toast（功能永久坏）。
+    r = await callAI({
       scene: '会宁·数一数熟面孔',
       callType: 'act_review',
       situation: '会师了，清点这一路还认得出来的人',
@@ -276,15 +311,18 @@ export async function doFishing(act, forced) {
   setPortrait('老班长', '炊事班长', '班', '专注', '/assets/characters/laoban.png');
   setStagePanel('');
   await say('老班长', '鱼钩是缝衣针弯的。手上稳着点，别掰断。');
-  await gamesApi().play('bendhook');
+  const hookOp = await gamesApi().play('bendhook');
   showScreen('screen-stage');
+  // 弯针中途放弃：整段钓鱼结束，不再强拉进起竿
+  if (isAborted(hookOp)) { return finishAborted(); }
 
   setStageBanner('金色的鱼钩 · 起竿', '/assets/scenes/pond_close.jpg');
   await say('老班长', '漂相看真了再起竿。晃是假的，沉才是口。', 'laoban_hook');
   const op = await gamesApi().play('goldenhook');
   showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
   st().remember('fishingBest', Math.max(S.fishingBest || 0, op.score));
-  markLine('fishing');
+  markLine('fishing', { voluntary: !forced });
   let result;
   result = await reviewOrFixed(op, {
     scene: '钓鱼·咬钩起竿',
@@ -316,6 +354,7 @@ export async function doLuding(act) {
   await say('突击队长', '桥板被人抽了，铁索还在。跟着我，别往下看。');
   const op = await gamesApi().play('luding-chain');
   showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
   st().remember('ludingResult', op.detail || null);
   // 战友拉住的那一下，先落到状态里再交给模型写后果
   if (op.detail?.retry) st().applyEffects({ 体力: -10 });

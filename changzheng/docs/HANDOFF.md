@@ -121,17 +121,19 @@ tokens/frames/tone/handoff 全绿 · `dev:check` 10/10（≈13s，含"升华可�
 
 ## 三、还没做 / 已知缺口（按优先级）
 
+> **v0.3 体验整改总方案见 [`V0.3-PLAN.md`](V0.3-PLAN.md)**（P0 已落地，P1/P2/P3 待做）。
+
 | 优先级 | 缺口 | 说明 |
 |--------|------|------|
 | P0 | **`verify:full`（五幕真调一局）还没跑** | 十支小游戏接完只跑到 `qa:board` + `dev:check`；"整局流程顺不顺"的最终凭据是 `npm run verify:full`（或 `npm run test:e2e`）。**接手第一条就跑它**，见 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) §四 欠账 7 |
-| P1 | 玩法侧四项欠账 | 注入样式没过 token（`qa:tokens` 扫不到 JS 内联 `<style>`）· `miniTruth` F12 可见 · `CHOICE_SETS.cross` 成死代码 · 同事 12 个 `qa-*.mjs` 还没并入 npm——**逐条与建议见 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) §四** |
+| P1 | **v0.3 玩法手感 P1×14** | 浮桥稳流窗 UI、陡坡 decide 冻结、钓鱼起竿窗、夜校触屏/键盘、统一放弃契约等——逐条见 `V0.3-PLAN.md` §3 |
+| P1 | 玩法侧四项欠账 | 注入样式没过 token · `miniTruth` F12 可见 · `CHOICE_SETS.cross` 成死代码 · 同事 12 个 `qa-*.mjs` 还没并入 npm |
 | P1 | 契约还差两处 | `runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职（建议走 `askChoice`）；`runRest` 只有一个「继续」，可直接 `waitContinue` |
-| P1 | 数值平衡未调 | 测量口径已建（`npm run qa:playtest` → `docs/PLAYTEST.md`），调参待做 |
-| P1 | ~~视觉批 6~~ | ~~答题/夜间/终局/记录与答辩~~ 已完成；视觉侧只剩「新增内容时按框架补」 |
+| P1 | 数值平衡未调 | 测量口径已建（`npm run qa:playtest` → `docs/PLAYTEST.md`），调参待做；v0.3 已做 P2-4（第三次休息不调 AI） |
+| P2 | v0.3 P2 其余 | 风险标签同源、营地目标 HUD、回响减负、篝火日限、quiet 覆盖等——见 `V0.3-PLAN.md` §4 |
 | P2 | 移动端不做 | 窄屏只保证到 **820**（已逐屏体检）；375 手机档明确不在交付范围 |
 | P2 | 操作音效仍是合成 | click/hook/echo 等由 WebAudio 合成；是否预录看路演音质要求 |
 | P2 | 封装未定型 | 一键启动（`start.bat` + 便携 Node）见 [`DELIVERY.md`](DELIVERY.md)，演示前收口 |
-| P3 | ~~终局屏小字偏淡~~ | 已修（2026-09-15）：次要文字改由**材料**决定墨色——纸面 `--ink-note` 5.3:1、墨纱 `--paper-dim`，`qa:tone` 加了比值与结构断言。见 HANDOFF-CODE 坑 44 |
 | P3 | 离线回放（备选） | 现场无网/额度耗尽的风险预案，见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)，**未开发** |
 
 ## 四、接着干的话，从哪儿下手

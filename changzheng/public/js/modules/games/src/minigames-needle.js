@@ -730,8 +730,20 @@ export function runBendHook(container, opts = {}) {
     let showcase = 0;
     let shake = 0;
     let fireBoost = 0;
-    let finishTimer = false;
+    let finishTimer = 0;               // 结算动画的排定定时器 id（0 = 还没排定）；teardown 要把它清掉
     let alive = true;
+    let settled = false;               // 内层 Promise 结过账没有（正常结算 / 中途被拆走都算）
+    /** 只结一次账：两条正常路（断针 / 定妆）都比"这一帧"晚一点，容器被拆走时也要结 ——
+     *  否则内层 Promise 永远挂着，canvas / 定时器 / 闭包全被钉住。见 sentry 的同款写法。 */
+    function settleOnce(result) {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    }
+    /** 中途被拆走：形状与各支一致（score 0 · detached · aborted），别改分与 detail 的形状 */
+    function settleDetached() {
+      settleOnce({ score: 0, detail: { outcome: 'none', why: 'detached', aborted: true }, summary: '' });
+    }
 
     const IDEAL = needlePath(GOAL.ideal.body, GOAL.ideal.tip);
     const sparks = [];
@@ -850,13 +862,12 @@ export function runBendHook(container, opts = {}) {
       if (phase === 'broken') {
         broken.t = Math.min(1.2, broken.t + dt);
         if (broken.t >= 1.2 && !finishTimer) {
-          finishTimer = true;
-          window.setTimeout(() => {
+          finishTimer = window.setTimeout(() => {
             if (!alive) return;
             phase = 'done';
             container.dataset.miniState = 'done';
             container.dataset.miniOutcome = outcome;
-            resolve({
+            settleOnce({
               score: outcome === 'burnt' ? 0.09 : 0.1,
               detail: { outcome, body: Math.round(h.body), tip: Math.round(h.tip), oxide: Math.round(h.oxide), cycles: h.cycle, hook: 0 },
               summary: outcome === 'burnt'
@@ -872,15 +883,14 @@ export function runBendHook(container, opts = {}) {
       if (phase === 'showcase') {
         showcase = Math.min(1, showcase + dt / 1.6);
         if (showcase >= 1 && !finishTimer) {
-          finishTimer = true;
           const ops = grade();
-          window.setTimeout(() => {
+          finishTimer = window.setTimeout(() => {
             if (!alive) return;
             phase = 'done';
             container.dataset.miniState = 'done';
             container.dataset.miniOutcome = outcome;
             setStatus(ops.line, ops.good ? 'good' : '');
-            resolve({
+            settleOnce({
               score: ops.score,
               detail: { outcome, body: Math.round(h.body), tip: Math.round(h.tip), oxide: Math.round(h.oxide), cycles: h.cycle, hook: ops.score },
               summary: ops.summary,
@@ -1141,6 +1151,8 @@ export function runBendHook(container, opts = {}) {
     let syncTimer = 0;
     function teardown() {
       alive = false;
+      clearTimeout(finishTimer);           // 已排定的结算动画跟着一起作废（不然它回来时容器已经没了）
+      finishTimer = 0;
       cancelAnimationFrame(raf);
       clearInterval(syncTimer);
       if (ro) ro.disconnect();
@@ -1148,6 +1160,7 @@ export function runBendHook(container, opts = {}) {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
+      settleDetached();                    // 被拆走也要结账：谁在等这个 Promise 都不该悬着
     }
 
     // 契约声明：调试台用 'bendhook' 区分来源；接主线时用 opts.id 覆盖成注册表的 id（'needle'）

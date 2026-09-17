@@ -139,10 +139,10 @@ export function isDone(actId, key) {
   return !!(S.doneKeys && S.doneKeys[`${actId}:${key}`]);
 }
 
-/** 点亮一条附身线（幂等，由 state 模块判重）；顺手写进营地手记 */
-export function markLine(key) {
+/** 点亮一条附身线（幂等）；`opts.voluntary` 计入篝火夜门槛（强制链请传 false/省略） */
+export function markLine(key, opts = {}) {
   if (!LINE_NAMES[key]) return;
-  if (st().markLine(key)) {
+  if (st().markLine(key, opts)) {
     st().pushCampLog('附身线', `点亮「${LINE_NAMES[key]}」（${st().linesDone()}/${LINES_TOTAL}）`);
   }
 }

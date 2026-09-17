@@ -20,21 +20,26 @@ export const SEQUENCES = {
   'prologue-open': [
     {
       kind: 'title',
-      eyebrow: '一九三四年十月 · 江西于都',
+      eyebrow: '一九三四年十月',
       title: '于都河',
       sub: '八万六千人，八个渡口',
-      note: '长征 · 抉择 · 序',
-      holdMs: 3800,
+      note: '长征 · 抉择',
+      holdMs: 5200,
+    },
+    {
+      kind: 'photo',
+      img: '/assets/scenes/depart_crowd.jpg',
+      text: '没有人知道要走多远。',
+      holdMs: 3600,
     },
     {
       kind: 'map',
       img: '/assets/scenes/map_route.jpg',
-      // 地图是纸色的：满屏会把这屏的调子拉亮，压暗一档并加重上下暗场（样式见 components.css 的 .cut-stage.is-map）
       stageClass: 'is-map',
-      text: '没有人知道要走多远。地图上是一条线，走过去，是一年。',
+      text: '地图上是一条线，走过去，是一年。',
       lit: 'all',
-      revealMs: 280,
-      holdMs: 2000,
+      revealMs: 380,
+      holdMs: 4200,
     },
   ],
 
@@ -74,18 +79,20 @@ export const SEQUENCES = {
       img: mapImg,                                // 流程层探测的结果（有 map_route_deep.jpg 就用它）
       stageClass: 'is-map',
       sfx: 'march',
-      lit: idx,                                  // 走过的每一段常亮，本幕还暗着
+      // ribbon 语义是 1 基「走到第几个」：lit=idx+1 → 已走 done、本幕 now
+      lit: idx + 1,
       text: review?.lines?.length
         ? review.lines.join('')
         : `走出${prev?.title || '上一幕'}，队伍没有停。`,
-      revealMs: 200,
-      holdMs: 1400,
+      revealMs: 320,
+      holdMs: 2800,
     }];
     beats.push({
       kind: 'photo',
-      img: prev?.cutAlt || prev?.pano || act.pano,
+      // 本幕空镜（与字幕口径一致）；回望文案在 map 拍
+      img: act.cutAlt || act.pano,
       text: `${act.date}。${act.subtitle}——${act.theme}。`,
-      holdMs: 1500,
+      holdMs: 3200,
     });
     beats.push({
       kind: 'title',
@@ -93,7 +100,7 @@ export const SEQUENCES = {
       title: act.title,
       sub: act.subtitle,
       note: act.theme,
-      holdMs: 2800,
+      holdMs: 4200,
     });
     return beats;
   },

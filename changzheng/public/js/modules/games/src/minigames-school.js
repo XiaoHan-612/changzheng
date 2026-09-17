@@ -65,6 +65,10 @@
  * 玩法 id：`nightschool`
  */
 
+// 模型窗口：夜校的两处调用（开局定课本 / 局末复盘）都套 10 秒上限——
+// 网关挂起时不能把玩家停在"教员合上本子……"上（见 ai-window.js）。
+import { decideWithin } from './ai-window.js';
+
 /* ── 宿主注入（我们的架构：玩法不碰音频门面、数值签归宿主）────────────────
  * 这一段由 tools/intake-minigames.mjs 插入；要改缝合方式请改工具，别手改这里。
  * 宿主（modules/games/adapter.js）在装配这一支时调 bindHost({sfx, stats, decide})：
@@ -837,7 +841,7 @@ export function runNightSchoolOil(container, opts = {}) {
       statusEl.innerHTML = '教员合上本子……';
       let out = null;
       try {
-        out = await DECIDE({
+        out = await decideWithin(DECIDE, {
           scene: `夜校识字 · ${place}`,
           callType: 'minigame_review',
           situation: `一灯油教三个字：${detail.chars.map((c) => `${c.kind}"${c.ch}"→${c.state}`).join('；')}；烧了 ${detail.burnt}s，剩油 ${detail.oilLeft}%`,
@@ -854,6 +858,10 @@ export function runNightSchoolOil(container, opts = {}) {
         result.detail.choice = out.choice || '';
         result.detail.reason = out.reason || '';
         statusEl.innerHTML = esc(result.summary || '教员合上了本子。');
+      } else if (!out) {
+        // 10 秒没答上来（不是出错）：走固定收束，别把"没等到"说成"调用失败"
+        statusEl.textContent = '教员合上了本子。';
+        result.detail.reviewFallback = true;
       } else {
         statusEl.innerHTML = `<span class="warn">结算调用失败：${esc(String(out?.message || '未知')).slice(0, 60)}</span>`;
         result.detail.reviewError = true;
@@ -894,7 +902,7 @@ export function runNightSchoolOil(container, opts = {}) {
       for (let attempt = 0; attempt < 2; attempt++) {
         let raw = null;
         try {
-          raw = await DECIDE({
+          raw = await decideWithin(DECIDE, {
             scene: `夜校识字 · ${place}`,
             callType: 'school_lesson',
             situation: '定今晚夜校要教的三个字（口令 / 地名 / 人名 各一个），以及今晚的口令',
@@ -910,6 +918,9 @@ export function runNightSchoolOil(container, opts = {}) {
           const { lesson: L, notes } = gateLesson(raw, pool);
           if (L) return { lesson: { ...L, _model: true }, note: '' };
           if (attempt === 1) return { lesson: null, note: `模型给的字没过闸：${notes.slice(0, 2).join('；')}` };
+        } else if (raw === null) {
+          // 10 秒没答上来：不再重试第二遍（那会让学生干等 20 秒），直接翻备课本
+          return { lesson: null, note: '模型没答上来（10 秒），教员翻出了备课本。' };
         } else if (attempt === 1) {
           return { lesson: null, note: `模型调用失败：${String(raw?.message || '未知').slice(0, 50)}` };
         }

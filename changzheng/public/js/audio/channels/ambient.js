@@ -169,7 +169,7 @@ export class AmbientChannel {
       night: { cut: 240, level: 0.07, lfo: 0.03, cricket: true },
       gorge: { cut: 300, level: 0.08, lfo: 0.06 },
       xiangjiang: { cut: 320, level: 0.09, lfo: 0.05 },
-      zunyi: { cut: 260, level: 0.07, lfo: 0.03, cricket: true },
+      zunyi: { cut: 260, level: 0.04, lfo: 0.02, cricket: false },
       huining: { cut: 400, level: 0.08, lfo: 0.06 },
     }[kind] || { cut: 360, level: 0.08, lfo: 0.05 };
 

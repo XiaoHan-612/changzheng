@@ -102,22 +102,49 @@ export const BEATS = {
    */
   poem: {
     kind: 'poem',
-    holdMs: () => 2400,                 // 读完之后的一点余韵
-    speeds: [1, 1.5],                   // 可加速：播放器据此露出速度键（档位值来自 audio/mix.js）
+    holdMs: () => 4200,                 // 读完之后的余韵（原先 2.4s 太短，像被踢走）
+    speeds: [1, 1.5],
     /** 收尾：把这首朗诵停掉——它的尾巴不该盖到钤印那一拍上 */
     cleanup() { kernel.emit('voice:stop', {}); },
     async render(ctx, b) {
-      const poem = await fetchPoem();
-      if (!poem) { ctx.cap.textContent = ''; return; }
-      // 底纹可选（`data/poem.json` 之外由编排给）：没有就是纯黑场，让诗自己立住
+      let poem = null;
+      try { poem = await fetchPoem(); } catch { poem = null; }
+      // 取不到数据也要演：内嵌形制与 data/poem.json 一致的骨架，避免一拍就跳走
+      if (!poem || !Array.isArray(poem.lines) || !poem.lines.length) {
+        poem = {
+          title: '七律·长征',
+          author: '毛泽东',
+          pace: { msPerChar: 220, lineGapMs: 560, holdTitleMs: 1600 },
+          audio: { titleMs: 2300 },
+          lines: [
+            { i: 1, text: '红军不怕远征难', punct: '，' },
+            { i: 2, text: '万水千山只等闲', punct: '。' },
+            { i: 3, text: '五岭逶迤腾细浪', punct: '，' },
+            { i: 4, text: '乌蒙磅礴走泥丸', punct: '。' },
+            { i: 5, text: '金沙水拍云崖暖', punct: '，' },
+            { i: 6, text: '大渡桥横铁索寒', punct: '。' },
+            { i: 7, text: '更喜岷山千里雪', punct: '，' },
+            { i: 8, text: '三军过后尽开颜', punct: '。' },
+          ],
+        };
+      }
       ctx.stage.style.backgroundImage = b.img ? `url('${b.img}')` : 'none';
       const lines = poem.lines || [];
       const chars = (t) => [...String(t || '')];
-      ctx.beat.innerHTML = `<div class="poem">
-        <p class="poem-title">${escapeHtml(poem.title || '')}<span>${escapeHtml(poem.author || '')}</span></p>
-        <div class="poem-body">${lines.map((l) => `<p class="poem-line" data-i="${l.i}">`
-          + chars(l.text).map((ch) => `<span class="poem-ch">${escapeHtml(ch)}</span>`).join('')
-          + `<span class="poem-ch">${escapeHtml(l.punct || '')}</span></p>`).join('')}</div>
+      // 四联横排：传统诗笺版式（不用 display 毛笔族——缺字太多，用系统宋体/serif）
+      // 句序仍按音频时间轴从右到左、从上到下逐字点亮
+      const pairRows = [];
+      for (let i = 0; i < lines.length; i += 2) pairRows.push(lines.slice(i, i + 2));
+      ctx.beat.innerHTML = `<div class="poem-scroll">
+        <header class="poem-head">
+          <h2 class="poem-title">${escapeHtml(poem.title || '七律·长征')}</h2>
+          <p class="poem-author">${escapeHtml(poem.author || '')}</p>
+        </header>
+        <div class="poem-plate">${pairRows.map((pair) => `<div class="poem-pair">`
+          + pair.map((l) => `<p class="poem-line" data-i="${l.i}">`
+            + chars(l.text).map((ch) => `<span class="poem-ch">${escapeHtml(ch)}</span>`).join('')
+            + `<span class="poem-ch">${escapeHtml(l.punct || '')}</span></p>`).join('')
+          + `</div>`).join('')}</div>
       </div>`;
       const titleEl = ctx.beat.querySelector('.poem-title');
       const rows = [...ctx.beat.querySelectorAll('.poem-line')].map((el) => ({
@@ -126,26 +153,38 @@ export const BEATS = {
       }));
       ctx.cap.textContent = '';
 
-      // 时间轴：有量出来的逐句窗口就用它（换音频要重新量），没有就按 pace 合成一条；
-      // 两种都按语速折算，并整体提前 POEM_LEAD_MS（文字略早于音频——用户口径）
       const rate = ctx.rate || 1;
       const plan = timelineOf(poem, rate);
-      const end = plan.length ? plan[plan.length - 1].endMs : 0;
+      let end = plan.length
+        ? plan[plan.length - 1].endMs
+        : Math.max(28000, lines.length * 3200);
       ctx.beat.querySelectorAll('.poem-ch').forEach((c) => c.classList.remove('on'));
-      // 题字跟音频念到它时再淡入（`audio.titleMs` 量的是录音里"《七律·长征》"起声的毫秒）。
-      // 没标就立即显示——老录音没有这条标注时行为不变，不靠猜。
-      const titleMs = Number(poem.audio?.titleMs);
-      if (Number.isFinite(titleMs) && titleMs > 0 && !ctx.reduce) {
-        ctx.after(Math.max(0, titleMs / rate - POEM_LEAD_MS), () => {
-          if (!ctx.gone() && titleEl) titleEl.classList.add('on');
-        });
-      } else if (titleEl) {
-        titleEl.classList.add('on');
+      if (titleEl) titleEl.classList.add('on');
+
+      // 先起朗诵，再按「真实音频时长」拉长时间轴——原先只跟 poem.json 的 endMs，
+      // 文件若比标定更长，cleanup 的 voice:stop 会在朗读未完时掐断（用户反馈）。
+      const fileUrl = poem.audio?.full ? `/audio/poem/${poem.audio.full}` : '';
+      let voiceLine = null;
+      if (fileUrl) {
+        const realMs = await probeAudioMs(fileUrl);
+        if (realMs > end + 200) {
+          const scale = realMs / end;
+          for (const row of plan) { row.startMs *= scale; row.endMs *= scale; }
+          end = realMs;
+          console.info(`[cinema] 诗时间轴按真实音频拉长到 ${realMs}ms`);
+        }
+        voiceLine = ctx.say({ file: fileUrl, rate });
       }
-      // 配音只当背景轨：起播早晚都无所谓，逐字不等它、也不读它
-      if (poem.audio?.full) ctx.say({ file: `/audio/poem/${poem.audio.full}`, rate });
-      console.info(`[cinema] 诗 ${lines.length} 句 · 时间轴 0–${Math.round(end)}ms · ${rate}× · 题字 ${Number.isFinite(titleMs) ? titleMs + 'ms' : '立即'} · 文字比音频早 ${POEM_LEAD_MS}ms`);
-      await revealByAnchor(ctx, plan, rows, performance.now(), rate, end);
+      console.info(`[cinema] 诗 ${lines.length} 句 · 时间轴 0–${Math.round(end)}ms · ${rate}× · 题「${poem.title}」`);
+      // 逐字：点按不打断（只有「跳过」会停）
+      await revealByAnchor(ctx, plan, rows, performance.now(), rate, end, { ignoreTap: true });
+      // 逐字走完后，若朗诵还在响，等它自然结束（上限 90s，防止挂死）
+      if (voiceLine) {
+        const cap = Date.now() + 90000;
+        while (voiceLine.playing() && Date.now() < cap && !ctx.skipped?.()) {
+          await sleep(120);
+        }
+      }
     },
   },
 
@@ -186,18 +225,25 @@ const POEM_LEAD_MS = 500;
 function timelineOf(poem, rate = 1) {
   const lines = poem.lines || [];
   const paced = lines.every((l) => !Number.isFinite(l.startMs) || !Number.isFinite(l.endMs));
-  const msPerChar = Number(poem.pace?.msPerChar) || 210;
-  const gap = Number(poem.pace?.lineGapMs) || 500;
-  const hold = Number(poem.pace?.holdTitleMs) || 1400;
+  const msPerChar = Number(poem.pace?.msPerChar) || 220;
+  const gap = Number(poem.pace?.lineGapMs) || 560;
+  const hold = Number(poem.pace?.holdTitleMs) || 1600;
   const lead = (ms) => Math.max(0, ms - POEM_LEAD_MS);        // 提前，但不许负
   let t = paced ? hold : 0;
-  return lines.map((l) => {
+  const plan = lines.map((l) => {
     if (!paced) return { i: l.i, startMs: lead(l.startMs) / rate, endMs: lead(l.endMs) / rate };
     const dur = ([...String(l.text)].length * msPerChar) / rate;
     const row = { i: l.i, startMs: t, endMs: t + dur };
     t += dur + gap / rate;
     return row;
   });
+  // 兜底：整卷至少约 22s，防止异常数据导致「一闪而过」
+  const last = plan.length ? plan[plan.length - 1].endMs : 0;
+  if (last < 22000) {
+    const scale = 22000 / Math.max(1, last);
+    for (const row of plan) { row.startMs *= scale; row.endMs *= scale; }
+  }
+  return plan;
 }
 
 /**
@@ -209,15 +255,17 @@ function timelineOf(poem, rate = 1) {
  * @param {number} anchor performance.now() 锚点（这一拍开始那一刻）
  * @param {number} rate 语速档位
  */
-async function revealByAnchor(ctx, plan, rows, anchor, rate, endMs) {
+/**
+ * 逐字显现：**只跟时间**（`锚点 + 挂钟 × 语速`）。
+ * 诗专用：**不把「点按」当中断**——点屏幕不应把整首诗踢到下一拍；
+ * 只有「跳过 / 换语速重来 / 换拍」才收手。
+ */
+async function revealByAnchor(ctx, plan, rows, anchor, rate, endMs, { ignoreTap = false } = {}) {
   const at = () => (performance.now() - anchor) * rate;
   for (;;) {
-    if (ctx.gone()) {
-      // 三种收手要分清：跳过 = 立即收摊；换语速 = 直接交给下一次演出（**不要**把字补完，
-      // 否则点"更快"会先整段闪一下再从头演）；点按 = 剩下的字直接读完，停一拍再走。
-      if (!ctx.skipped?.() && !ctx.restarting?.()) {
-        rows.forEach((r) => r.chs.forEach((c) => c.classList.add('on')));
-      }
+    if (ctx.skipped?.() || ctx.restarting?.()) return;
+    if (!ignoreTap && ctx.gone()) {
+      rows.forEach((r) => r.chs.forEach((c) => c.classList.add('on')));
       return;
     }
     const ms = at();
@@ -225,14 +273,29 @@ async function revealByAnchor(ctx, plan, rows, anchor, rate, endMs) {
       const row = rows[line.i - 1];
       if (!row) continue;
       const span = Math.max(1, line.endMs - line.startMs);
-      // 注意别写成 `* (chs.length - 1)`：那样每句的**最后一个字（标点）永远不会亮**
-      // （ratio 到 1 时也只是 len-1，第 len 个字永远差一个）——2026-09-16 联系表采样 `on:7` 暴露
       const n = ms <= line.startMs ? 0 : Math.min(row.chs.length, Math.ceil((Math.min(1, (ms - line.startMs) / span)) * row.chs.length));
       row.chs.forEach((c, i) => { c.classList.toggle('on', i < n); });
     }
-    if (ms > endMs + 700) return;
-    await sleep(60);
+    if (ms > endMs + 900) {
+      rows.forEach((r) => r.chs.forEach((c) => c.classList.add('on')));
+      return;
+    }
+    await sleep(50);
   }
+}
+
+/** 量一下朗诵文件的真实时长（ms）；失败返回 0 */
+function probeAudioMs(url) {
+  return new Promise((resolve) => {
+    const el = new Audio();
+    let done = false;
+    const fin = (ms) => { if (!done) { done = true; resolve(ms); } };
+    el.preload = 'metadata';
+    el.onloadedmetadata = () => fin(Math.round((el.duration || 0) * 1000));
+    el.onerror = () => fin(0);
+    setTimeout(() => fin(0), 4000);
+    el.src = url;
+  });
 }
 
 /** 拍子词汇的封闭列表（文档、体检、序列数据都对着它） */

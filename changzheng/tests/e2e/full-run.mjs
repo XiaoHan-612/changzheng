@@ -1,4 +1,4 @@
-﻿/**
+/**
  * E2E 全流程：五幕真调通关（需要 GLM_API_KEY）
  * 运行：npm run test:e2e
  */
@@ -258,12 +258,14 @@ async function run() {
   if (logCount < 20) throw new Error('日志过少: ' + logCount);
   if (soupTimes !== 1) throw new Error(`分汤重复结算: ${soupTimes} 次`);
   if (fishTimes !== 1) throw new Error(`钓鱼重复结算: ${fishTimes} 次`);
-  if (candyTimes !== 1) throw new Error(`分糖未按预期触发: ${candyTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
-  if (sentryTimes !== 1) throw new Error(`夜岗未按预期触发: ${sentryTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  // 标准模式：强制链会跑 candy/sentry/luding；快速模式只跑每幕 forced[0]，这些可能不出现
+  if (!QUICK && candyTimes !== 1) throw new Error(`分糖未按预期触发: ${candyTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  if (!QUICK && sentryTimes !== 1) throw new Error(`夜岗未按预期触发: ${sentryTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
   // 快速模式跳过营地日，可选的五子棋不会触发
   if (!QUICK && gomokuTimes !== 1) throw new Error(`五子棋未按预期触发: ${gomokuTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
-  if (ludingTimes !== 1) throw new Error(`泸定桥未按预期触发: ${ludingTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
-  if (nightTimes !== 2) throw new Error(`夜间抉择应有 night_options + night_resolve 两条: ${nightTimes}`);
+  if (!QUICK && ludingTimes !== 1) throw new Error(`泸定桥未按预期触发: ${ludingTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  // 快速模式跳过篝火夜（runQuickAct → finishAct({quick})）
+  if (!QUICK && nightTimes !== 2) throw new Error(`夜间抉择应有 night_options + night_resolve 两条: ${nightTimes}`);
   // 快速模式跳过开场设定与营地日
   if (!QUICK && !seenSteps.has('origin')) throw new Error('开场出身设定（step=origin）未出现');
   if (!QUICK && oillampTimes !== 1) throw new Error(`二幕「油灯下的地图」未按预期触发: ${oillampTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);

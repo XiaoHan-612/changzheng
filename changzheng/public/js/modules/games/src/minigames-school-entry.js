@@ -119,6 +119,8 @@ export function runNightSchoolEntry(container, opts = {}) {
   return new Promise((resolve) => {
     let alive = true;
     let picked = '';
+    let watchdog = 0;               // 交给子玩法之后的兜底定时器（子玩法一旦落地就清掉）
+    const TIMEOUT = Symbol('entry-timeout');
 
     container.innerHTML = '';
     container.dataset.mini = opts.id || 'nightschool-entry';
@@ -186,12 +188,25 @@ export function runNightSchoolEntry(container, opts = {}) {
       if (c.dir === 'quiz' && opts.quiz) sub.quiz = opts.quiz;
       if (c.dir === 'quiz' && opts.secPerQ) sub.secPerQ = opts.secPerQ;
       try {
-        const r = await run(container, sub);
+        // 子玩法自己会收尾（玩完 / 容器被拆走都会落地）。这层是**最后一道兜底**：
+        // 万一那条 Promise 永远不落地（例如子玩法的模型调用挂住），入口不能跟着一起悬着。
+        // 90s 而不是十几秒：正常一路玩下来是"开局一次模型调用 + 3 道题 × 14s"，
+        // 兜底定得比正常玩完还短，就会把好好在玩的局掐断。它只在下不来台的场合生效。
+        const r = await Promise.race([
+          run(container, sub),
+          new Promise((res) => { watchdog = setTimeout(() => res(TIMEOUT), 90000); }),
+        ]);
+        if (watchdog) { clearTimeout(watchdog); watchdog = 0; }
+        if (r === TIMEOUT) {
+          resolve({ score: 0, detail: { dir: c.dir, why: 'timeout', outcome: 'none' }, summary: '' });
+          return;
+        }
         if (!r.detail) r.detail = {};
         r.detail.dir = c.dir;
         r.detail.entryPick = c.dir;
         resolve(r);
       } catch (err) {
+        if (watchdog) { clearTimeout(watchdog); watchdog = 0; }
         resolve({ score: 0, detail: { dir: c.dir, why: 'error', outcome: 'none', error: String(err?.message || err) }, summary: '' });
       }
     }
@@ -203,6 +218,7 @@ export function runNightSchoolEntry(container, opts = {}) {
         if (alive) {
           alive = false;
           if (picked) return;            // 已经在跑子玩法，交给它自己收
+          if (watchdog) { clearTimeout(watchdog); watchdog = 0; }
           resolve({ score: 0, detail: { dir: '', why: 'detached', outcome: 'none' }, summary: '' });
         }
       }

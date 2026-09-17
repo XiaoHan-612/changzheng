@@ -21,9 +21,8 @@ export const MIX = {
   },
 
   ambient: {
-    /** 环境床文件元素的音量（<audio> 元素走元素级音量：ctx 被挂起时它照样响）。
-     *  0.32 时实测只有 −37 dBFS（素材本身偏轻），抬到 0.7 ≈ −28 dBFS 才是"听得见但不吵"的一档 */
-    level: 0.7,
+    /** 环境床文件元素的音量。雨声等偏吵，整体再压一档 */
+    level: 0.55,
     fadeInMs: 1800,
     fadeOutMs: 600,
     /** 合成兜底的起播淡入（与 fadeInMs 独立：合成是节点级的） */
@@ -33,11 +32,11 @@ export const MIX = {
   },
 
   bgm: {
-    level: 0.18,          // 低于环境床（策划案 §2.6 的混音口径）
+    level: 0.14,          // 低于环境床；再压一档，避免叠上雨声后吵
     fadeInMs: 1200,
     fadeOutMs: 900,
     /** 语音播放时闪避到多少（1 = 不闪避） */
-    duckWhenVoice: 0.4,
+    duckWhenVoice: 0.35,
   },
 
   sfx: {

@@ -114,6 +114,17 @@ export default {
       live = { id, host, exit: [] };
       kernel.emit('game:start', { id, title: title || spec.title || '' });
 
+      // 「放弃本局」：换回舞台屏 → screens.own 的 destroy → adapter onExit settle aborted。
+      // 流程层对 detail.aborted 应跳过 minigame_review（见 games-flow 的 aborted 短路）。
+      const abandonBtn = $('btn-board-abandon');
+      if (abandonBtn) {
+        abandonBtn.hidden = false;
+        abandonBtn.onclick = () => {
+          abandonBtn.onclick = null;
+          showScreen('screen-stage');
+        };
+      }
+
       const ctx = {
         /** 更新板头数值签（返回句柄，频繁变化的数只改句柄） */
         stats: (items) => renderStats(items),
@@ -137,6 +148,9 @@ export default {
         // 玩法自己炸了：如实记下来，但不让整局卡死（板屏照旧可退）
         console.error(`[games] 玩法「${id}」挂载/运行出错：`, err);
         result = { score: 0, detail: { error: String(err?.message || err) }, summary: '这一局没有完成' };
+      } finally {
+        const ab = $('btn-board-abandon');
+        if (ab) { ab.onclick = null; ab.hidden = true; }
       }
       const out = { score: 0, detail: {}, summary: '', noAi: !!spec.noAi, ...(result || {}) };
       kernel.emit('game:end', { id, score: Number(out.score) || 0, ms: Date.now() - t0 });

@@ -59,6 +59,28 @@ export const CONFIG = {
   runtimePath,
 };
 
+/**
+ * 接口地址的安全闸：**只认 https，host 必须在白名单里**。
+ *
+ * 白名单 = 赛制指定的 `open.bigmodel.cn` + **本机已经保存过的那一个**
+ * （`.env` / `runtime-config.json` 里配的，可能是自建网关）。
+ * 用途有两处，口径同一条：设置页的「测试连通」探测、以及写 runtime-config 时改 apiUrl。
+ * 为什么要有它：这两个入口过去接受任意 URL —— 局域网里的别人可以把演示机当成
+ * "拿你们的 Key 打任意地址"的代理（Key 还会被发到那个地址上）。
+ */
+export function assertSafeApiUrl(raw) {
+  const s = String(raw || '').trim();
+  let u;
+  try { u = new URL(s); } catch { throw new Error(`接口地址不是合法 URL：${s || '(空)'}`); }
+  if (u.protocol !== 'https:') throw new Error('接口地址必须是 https');
+  const allowed = new Set(['open.bigmodel.cn']);
+  try { allowed.add(new URL(CONFIG.GLM_API_URL).host); } catch { /* 保存的那个不合法就不加 */ }
+  if (!allowed.has(u.host)) {
+    throw new Error(`接口地址不在白名单：${u.host}（只允许 open.bigmodel.cn，或本机已保存过的那个接口）`);
+  }
+  return u.toString();
+}
+
 export function saveRuntimeConfig(patch) {
   const next = { ...runtime, ...patch };
   // 清除与保留的语义分开：**空字符串 = 清除这一项**（设置里清空输入框就是清空），

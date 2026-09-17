@@ -57,6 +57,8 @@ export default {
   /* ── 模型调用的进度 UI（批 6）── */
 
   onAiStart(p) {
+    // 新一次调用开始：清掉上一轮可能残留的「重试／跳过」条（超时结账时 UI 收不到点击）
+    document.querySelectorAll('#ai-retry-row').forEach((n) => n.remove());
     const el = $('thinking-label');
     if (el) el.textContent = `${p.label || p.callType || '模型'} · 正在书写…`;
     showThinking(true);
@@ -64,6 +66,7 @@ export default {
 
   onAiDone() {
     showThinking(false);
+    document.querySelectorAll('#ai-retry-row').forEach((n) => n.remove());
   },
 
   /**

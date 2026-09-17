@@ -54,5 +54,8 @@ export default {
 
   onVoiceStart(p) { onVoiceStart(p); },
   onVoiceProgress(p) { onVoiceProgress(p); },
-  onVoiceEnd() { onVoiceEnd(); },
+  // 把 payload 带下去：`seq` 是"这一句是不是我发的"的唯一凭据（player.js 按 seq 认领），
+  // 早先这里 `() => onVoiceEnd()` 把 payload 丢了，播放器只能认最后一个 seq——
+  // 别的拍子/别的通道的 ended 会被当成自己那一句播完了。
+  onVoiceEnd(p) { onVoiceEnd(p); },
 };

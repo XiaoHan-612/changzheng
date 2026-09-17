@@ -532,12 +532,24 @@ export function runRally(container, opts = {}) {
     // 让结算屏至少上屏一帧再 resolve（不然自动化读不到终态）
     requestAnimationFrame(() => requestAnimationFrame(() => {
       ac.abort();
-      resolve(fin);
+      settleOnce(fin);
     }));
   }
 
   let resolve = () => {};
   const p = new Promise((r) => { resolve = r; });
+  let settled = false;               // 内层 Promise 结过账没有（正常收工 / 中途被拆走都算）
+  /** 只结一次账：正常收工走 finish()，容器被拆走也要结 —— 否则内层 Promise 永远挂着，
+   *  局内的 DOM / 闭包全被钉住（这一支没有帧循环，所以只能靠下面的守卫发现"被拆走"）。 */
+  function settleOnce(result) {
+    if (settled) return;
+    settled = true;
+    resolve(result);
+  }
+  /** 中途被拆走：形状与各支一致（score 0 · detached · aborted），别改分与 detail 的形状 */
+  function settleDetached() {
+    settleOnce({ score: 0, detail: { outcome: 'none', why: 'detached', aborted: true }, summary: '' });
+  }
 
   /* ── 动作 ──────────────────────────────────────────────────── */
   function spend(n) { st.ticks = Math.max(0, st.ticks - n); }
@@ -647,6 +659,14 @@ export function runRally(container, opts = {}) {
   sync();
   fb('先从哪里下手？<span class="dim">标「有人」的地方最稳；标「存疑」的先等旁证再动。</span>');
   hintEl.textContent = '天亮之后，渡口就没了 —— 搜得越多，不等于带得走越多。';
+
+  /* 自清 + 结账：板屏换屏后不会有人再来点这些按钮了，容器一被拆走就收工结账 */
+  const guard = setInterval(() => {
+    if (container.isConnected) return;
+    clearInterval(guard);
+    ac.abort();
+    settleDetached();
+  }, 500);
 
   return p;
 }

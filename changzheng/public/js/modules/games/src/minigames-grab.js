@@ -272,6 +272,18 @@ export function runSnowGrab(container, opts = {}) {
     let outcome = null;
     let why = '';
     let over = false;
+    let settled = false;               // 内层 Promise 结过账没有（正常结算 / 中途被拆走都算）
+    /** 只结一次账：正常玩完走 finish()，容器被拆走也要结 —— 否则内层 Promise 永远挂着，
+     *  局内的 svg / 帧循环 / 闭包全被钉住（多局就是一路泄漏）。见 sentry 的同款写法。 */
+    function settleOnce(result) {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    }
+    /** 中途被拆走：形状与各支一致（score 0 · detached · aborted），别改分与 detail 的形状 */
+    function settleDetached() {
+      settleOnce({ score: 0, detail: { outcome: 'none', why: 'detached', aborted: true }, summary: '' });
+    }
     let raf = 0;
     let last = performance.now();
     let lastDt = 0.016;
@@ -544,7 +556,7 @@ export function runSnowGrab(container, opts = {}) {
       play(kind === 'saved' ? 'win' : 'lose');
       render(true);
       // 帧循环在同一帧内还会跑一次 paint()，把雾慢慢散开 / 合上
-      resolve({
+      settleOnce({
         score,
         detail: {
           outcome: kind, why, rope, grabs,
@@ -556,7 +568,6 @@ export function runSnowGrab(container, opts = {}) {
         summary,
       });
     }
-
     /* ── 每帧更新 ── */
     function step(dt) {
       if (phase === 'decide' || phase === 'aim') {
@@ -893,7 +904,7 @@ export function runSnowGrab(container, opts = {}) {
     };
     ctl.signal.addEventListener('abort', teardown);
     const guard = setInterval(() => {
-      if (!document.body.contains(container)) { teardown(); clearInterval(guard); }
+      if (!document.body.contains(container)) { teardown(); clearInterval(guard); settleDetached(); }
     }, 500);
 
     render(true);

@@ -23,8 +23,9 @@ import { SEQUENCES } from './sequences.js';
 /** 配音的宽限与上限：宽限内没听到开播就当"这一拍没声"（缺音频是常态），上限防长音频挂住流程 */
 const VOICE_GRACE_MS = 650;
 const VOICE_CAP_MS = 9000;
-/** 逐字速度（与老过场一致：24ms/字） */
-const TYPE_MS = 24;
+/** 逐字速度：过场字幕要「念得出来」——过快会糊成一片（用户反馈） */
+const TYPE_MS = 42;
+const TYPE_MS_TITLE = 56;
 /** 没有 holdMs 时的默认停留 */
 const DEFAULT_HOLD_MS = 1500;
 
@@ -146,9 +147,13 @@ export async function play(id, opts = {}) {
   // 但它仍然是**纯数据**：只挑拍子与文案，不做任何流程判断。
   const raw = SEQUENCES[id];
   const seq = typeof raw === 'function' ? raw(opts.ctx || {}) : raw;
-  if (!seq || !seq.length) {
+  if (!raw) {
     // 编排 id 写错就明说：静默演一段空白，会让"序章没了"变成很晚才发现的怪事
     console.error(`[cinema] 没有编排「${id}」，可用：${Object.keys(SEQUENCES).join('、')}`);
+    return { id, beats: 0, skipped: false };
+  }
+  // 空编排是合法选择（如 act-intro 的 idx=0：序章已演过题字与路线图，不再重演）
+  if (!seq || !seq.length) {
     return { id, beats: 0, skipped: false };
   }
   const f = frame();
@@ -215,6 +220,9 @@ export async function play(id, opts = {}) {
 
   let n = 0;
   let prevImpl = null;                        // 上一拍的实现（在下一拍开始前调它的 cleanup）
+  let lastCtx = null;                         // 上一拍的 ctx：cleanup 要用它，而本拍的 ctx 还没建出来
+  let capType = null;                         // 当前字幕打字机句柄（换拍/跳过必须 finish，否则旧 interval 覆写）
+  const finishCap = () => { if (capType) { try { capType.finish(); } catch { /* 已结束 */ } capType = null; } };
   myRun.done = (async () => {                 // 让"下一段"能等到这一段真的收尾
   for (const beat of seq) {
     if (skipped) break;
@@ -224,8 +232,12 @@ export async function play(id, opts = {}) {
     while (again && !skipped) {
     again = false;
     n += 1;
+    finishCap();                           // 上一拍的打字机必须收掉，否则 interval 会覆写本拍字幕
     // 上一拍收尾（它自己要停的东西自己停：比如诗那一拍的长音频不该盖到钤印上）
-    try { prevImpl?.cleanup?.(ctx); } catch { /* 收尾出错不拖垮播放 */ }
+    // 用 lastCtx 而不是本行的 ctx：`const ctx` 在本拍下方才声明，直接写 ctx 会踩 TDZ
+    // ——第一拍 prevImpl 是 null 短路掉看不出来，第二拍起必抛 ReferenceError，
+    // 又被这行的空 catch 吞掉，等于 cleanup **从来没执行过**（诗的 voice:stop 没发出去）。
+    try { prevImpl?.cleanup?.(lastCtx); } catch { /* 收尾出错不拖垮播放 */ }
     prevImpl = impl;
     applySpeedBtn(beat.speeds || impl.speeds);
     clearTimers();
@@ -252,13 +264,15 @@ export async function play(id, opts = {}) {
       // gone：这一拍作废（点按/跳过/换拍/换语速都会置位）——长拍子（诗）的循环靠它收手
       gone: () => gone || skipped || aborted || gen !== myGen,
     };
+    lastCtx = ctx;                          // 交给下一拍开头那次 cleanup 用
     if (opts.onBeat) { try { opts.onBeat(beat, n); } catch { /* 回调出错不拖垮播放 */ } }
 
     if (f.next) f.next.textContent = n < seq.length ? '下一句 ▸' : '进入 ▸';
     // 换底片的处理档（如路线图要压暗一档）：由拍子声明、播放器执行——拍子不直接改 class，
     // 免得上一拍加的类留在下一拍身上（"谁加谁清"在这里容易漏）。
     f.stage.className = `cut-stage${beat.stageClass ? ' ' + beat.stageClass : ''}`;
-    // 拍子可以声明一个音效（如幕间启程的鼓点）：走事件，交给音频模块放
+    // 诗/钤印：内容要铺满过场屏，不能挤在底部字幕条里
+    f.screen.classList.toggle('is-poem', beat.kind === 'poem' || beat.kind === 'seal');
     if (beat.sfx) kernel.emit('sfx:play', { name: beat.sfx });
     // 拍子的 render 允许是异步的，而且**必须等它**：终章的诗要自己演一分钟（逐字跟音频），
     // 早先没 await（批 C 的拍子都是同步的，看不出来），诗会刚摆上来就被下一拍顶掉。
@@ -270,12 +284,13 @@ export async function play(id, opts = {}) {
     // 换语速要"立刻重演"，别先走完停留（不然点了"更快"会先停一拍再从头来）
     if (again) { f.cap.textContent = ''; f.beat.innerHTML = ''; continue; }
 
-    // 字幕：减动效直接给全文；点按先把剩下的一次性显示完，再一次点按才走（老行为，别改）
+    // 字幕：题字用更慢的打字节奏；减动效直接给全文
     const text = String(beat.text || '');
     let typingDone = !text;
+    const typeMs = beat.kind === 'title' ? TYPE_MS_TITLE : TYPE_MS;
     const typed = !text || reduce
       ? Promise.resolve().then(() => { if (text) f.cap.textContent = text; })
-      : typeText(f.cap, text, TYPE_MS).then(() => { typingDone = true; });
+      : (capType = typeText(f.cap, text, typeMs)).then(() => { typingDone = true; });
     if (!text) f.cap.textContent = '';
 
     // 配音：交给语音通道（它在播什么、播多久只有它知道），这里只等它的回声
@@ -292,15 +307,17 @@ export async function play(id, opts = {}) {
     if (beat.hold === 'click' || impl.hold === 'click') {
       await waitUser();
       if (skipped) break;
-      if (!typingDone) { f.cap.textContent = text; await waitUser(); }
+      if (!typingDone) { finishCap(); f.cap.textContent = text; await waitUser(); }
     } else {
       // 自动播：等"字走完 + 声播完"，再停留 holdMs——三者都可能被一次点按/跳过直接打断
       await Promise.race([Promise.all([typed, voiceWait]), waitUser()]);
-      if (skipped) break;
+      if (skipped) { finishCap(); break; }
+      finishCap();
       const hold = Number(impl.holdMs?.(beat, opts.ctx || {}) ?? beat.holdMs ?? DEFAULT_HOLD_MS);
       await Promise.race([sleep(hold), waitUser()]);
     }
     gone = true;
+    finishCap();
     if (again && !skipped) { f.cap.textContent = ''; f.beat.innerHTML = ''; }   // 重来一拍：清干净再演
     }
   }
@@ -308,6 +325,8 @@ export async function play(id, opts = {}) {
   // ── 收尾：清定时器、摘契约标记、回到干净状态 ──
   try { prevImpl?.cleanup?.({ ...f, reduce, rate }); } catch { /* 同上 */ }
   clearTimers();
+  if (capType) { capType.finish(); capType = null; }
+  f.screen.classList.remove('is-poem');
   if (f.next) { f.next.onclick = null; delete f.next.dataset.action; }
   if (f.skip) { f.skip.onclick = null; delete f.skip.dataset.action; }
   if (speedBtn) { speedBtn.onclick = null; speedBtn.classList.add('hidden'); delete speedBtn.dataset.action; }

@@ -37,7 +37,7 @@ import {
   renderJourney, updateDusk, bindLantern, originText,
 } from './flow/view.js';
 // 史实回响（每步之后的三栏；被 20 多处调用）
-import { showEcho, afterJudge, bindEcho } from './flow/echo.js';
+import { showEcho, afterJudge, bindEcho, closeEcho } from './flow/echo.js';
 // 叶子组（批 7 二·4）：数据表 / 玩法流程 / 对决 / 篝火夜
 import { CHOICE_SETS, REPEATABLE_HOTSPOTS } from './flow/tables.js';
 import { doSchool, doCandy, doSentry, doGomoku, doGrab, doRoster, doFishing, doLuding } from './flow/games-flow.js';
@@ -45,7 +45,7 @@ import { runQuiz } from './flow/quiz.js';
 import { runNightChoice, nightContext } from './flow/night.js';
 // 一幕的推进（含营地）与收尾（批 7 二·5；main.js 从此只剩组合根）
 import {
-  startRun, resumeRun, enterCampDay, updateMarchButton,
+  startRun, resumeRun, enterCampDay, updateMarchButton, jumpToAct,
   renderFireMenu, renderPathZones,
 } from './flow/act.js';
 import { runEnding } from './flow/end.js';
@@ -53,7 +53,7 @@ import { runEnding } from './flow/end.js';
 const { $, showScreen, setTopbar,
   toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
   flashEffects, setAiMode, typeText, escapeHtml, renderLogs, renderFacts,
-  showOverlay, hideOverlay, replayAnim, wipe, bindParallax, isTypingTarget, contentFace, actionHost } = UI;
+  showOverlay, hideOverlay, replayAnim, wipe, bindParallax, isTypingTarget, contentFace, actionHost, skipTyping } = UI;
 
 
 
@@ -89,6 +89,10 @@ async function boot() {
   bindTitle();
   bindEcho();
   bindSettings();
+  // 「启程」按钮的刷新钩子：kit 的 withLock 进出锁时要重画它（忙 → disabled），
+  // 但那个按钮归 act 那一块，所以要在这里注入（见 kit.js 的 setMarchUpdater 注释）。
+  // 漏了这一步的后果：锁一旦被占（例如开局那一分钟），启程键看起来还能点。
+  setMarchUpdater(updateMarchButton);
   preloadScenes();
   offerResume();
   showScreen('screen-title');
@@ -133,7 +137,7 @@ function exposeSheetHooks() {
     },
     // 答题 / 篝火夜 / 终局：都太长（要走到深幕），截图时直接跑各自的**真实流程**，
     // 由截图脚本在中途等（不另写一套渲染，理由同 fire）。
-    quiz: () => { if (S) runQuiz(currentActDef()); },
+    quiz: () => { if (hasS()) runQuiz(currentActDef()); },
     // 「临时插一行会插到哪儿」——给体检脚本用真实现（别在脚本里再抄一份选择器：
     // 抄一份就有两个真相，改了一处另一处照旧绿；内容面的来龙去脉见 ui.js contentFace）
     face: (el) => {
@@ -142,11 +146,12 @@ function exposeSheetHooks() {
     },
     night: () => {
       if (!hasS()) return;
-      // 篝火夜的门槛是"点亮 ≥3 条附身线"；截图只需要过门槛，内容仍由模型现场生成
+      // 篝火夜门槛是「营地**自愿**点亮 ≥2 条」；截图/体检要同时预置 linesDone 与 voluntaryLines
         st().set('linesDone', ['fishing', 'candy', 'sentry'], '调试：预置附身线');
+        st().set('voluntaryLines', ['fishing', 'candy'], '调试：预置自愿附身线');
       runNightChoice(currentActDef());
     },
-    end: () => { if (S) runEnding(); },
+    end: () => { if (hasS()) runEnding(); },
     logs: () => $('btn-logs').click(),
     defense: () => $('btn-defense').click(),
     // 玩法板同理：四个玩法都在幕深处，截图/体检直接把它们摆到板屏上
@@ -216,16 +221,25 @@ function bindChrome() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (e.isComposing) return;                    // 输入法组字中：这一下是"取消组字"
+      // 回响：Esc = 「明白了」（要 resolve Promise，不能只 hide）
+      if (closeEcho()) return;
       ['screen-journal', 'screen-defense', 'screen-logs', 'screen-facts', 'screen-settings', 'screen-fire', 'screen-how']
         .forEach((id) => hideOverlay(id));
       return;
     }
     if (isTypingTarget(e)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return; // 组合键留给浏览器（复制/粘贴/开发者工具）
+    // 空格/回车：若正在打字，先补全文（v0.3 P0-2）
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (skipTyping()) { e.preventDefault(); return; }
+    }
     if (e.key.toLowerCase() === 'j' && hasS()) { openJournal(); return; }
     const n = Number(e.key);
     if (n >= 1 && n <= 9 && activateChoice(n)) kernel.emit('sfx:play', { name: 'click' });
   });
+  // 点对白区：正在打字 → 补全文（再一次点击由 waitBtn/选项自己处理）
+  const dlg = $('dialogue');
+  if (dlg) dlg.addEventListener('click', () => skipTyping());
 }
 
 function openJournal() {
@@ -321,6 +335,13 @@ function bindTitle() {
   if (march) march.onclick = () => startRun('march');
   const quick = $('btn-mode-quick');
   if (quick) quick.onclick = () => startRun('quick');
+  const jump = $('btn-jump-huining');
+  if (jump) jump.onclick = () => jumpToAct('study', 'act5');
+  // URL 直达：/?jump=act5 或 #act5
+  const q = new URLSearchParams(location.search).get('jump') || (location.hash || '').replace('#', '');
+  if (q && /^act\d$/.test(q)) {
+    setTimeout(() => jumpToAct('study', q), 400);
+  }
   const judge = $('btn-judge');
   if (judge) {
     // 只在展示开关打开时绑定：关掉后按钮不可见，也不该有任何入口能触发答辩实况
@@ -437,7 +458,7 @@ function bindSettings() {
   };
   $('btn-set-clear-logs').onclick = async () => {
     await clearLogs();
-  if (S) st().set('aiCount', 0, '清零调用计数');
+    if (hasS()) st().set('aiCount', 0, '清零调用计数');
     $('ai-count').textContent = '0';
     toast('调用日志已重置');
     $('set-status').textContent = '日志已清空';

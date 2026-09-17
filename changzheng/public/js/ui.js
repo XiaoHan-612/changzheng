@@ -230,7 +230,7 @@ export function renderCompanions(state) {
       : `<div class="comp-ava">${c.ava}</div>`;
     return `<div class="comp-item" title="${c.name} · 好感 ${aff}" aria-label="${c.name}，好感 ${aff}">
       ${ava}
-      <div class="comp-meta"><b>${c.name}</b><span>${c.role}</span></div>
+      <div class="comp-meta"><b>${escapeHtml(c.name)}</b></div>
       <div class="comp-aff${band}">${aff}</div>
     </div>`;
   }).join('');
@@ -277,21 +277,48 @@ export function showThinking(on) {
   }, 1000);
 }
 
+/**
+ * 打字机。返回 `{ promise, finish }`：`finish()` 立刻补全文（跳过剩余动画）。
+ * 调用方仍可 `await typeText(...)`——对象上的 then 不存在，所以请 await `.promise`
+ * 或使用下面的薄包装 `typeTextSkip`。旧调用点 `await typeText(el, t)` 会拿到
+ * 非 Promise 的对象；为兼容，这里给返回值挂上 thenable。
+ */
 export function typeText(el, text, speed = 18) {
-  return new Promise((resolve) => {
-    el.textContent = '';
-    el.classList.add('typing');
-    let i = 0;
-    const t = setInterval(() => {
-      el.textContent = text.slice(0, i);
-      i += 1;
-      if (i > text.length) {
-        clearInterval(t);
-        el.classList.remove('typing');
-        resolve();
-      }
-    }, speed);
-  });
+  let timer = 0;
+  let done = false;
+  let resolveFn = null;
+  const promise = new Promise((resolve) => { resolveFn = resolve; });
+  const finish = () => {
+    if (done) return;
+    done = true;
+    clearInterval(timer);
+    el.textContent = text;
+    el.classList.remove('typing');
+    resolveFn();
+  };
+  el.textContent = '';
+  el.classList.add('typing');
+  let i = 0;
+  timer = setInterval(() => {
+    if (done) return;
+    el.textContent = text.slice(0, i);
+    i += 1;
+    if (i > text.length) finish();
+  }, speed);
+  // thenable：`await typeText(...)` 与 `await t.promise` 都能用
+  return { promise, finish, then: (onF, onR) => promise.then(onF, onR) };
+}
+
+/** 当前正在打的那段字（say / 终局 / 夜间共用）：点对白区可跳过 */
+let liveTyping = null;
+export function skipTyping() {
+  if (liveTyping) { liveTyping.finish(); liveTyping = null; return true; }
+  return false;
+}
+/** 把一段 typeText 句柄挂到全局跳过（night 等非 say 路径用） */
+export function registerLiveTyping(handle) {
+  liveTyping = handle || null;
+  return handle;
 }
 
 export function flashEffects(changes) {
@@ -357,7 +384,12 @@ export async function say(speaker, text, voiceId) {
   replayAnim($('dlg-body'), 'anim-ink');
   // 预置语音后台播，不阻塞打字与流程
   kernel.emit('voice:say', { text, actorId: speaker || '叙事', voiceId });
-  await typeText($('dlg-body'), text);
+  liveTyping = typeText($('dlg-body'), text);
+  try {
+    await liveTyping.promise;
+  } finally {
+    liveTyping = null;
+  }
 }
 
 export function escapeHtml(s) {
@@ -404,8 +436,16 @@ export async function renderFacts(allFacts, unlocked) {
   box.innerHTML = entries
     .map(([id, f]) => {
       const open = unlocked?.includes(id);
-      return `<div class="fact-card" style="${open ? '' : 'opacity:0.45'}">
-        <h3>${escapeHtml(f.title)}${open ? '' : '（未解锁）'}</h3>
+      // 未解锁**不注入正文**：原先只降透明度，点开档案仍能读到全部史实——剧透且削弱收集感（v0.3 P0-7）
+      if (!open) {
+        return `<div class="fact-card locked">
+          <h3>${escapeHtml(f.title)}（未解锁）</h3>
+          <div class="date">${escapeHtml(f.date || '')}</div>
+          <p class="muted">完成对应节点后解锁这段史实。</p>
+        </div>`;
+      }
+      return `<div class="fact-card">
+        <h3>${escapeHtml(f.title)}</h3>
         <div class="date">${escapeHtml(f.date || '')}</div>
         <div class="row"><span class="label real">真实史实</span>${escapeHtml(f.real || '')}</div>
         <div class="row"><span class="label fic">虚构互动</span>${escapeHtml(f.fiction || '')}</div>

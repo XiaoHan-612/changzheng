@@ -45,7 +45,7 @@ export async function runQuiz(act) {
     <div class="blk-choice-list" id="quiz-opts"></div>
     <div id="quiz-feedback" class="blk-note"></div>
     <div class="blk-actions">
-      <button type="button" class="btn ghost sm" id="quiz-auto" data-action="quiz-auto">看两个 AI 对答（ai_vs_ai）</button>
+      <button type="button" class="btn ghost" id="quiz-auto" data-action="quiz-auto">让两位战友先答</button>
       <button type="button" class="btn primary hidden" id="quiz-next" data-action="continue">继续</button>
     </div>
   `;

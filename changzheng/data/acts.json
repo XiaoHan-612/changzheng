@@ -110,6 +110,7 @@
             { "id": "straggler", "label": "掉队的战士", "sub": "扶他一把", "x": 30, "y": 50, "kind": "choice", "action": "snow_help" },
             { "id": "grab", "label": "陡坡", "sub": "拽住同伴", "x": 55, "y": 45, "kind": "grab" },
             { "id": "drummer", "label": "宣传员", "sub": "拟一句鼓动", "x": 72, "y": 42, "kind": "talk", "npc": "宣传员" },
+            { "id": "school", "label": "识字班", "sub": "夜校学口令", "x": 22, "y": 62, "kind": "school" },
             { "id": "march", "label": "下山", "sub": "进入草地 →", "x": 90, "y": 48, "kind": "march" }
           ]
         },
@@ -122,9 +123,10 @@
             { "id": "school", "label": "夜校", "sub": "认字学口令", "x": 38, "y": 50, "kind": "school" },
             { "id": "gomoku", "label": "两个小鬼", "sub": "泥地五子棋", "x": 46, "y": 60, "kind": "gomoku" },
             { "id": "fire", "label": "篝火旁", "sub": "交谈/分享", "x": 58, "y": 48, "kind": "fire" },
-            { "id": "rest", "label": "背囊旁", "sub": "休息", "x": 74, "y": 42, "kind": "rest" },
-            { "id": "sentry", "label": "夜哨", "sub": "听声辨位", "x": 80, "y": 63, "kind": "sentry" },
-            { "id": "march", "label": "东边小路", "sub": "行军 →", "x": 90, "y": 46, "kind": "march" }
+            { "id": "rest", "label": "背囊旁", "sub": "休息", "x": 66, "y": 42, "kind": "rest" },
+            { "id": "path", "label": "三条岔路", "sub": "怎么过草地", "x": 74, "y": 55, "kind": "path" },
+            { "id": "sentry", "label": "夜哨", "sub": "听声辨位", "x": 82, "y": 63, "kind": "sentry" },
+            { "id": "march", "label": "东边小路", "sub": "行军 →", "x": 92, "y": 46, "kind": "march" }
           ]
         }
       ],
@@ -144,7 +146,7 @@
         "pano": "/assets/scenes/snow_pano.jpg",
         "choice": "let_clothes"
       },
-      "forced": ["fishing", "soup", "candy", "sentry", "path"],
+      "forced": ["fishing", "candy", "sentry"],
       "quiz": true,
       "facts": ["h_xueshan", "h_fishhook", "h_grassland", "h_share", "h_sentry", "h_campfire"]
     },

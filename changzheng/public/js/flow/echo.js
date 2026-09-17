@@ -19,15 +19,21 @@ import { sceneImage } from './view.js';
 /** 「明白了」键没按之前的那个 resolve（同一时刻只会有一个回响层） */
 let echoResolve = null;
 
+/** 关闭回响层并 resolve（按钮与 Esc 共用；没有开着的回响时是 no-op） */
+export function closeEcho() {
+  const panel = $('screen-echo');
+  if (!panel || panel.classList.contains('hidden')) return false;
+  hideOverlay('screen-echo');
+  if (echoResolve) {
+    const r = echoResolve;
+    echoResolve = null;
+    r();
+  }
+  return true;
+}
+
 export function bindEcho() {
-  $('btn-echo-ok').onclick = () => {
-    hideOverlay('screen-echo');
-    if (echoResolve) {
-      const r = echoResolve;
-      echoResolve = null;
-      r();
-    }
-  };
+  $('btn-echo-ok').onclick = () => closeEcho();
 }
 
 export function showEcho({ title, play, real, fic }) {
