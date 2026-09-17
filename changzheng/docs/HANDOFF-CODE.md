@@ -10,7 +10,7 @@
 cd changzheng
 npm install
 npm start                 # http://localhost:3001
-npm run test:unit         # 58 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制
+npm run test:unit         # 65 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 民心与结局
 npm run test:e2e          # 五幕**真调**通关（含快速模式：node tests/e2e/full-run.mjs --quick）
 npm run qa:smoke          # 标题→营地→一次互动
 npm run qa:audit          # 日志 schema 审计 → docs/LOG-AUDIT.md
@@ -57,7 +57,9 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
    → 终局 runEnding（ending_review + 研学报告 study_report）
 ```
 
-**附身线门控**：`state.linesDone` 记 5 条营地线（fishing/candy/sentry/school/gomoku），`canNight()` ≥3 才解锁篝火夜；手记面板显示 `N/5`。
+**附身线门控（v0.3）**：`state.linesDone` 记全部点亮；`state.voluntaryLines` 只记**营地自愿**玩过；
+`canNight(2)` 看 **voluntary ≥2**（强制链 `markLine(id)` 不传 voluntary）。手记仍显示 `N/5`。
+验收捷径：`?jump=act5` 或标题「直达会宁」。
 
 **防重入**：`S.busy` + `withLock`。注意历史约定：在锁内要调用 `runForcedChain` 时先手动 `S.busy = false`（见 `onHotspot` 的 march 分支与 `runQuickAct`），否则嵌套 `withLock` 会静默 return。
 
@@ -290,6 +292,20 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
     - 现在的三道自保：① 页数打印出来（`共 17 屏`）；② 脚本里写死一张"**必到的屏**"清单（`REQUIRED`）并对账，少跑一屏就计入问题、非零退出；③ 有 defects 就 `process.exitCode = 1`。
     - 更一般的教训：**机械重构之后，验收脚本要"跑一次并读它的输出形状"**，不能只看绿不绿。同类信号：条数从 N 变成 M、少了一屏、少了一个"检查了 x 个文件"的计数——本项目已经吃过三次（坑 47 的"空切片换绿"、坑 51 的"手列清单漏文件"、这一条）。所以凡体检脚本，**必须打印它体检了几样东西**，并对自己有个下限断言。
 53. **对"可能不在的元素"用默认超时的 `page.click` 会让快检慢 4 倍**（批 C 顺手修掉） —— 序章上线后，`dev:check` 的"开局到营地"从 1.4s 变成 31.9s。原因不是序章慢，而是那一步里有一句历史遗留的 `page.click('#btn-cut-skip')`：`passOrigin` 已经把过场都清掉了，按钮此时**不可见**，Playwright 会按默认 **30s** 死等可交互性，超时抛错后被 `.catch(() => {})` 吞掉——于是"什么都没做，但花了 30 秒"。
+
+54. **大片纸选择器漏 `{` = 整段材质静默失效**（v0.3 实锤，玩家「黑字压暗图」） —— `components.css` 曾写成
+   `.panel, .sheet, …,\n  background-color: var(--paper-veil);`（选择器列表后没有 `{`）。浏览器丢弃整条规则，
+   纸面透明、墨字直接落在插画上。改材质时用 `qa:frames`/肉眼对照**截图**，别只信"类名在 HTML 里"。
+
+55. **过场字幕区若复用 `.cut-caption-wrap` 的纸面，会和「电影」定位打架** —— v0.3 把过场改成
+   `cut-theater` 全屏放映：底部暗场托字 + `cut-btn`，诗/钤印用 `is-poem` 撑满屏。**不要再给过场上纸卡**。
+
+56. **终局诗：点按曾会中止逐字并切拍** —— 播放器 `tap()` 置 `aborted` → `gone()` 为真 → `revealByAnchor` 提前返回；
+   同时 `cleanup` 的 `voice:stop` 掐断朗诵。v0.3 起诗拍 `ignoreTap:true`，并 `probeAudioMs` 按真实 mp3 拉长时间轴、
+   播完再进钤印。改诗只动 `beats.js` 的 `poem` 与 `data/poem.json`。
+
+57. **小游戏「放弃」≠ 完成** —— 板头「放弃本局」→ adapter `onExit` → `detail.aborted`；
+   `games-flow` 返回 `'aborted'` 时**不** `markDone`、不调 `minigame_review`。强制链同理。
     - 规矩：**对"可能不存在/可能不可见"的元素，要么先判 `count()/isVisible()`，要么显式给 `{ timeout: 1500 }`**。快检的每一秒都是开发者耐心，别把它花在等一个注定超时的点击上。
 
 ## 六、下一步建议（按价值排序）
@@ -325,7 +341,7 @@ npm run tts:manifest
 ```
 
 - [ ] `dev:check` 7 步全 ✓（总线静态规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 无报错）
-- [ ] unit 53/53
+- [ ] unit 65/65
 - [ ] 标准模式与 `--quick` 均 E2E FULL PASS，无 pageerror
 - [ ] 日志里 candy/sentry/gomoku/luding 各恰好 1 次，夜间 `night_options`+`night_resolve` 各 1 次
       （gomoku 只靠可选营地热点触发，偶尔落空——失败信息会带「营地历次热点 apN:[…]」）

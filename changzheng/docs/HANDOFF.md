@@ -27,10 +27,11 @@ npm start                   # http://localhost:3001
    （接四处缝合点，幂等）→ 在 `modules/games/<槽>.js` 里一行 `pluginFrom(...)` → `manifest.js` 两行
    → `qa-board` 的 specs 一行 + `driver.mjs` 一个 case → `npm run qa:board`。
 5. **人工完整玩一遍的路线**：标题 → 研学模式 → 出身三选一 → 过场 → 营地（点光点：交谈一次、抉择一次）
-   → 启程 → 知识对决 → 五幕走完。单局 **20–25 分钟**；赶时间选「快速演示」（约 18 分钟），
-   重点看这几处：**热点用过即作废**（变灰「已看过」）· 玩法都在**玩法板**上（题名 + 数值签）·
-   每步都有**史实回响**（你经历的 / 真实发生过的 / 虚构边界）· 第四幕幕末的**篝火夜**（需点亮 ≥3 条附身线）·
-   终局的**研学报告**。
+   → 启程 → 知识对决 → 五幕走完。单局 **20–25 分钟**；赶时间选「快速演示」。
+   **验收捷径**：标题页「直达会宁 · 验收」，或 `http://localhost:3001/?jump=act5`（跳过序章，预置附身线与史实）。
+   重点看：**热点用过即作废** · 玩法在**玩法板**上 · 板头**「放弃本局」**可中途退出 ·
+   **史实回响** · 第四幕幕末**篝火夜**（营地**自愿**点亮 **≥2** 条附身线；强制链不计入）·
+   终局**诗笺朗诵**（全屏宋体四联、按真实 mp3 时长逐字；点画面不打断，只有「跳过」会停）· **研学报告**。
 6. **坏了先看哪儿**：
    - 界面弹「模型调用失败」→ 点「重试」；连续失败看「设置 → 测试连通」和「记录」里那条 `source=ERROR` 的原因；
    - 一次真调 1.2–6 秒属正常（若换回赛制指定的 `glm-5.1` 约 11 秒/次）；**没有离线能力**，断网即报错（备选方案见 `OFFLINE-REPLAY.md`）；
@@ -53,6 +54,14 @@ npm start                   # http://localhost:3001
 | 玩法板上的十支小游戏 | 主线热点 / 强制链按槽进入 | 舞台交代任务 → 板屏做题（时机/判读/对弈…）→ 回舞台结算 | 十支全部就位（2026-09-16），见 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) |
 
 ## 二、已完成
+
+### v0.3 游玩体验与安全（已推 GitHub `a96009a`）
+总方案与勾选表：[`V0.3-PLAN.md`](V0.3-PLAN.md)。要点：
+- **纸面材质**：`components.css` 大片纸选择器曾漏 `{` → 背景透明、墨字压暗图；已修，`sheet-body` 改实心纸
+- **过场全屏放映**（`cut-theater`）：不再纸卡字幕；序章/幕间加长；字幕 42–56ms/字
+- **终局诗笺**：全屏宋体、题字常显、探测真实 mp3 时长、点按不打断朗诵
+- **板屏放弃本局** / **附身线 voluntary≥2** / **民心≥60 解锁老乡线** / **本地结局骨架**
+- **服务端**：默认 `127.0.0.1`；config/logs 仅本机；probe 不回退 Key；忽略客户端 `systemPrompt`
 
 ### 引擎与服务端
 - `/api/decide`：**15 类** callType（scene_gen / choice_hint / npc_chat / share_judge / minigame_review /
@@ -125,8 +134,8 @@ tokens/frames/tone/handoff 全绿 · `dev:check` 10/10（≈13s，含"升华可�
 
 | 优先级 | 缺口 | 说明 |
 |--------|------|------|
-| P0 | **`verify:full`（五幕真调一局）还没跑** | 十支小游戏接完只跑到 `qa:board` + `dev:check`；"整局流程顺不顺"的最终凭据是 `npm run verify:full`（或 `npm run test:e2e`）。**接手第一条就跑它**，见 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) §四 欠账 7 |
-| P1 | **v0.3 玩法手感 P1×14** | 浮桥稳流窗 UI、陡坡 decide 冻结、钓鱼起竿窗、夜校触屏/键盘、统一放弃契约等——逐条见 `V0.3-PLAN.md` §3 |
+| P0 | **`verify:full`（五幕真调一局）还没跑** | v0.3 改动后应再跑一次 `npm run verify:full`（或 `test:e2e` + `--quick`）。**接手第一条就跑它** |
+| P1 | **v0.3 玩法手感 P1×14** | 浮桥稳流窗 UI、陡坡 decide 冻结、钓鱼起竿窗、夜校触屏/键盘等——见 `V0.3-PLAN.md` §3 |
 | P1 | 玩法侧四项欠账 | 注入样式没过 token · `miniTruth` F12 可见 · `CHOICE_SETS.cross` 成死代码 · 同事 12 个 `qa-*.mjs` 还没并入 npm |
 | P1 | 契约还差两处 | `runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职（建议走 `askChoice`）；`runRest` 只有一个「继续」，可直接 `waitContinue` |
 | P1 | 数值平衡未调 | 测量口径已建（`npm run qa:playtest` → `docs/PLAYTEST.md`），调参待做；v0.3 已做 P2-4（第三次休息不调 AI） |
