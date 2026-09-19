@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>长征·抉择</title>
-  <meta name="description" content="《长征·抉择》— 五幕长征叙事互动游戏：在暮色营地里用有限行动点走近光点，抉择交由大模型实时裁决，每一步都能对照真实史实。" />
+  <title>星火微光·我路过他们的长征</title>
+  <meta name="description" content="《星火微光·我路过他们的长征》— 五幕长征叙事互动游戏：在暮色营地里用有限行动点走近光点，抉择交由大模型实时裁决，每一步都能对照真实史实。" />
   <meta name="theme-color" content="#0f1216" />
-  <meta property="og:title" content="长征·抉择" />
+  <meta property="og:title" content="星火微光·我路过他们的长征" />
   <meta property="og:description" content="用有限的暮色走近光点：每一步抉择交给大模型裁决，立刻对照真实史实。" />
   <meta property="og:image" content="/assets/scenes/depart_pano.jpg" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -22,13 +22,13 @@
     <header id="topbar" class="hidden">
       <div class="brand">
         <span class="brand-dot"></span>
-        <span>长征·抉择</span>
+        <span>星火微光</span>
       </div>
       <nav id="journey" class="journey" aria-label="行程"></nav>
       <div class="top-actions">
         <div id="stats" class="stats compact"></div>
         <button type="button" id="btn-facts" class="btn ghost sm">史实</button>
-        <button type="button" id="btn-logs" class="btn ghost sm dev-only">记录 <span id="ai-count" class="pill">0</span></button>
+        <button type="button" id="btn-logs" class="btn ghost sm" title="AI 调用记录">记录 <span id="ai-count" class="pill">0</span></button>
         <button type="button" id="btn-settings" class="btn ghost sm">设置</button>
         <button type="button" id="btn-mute" class="btn ghost sm" title="开关声音">🔊</button>
         <button type="button" id="btn-journal" class="btn ghost sm" title="手记">手记</button>
@@ -41,46 +41,186 @@
       <div class="title-bg" style="background-image:url('/assets/scenes/depart_pano.jpg')"></div>
       <div class="title-card">
         <p class="eyebrow">1934–1936 · 两万五千里</p>
-        <h1>长征<span>·</span>抉择</h1>
+        <!-- 长标题（12 字）用小一档字号，见 components.css 的 .title-card h1.long -->
+        <h1 class="long">星火微光<span>·</span>我路过他们的长征</h1>
         <p class="subtitle">你将走进暮色里的营地，替他们做完手头那件事</p>
         <p class="tagline">
           每一个光点，是一个人的一夜。<br/>
           每一次抉择，会被史书轻轻接住。
         </p>
         <div class="mode-pick">
-          <button type="button" class="mode-card" id="btn-mode-study">
-            <b>研学模式</b>
-            <span>不会失去战友。慢慢走完这一路。</span>
-          </button>
-          <button type="button" class="mode-card" id="btn-mode-march">
+          <button type="button" class="mode-card march" id="btn-mode-march">
             <b>行军模式</b>
             <span>资源见底会掉队，错误抉择会有人留下。</span>
           </button>
-          <button type="button" class="mode-card" id="btn-mode-quick">
-            <b>快速演示</b>
-            <span>每幕只跑主玩法与对决，约 18 分钟走完五幕。</span>
+          <button type="button" class="mode-card" id="btn-mode-auto">
+            <b>连贯行军</b>
+            <span>任务点自动进入，其余操作不变。</span>
+          </button>
+          <button type="button" class="mode-card" id="btn-mode-select">
+            <b>择点穿行</b>
+            <span>自选幕次与任务点进入。</span>
+          </button>
+          <button type="button" class="mode-card arcade" id="btn-mode-arcade">
+            <b>游戏模式</b>
+            <span>不进剧情，直接玩各支玩法。</span>
           </button>
         </div>
         <div class="title-actions">
           <button type="button" id="btn-continue-run" class="btn primary lg hidden">继续上一局</button>
-          <button type="button" id="btn-jump-huining" class="btn lg">直达会宁 · 验收</button>
           <button type="button" id="btn-judge" class="btn gold lg dev-only">评委演示</button>
           <button type="button" id="btn-how" class="btn ghost lg">怎么玩</button>
           <button type="button" id="btn-settings2" class="btn ghost lg">设置</button>
+        </div>
+        <!-- 了解长征：AI 圆徽 + 较大入口 -->
+        <div class="title-intro-wrap">
+          <button type="button" id="btn-march-intro" class="intro-cta" title="查看长征介绍，也可向 AI 提问">
+            <span class="intro-cta-badge">AI</span>
+            <span class="intro-cta-main">
+              <b>了解中国工农红军长征</b>
+              <span>详细介绍 · 常识问答</span>
+            </span>
+          </button>
+        </div>
+        <!-- 角落：反馈 + 九十周年感想（90 圆印） -->
+        <div class="title-corner">
+          <button type="button" id="btn-feedback" class="corner-link">意见与反馈</button>
+          <button type="button" id="btn-reflection" class="corner-seal" title="写下你的感想">
+            <span class="corner-seal-badge">90</span>
+            <span class="corner-seal-text">写下感想</span>
+          </button>
+          <p class="corner-note">2026 · 红军长征胜利九十周年</p>
         </div>
         <p class="foot-note dev-only">模型 <strong id="title-model">—</strong> · 赛道二 AI 游戏 · 可演示真调日志</p>
       </div>
     </section>
 
+    <!-- 了解中国工农红军长征（API 详细解答） -->
+    <section id="screen-march-intro" class="screen overlay hidden tpl-panel">
+      <div class="panel wide glass">
+        <h2>了解中国工农红军长征</h2>
+        <p class="blk-lead">
+          <span class="corner-link-ai">AI</span>
+          下文与问答均由指定大模型现场生成并写入日志。<strong>此内容由 AI 生成，请结合权威史料自行鉴别。</strong>
+        </p>
+        <div id="march-intro-body" class="march-intro-body">
+          <p class="muted">正在调用大模型，生成「中国工农红军长征」详细介绍…</p>
+        </div>
+        <div class="intro-qa">
+          <h3 class="intro-qa-title">向 AI 提问（长征相关常识）</h3>
+          <p class="muted sm">例如：遵义会议有什么意义？过草地主要难在哪里？为什么说湘江战役代价很大？</p>
+          <div class="intro-qa-row">
+            <input id="march-qa-input" class="intro-qa-input" type="text" maxlength="200" placeholder="输入你的问题…" autocomplete="off" />
+            <button type="button" id="btn-march-qa" class="btn primary">提问</button>
+          </div>
+          <div id="march-qa-out" class="intro-qa-out">
+            <p class="muted sm">回答会显示在这里（真调，可能需要数秒）。</p>
+          </div>
+        </div>
+        <div class="blk-actions center">
+          <button type="button" id="btn-march-intro-refresh" class="btn ghost">重新生成介绍</button>
+          <button type="button" id="btn-march-intro-close" class="btn primary">返回标题</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 意见与反馈 -->
+    <section id="screen-feedback" class="screen overlay hidden tpl-panel">
+      <div class="panel wide glass">
+        <h2>意见与反馈</h2>
+        <p class="blk-lead">欢迎指出玩法、界面、史实表述或体验上的问题。内容先保存在本机，方便演示后整理。</p>
+        <label class="fb-label" for="fb-text">你的意见</label>
+        <textarea id="fb-text" class="fb-textarea" rows="7" placeholder="例如：某一幕节奏偏快 / 某处文案可再准确 / 某按钮不好点…"></textarea>
+        <p id="fb-status" class="muted sm"></p>
+        <div class="blk-actions center">
+          <button type="button" id="btn-fb-save" class="btn primary">保存到本机</button>
+          <button type="button" id="btn-fb-copy" class="btn ghost">复制全文</button>
+          <button type="button" id="btn-fb-close" class="btn ghost">返回标题</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 九十周年纪念感言 -->
+    <section id="screen-reflection" class="screen overlay hidden tpl-panel">
+      <div class="panel wide glass">
+        <p class="eyebrow">限时纪念 · 胜利九十周年</p>
+        <h2>写下你的感想</h2>
+        <p class="blk-lead">走过营地与抉择之后，用几句话记下印象最深的一幕、一次选择，或你愿意带出游戏的一点思考。</p>
+        <p class="ref-anniv">今年是红军长征胜利九十周年（1936—2026）。感想仅存本机，不上传、不参与评分。</p>
+        <label class="fb-label" for="ref-text">我的感想</label>
+        <textarea id="ref-text" class="fb-textarea" rows="7" placeholder="我印象最深的是……"></textarea>
+        <p id="ref-status" class="muted sm"></p>
+        <div class="blk-actions center">
+          <button type="button" id="btn-ref-save" class="btn primary">保存感想</button>
+          <button type="button" id="btn-ref-copy" class="btn ghost">复制全文</button>
+          <button type="button" id="btn-ref-close" class="btn ghost">返回标题</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 择点穿行：自选幕次与任务 -->
+    <section id="screen-select" class="screen overlay hidden tpl-panel">
+      <div class="panel wide glass">
+        <h2>择点穿行</h2>
+        <p class="blk-lead">选择一幕中的任务点直接进入。模型裁决、JSONL 日志与行军主线相同（无 MOCK）。</p>
+        <div id="select-list" class="select-list"></div>
+        <div class="blk-actions center">
+          <button type="button" id="btn-select-back" class="btn ghost">返回标题</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 怎么玩 -->
     <section id="screen-how" class="screen overlay hidden tpl-panel">
       <div class="panel wide glass">
         <h2>怎么玩</h2>
-        <ol class="how-list">
-          <li><strong>提灯看营地</strong> — 光会跟着你；照到哪里，哪里的故事醒来。</li>
-          <li><strong>有限的暮色</strong> — 行动点用尽，天就黑透，只能启程。</li>
-          <li><strong>做完一件事</strong> — 抉择交给大模型，立刻对照真实史实。</li>
-          <li><strong>走完五幕</strong> — 于都河到会宁，终点会记住你成为谁。</li>
-        </ol>
+        <p class="blk-lead">你以「过客」走进 1934–1936 年的长征节点：在暮色营地里点光点，替他们做完手头那件事；抉择与复盘交给大模型，并立刻对照史实。</p>
+        <div class="how-grid">
+          <section class="how-block">
+            <h3>核心循环</h3>
+            <ol class="how-list">
+              <li><strong>进一幕</strong> — 过场交代时间地点，进入营地。</li>
+              <li><strong>花暮色</strong> — 提灯点亮任务点；行动点用尽，天黑只能启程。</li>
+              <li><strong>做事</strong> — 交谈、抉择、小游戏、分粮……做完一件算一件。</li>
+              <li><strong>模型裁决</strong> — 结果由指定大模型判断，资源与关系随之变化。</li>
+              <li><strong>史实回响</strong> — 对照「你经历的 / 真实发生过的 / 虚构边界」。</li>
+              <li><strong>启程下一幕</strong> — 于都河 → 湘江 → 遵义 → 金沙江·泸定 → 雪山草地 → 会宁。</li>
+            </ol>
+          </section>
+          <section class="how-block">
+            <h3>四种模式</h3>
+            <ul class="how-list">
+              <li><strong>行军模式</strong> — 手动点任务；资源见底会掉队，高风险抉择可能有人留下。</li>
+              <li><strong>连贯行军</strong> — 自动进入任务点；对白、抉择、玩法仍由你操作。</li>
+              <li><strong>择点穿行</strong> — 自选某一幕的某一个任务，适合反复体验或演示。</li>
+              <li><strong>游戏模式</strong> — 不进剧情，单独玩搭桥、钓鱼、下棋等玩法。</li>
+            </ul>
+          </section>
+          <section class="how-block">
+            <h3>资源与代价</h3>
+            <ul class="how-list">
+              <li><strong>体力 / 粮食</strong> — 见底或断粮会掉队；过幕会消耗口粮。</li>
+              <li><strong>士气 / 信念 / 民心</strong> — 影响叙事、结局倾向与老乡等支线。</li>
+              <li><strong>同伴好感</strong> — 老班长、指导员、红小鬼、卫生员、老乡。</li>
+              <li><strong>营地侧栏</strong> — 可看本幕目标；资源告急时会红字提示。</li>
+            </ul>
+          </section>
+          <section class="how-block">
+            <h3>操作与提示</h3>
+            <ul class="how-list">
+              <li><strong>点击</strong> — 热点、选项、玩法板上的操作键。</li>
+              <li><strong>键盘</strong> — 数字键 <em>1/2/3</em> 选选项；<em>J</em> 手记；<em>Esc</em> 关浮层。</li>
+              <li><strong>继续</strong> — 叙事读完后点「继续」，再进史实回响。</li>
+              <li><strong>记录</strong> — 顶栏「记录」可查看每次 AI 调用日志（真调可审计）。</li>
+              <li><strong>模型</strong> — 设置里配置接口与 Key；调用失败会提示原因并可重试，无离线编造。</li>
+            </ul>
+          </section>
+          <section class="how-block how-block-wide">
+            <h3>五幕路线</h3>
+            <p class="how-route">于都河（告别与出发）→ 湘江（代价）→ 遵义（方向）→ 金沙江·泸定（速度）→ 雪山·草地（守望）→ 腊子口·会宁（传承）</p>
+            <p class="how-note">今年是红军长征胜利九十周年。通关后可在标题页「写下感想」留下你的记述。</p>
+          </section>
+        </div>
         <button type="button" class="btn primary" id="btn-how-back">返回</button>
       </div>
     </section>
@@ -161,7 +301,11 @@
           <span class="hud-sub">日 <b id="day-num">1</b>/<span id="day-max">1</span></span>
         </div>
         <div class="ap-runes" id="ap-dots" title="行动点"></div>
-        <p id="camp-hint" class="hud-hint">用光照亮他们。</p>
+        <div id="camp-note" class="camp-note">
+          <button type="button" id="btn-camp-note-toggle" class="camp-note-toggle" title="收起/展开提示">收起</button>
+          <p id="camp-goal" class="hud-goal" hidden></p>
+          <p id="camp-hint" class="hud-hint">用光照亮他们。</p>
+        </div>
         <div id="companion-list" class="companion-rail"></div>
       </aside>
 
@@ -193,6 +337,27 @@
       </article>
     </section>
 
+    <!-- 游戏模式：把玩法清单里的十支单独摆出来（不进剧情、点开即玩）。
+         卡片由 flow/arcade.js 从 gamesApi().list()+describe() 生出来 —— 清单是唯一真源，
+         同事往 manifest 加一支，这里自动多一张卡。 -->
+    <section id="screen-arcade" class="screen hidden tpl-title">
+      <div class="arcade-bg" style="background-image:url('/assets/scenes/camp_evening.jpg')"></div>
+      <div class="arcade-wrap">
+        <header class="arcade-head">
+          <span class="blk-kicker">游戏模式</span>
+          <h2 class="blk-title md">长征路上的夜，挑一个来玩</h2>
+          <p class="blk-lead">
+            这里有 <b id="arcade-count">…</b> 支小玩法：搭桥、钓鱼、识字、下棋、放哨、拽人上山……
+            它们本来长在剧情里，这里可以单独玩，不进剧情也不动存档。点开就玩，放弃就换一支。
+          </p>
+        </header>
+        <div class="arcade-grid" id="arcade-grid"></div>
+        <div class="blk-actions center">
+          <button type="button" class="btn ghost" id="btn-arcade-back">回标题</button>
+        </div>
+      </div>
+    </section>
+
     <!-- 玩法板：小游戏专用（钓鱼+弯针、夜校、分糖、夜岗、五子棋、泸定桥、陡坡）。
          玩法原先挤在舞台纸卷里（上面还顶着给对白用的人物立绘），样板页画好的
          "游戏名 + 数值签 + 玩法区" 无处落地——这里给它一屏自己的地方。 -->
@@ -203,7 +368,15 @@
           <span class="blk-kicker" id="board-kicker">玩法</span>
           <h2 class="blk-title md flush" id="board-title">—</h2>
           <div class="blk-stat-row" id="board-stats"></div>
-          <button type="button" id="btn-board-abandon" class="btn ghost sm board-abandon" data-action="board-abandon">放弃本局</button>
+          <!-- 两个出口，语义不同（别合并）：
+               跳过 = 不玩这一局、这件事就过去了（剧情继续，热点算完成、不给效果）；
+               放弃 = 先不玩，回营地，这个热点还在、随时能再来。 -->
+          <div class="board-top">
+            <button type="button" id="btn-board-skip" class="btn ghost sm board-skip"
+                    data-action="board-skip" title="不玩这一局，直接继续（这件事就算过去了）">跳过本局</button>
+            <button type="button" id="btn-board-abandon" class="btn ghost sm board-abandon"
+                    data-action="board-abandon" title="先不玩，回营地（这个点还在，能再来）">放弃本局</button>
+          </div>
         </header>
         <div class="board-body" id="board-body"></div>
       </article>
@@ -318,8 +491,9 @@
     <section id="screen-logs" class="screen overlay hidden tpl-panel">
       <div class="panel wide glass logs-panel">
         <div class="panel-head">
-          <h2>行军记录</h2>
+          <h2>行军记录 <span class="muted sm">· 大模型调用日志</span></h2>
           <div>
+            <button type="button" id="btn-logs-export" class="btn ghost sm" title="把原始 JSONL 下载到本机（含 prompt / 模型响应 / 耗时 / 来源）">导出日志</button>
             <button type="button" id="btn-logs-refresh" class="btn ghost sm">刷新</button>
             <button type="button" id="btn-logs-close" class="btn primary sm">关闭</button>
           </div>

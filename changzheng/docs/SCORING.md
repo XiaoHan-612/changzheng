@@ -21,8 +21,12 @@
 | 夜间 / 终局 / 研学报告 | night_* / ending_review / study_report | 是 |
 
 - 每次调用 JSONL + 游戏内「记录」+ **答辩面板**按类型聚合 + `npm run qa:audit` 产出 schema 审计报告
-- 一局**真调**约 **76** 次调用（标准模式，`npm run test:e2e` 实测），覆盖 **15 类** callType；`source=GLM`，具体模型名与推理档位见 `model` 字段，可审计
-- 快速模式（每幕只跑主玩法+对决）调用更少，供 18 分钟路演（2026-09-13 实测：标准模式真调一局约 5 分钟）
+- 一局**真调**约 **76+** 次调用起（标准模式，`npm run test:e2e` 实测；营地热点与 14 支玩法会再往上叠）
+- 契约表当前登记 **23 类** callType（`server/schema.js` / `public/js/modules/ai/registry.js` 为唯一真源；
+  含主线 15 类 + 同事玩法带来的 `candy_scene` / `gomoku_move` / `school_*` / `cipher_draft` /
+  `skim_throw` / `antiphony_reply` / `weave_note` 等）；`source=GLM`，模型名见 `model` 字段
+- **主线玩法收尾一律真调** `minigame_review`（比赛口径：尽可能使用 API；卡片上的 `noAi` 只表示局内不调）
+- 快速模式（每幕只跑主玩法+对决）调用更少，供路演压缩时长
 
 ## 技术创新与复杂度 10%
 

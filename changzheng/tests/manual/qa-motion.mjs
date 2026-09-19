@@ -55,7 +55,7 @@ const waitForAnim = async (sel, want, timeout = 8000) => {
 check('封面入场', await animOf('#screen-title .title-card'), 'fade-in 0s');
 
 // ② 序章（电影化的拍子）：黑场题字入场 → 路线图逐节点亮 + 换幕抹擦
-await page.click('#btn-mode-study');
+await page.click('#btn-mode-march');
 check('序章题字卡入场', await waitForAnim('#screen-cutscene .title-card', 'fade-in 0s'), 'fade-in 0s');
 let wipeSeen = '否';
 for (let i = 0; i < 20; i++) {                       // 抹擦层只存活 ~0.6s，边等边看
@@ -85,7 +85,9 @@ for (let i = 0; i < 40; i++) {                       // 等进营地（别用固
 }
 
 // ③ 营地：热点余烬 + 侧栏入场（tpl-side → anim-fade）
-check('营地余烬', await animOf('#hotspots .hotspot .ember'), 'ember 0s');
+// 注意挑**还能点**的那一格：序章已经演过"与母亲告别"（acts.json 的 preDone），
+// 那一格进幕就是 disabled，而 `.hotspot:disabled .ember{animation:none}` 是设计如此。
+check('营地余烬', await animOf('#hotspots .hotspot:not(:disabled) .ember'), 'ember 0s');
 check('营地侧栏入场', await animOf('#screen-camp .hud-left'), 'fade-in 0s');
 check('微视差已绑定', await page.evaluate(() => {
   const el = document.querySelector('#screen-camp .pano-img');
@@ -141,7 +143,7 @@ check('减动效：位移类被关掉', calm.riseName, 'none');
 check('减动效：淡入仍保留', calm.fadeName, 'fade-in');
 
 // ⑥b 减动效下的**拍子**：判得出自己在减动效、题字卡不上动画、字幕整段直显（音频照播，听感另有人耳那关）
-await page.click('#btn-mode-study');
+await page.click('#btn-mode-march');
 await page.waitForTimeout(500);
 const calmBeat = await page.evaluate(() => {
   const card = document.querySelector('#screen-cutscene .title-card');

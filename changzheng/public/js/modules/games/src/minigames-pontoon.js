@@ -54,6 +54,11 @@ export function bindHost(h = {}) {
   if (h.decide) DECIDE = h.decide;
 }
 
+// 画布自适应（宽度铺满玩法板、高度让开说明与按钮区）。
+// 同目录（src/）内的共享工具：units 的"玩法源码不许 import 目录外"与 lint-bus 的
+// "模块之间不许 import"两条守卫都允许（src/ 是同一个目录、games 是同一个顶层模块）。
+import { fitCanvas } from './fit-canvas.js';
+
 /* ══════════════ 小工具（自包含）══════════════ */
 function h(tag, attrs = {}, kids = []) {
   const el = document.createElement(tag);
@@ -163,12 +168,12 @@ export function runPontoonNight(container, opts = {}) {
     root.append(lead, cv, segRow, flowBox, acts, fbEl);
 
     const ctx = cv.getContext('2d');
-    const DPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
-    cv.width = Math.round(W * DPR);
-    cv.height = Math.round(H * DPR);
-    cv.style.width = `${W}px`;
-    cv.style.height = `${H}px`;
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // 画布按玩法板的可用空间自适应（宽度铺满、高度让开说明与按钮区）。
+    // 设计坐标仍是 W×H，变换走 DPR*viewScale —— 放大不糊，点按也不用重新映射。
+    // 原来这里是 1:1 定死 460×240，纸面放大后画布四周一片空（2026-09-17 修）。
+    const view = fitCanvas(cv, W, H, {
+      onSize: (s, dpr) => ctx.setTransform(dpr * s, 0, 0, dpr * s, 0, 0),
+    });
 
     container.dataset.mini = opts.id || 'pontoon-night';
     sync('rig');
@@ -240,7 +245,10 @@ export function runPontoonNight(container, opts = {}) {
           text: st === 'D' ? '拆' : st === '.' ? (isShallow(i) ? '滩' : '段') : st,
         });
         b.dataset.seg = String(i);
-        const canAct = (phase === 'rig' || phase === 'dismantle') && st !== 'D';
+        // "能点"必须等于"点了真有事"：搭桥阶段只有**空格**可点（点已搭好的段是空操作，
+        // 早先它们也带着 data-mini-action，自动化会一直点第一格原地打转——
+        // 与"看起来能点但点了没反应都当缺陷"同一条口径）；拆桥阶段则任何没拆掉的段都能点。
+        const canAct = phase === 'rig' ? st === '.' : (phase === 'dismantle' && st !== 'D');
         if (canAct) b.setAttribute('data-mini-action', 'seg');
         else b.removeAttribute('data-mini-action');
         if (alarmSeg === i) b.classList.add('alarm');

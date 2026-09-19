@@ -1,10 +1,9 @@
 # games/ —— 交互游戏（小游戏）插件
 
-> **状态（2026-09-15，批 5）**：宿主已经是真服务（`./index.js`），插件的**接口冻结**——
-> 现在目录里那 8 个（`needle/fishing/school/candy/sentry/gomoku/luding/grab`）是**占位实现**
-> （内部还是旧版，同事正在重做）。正式版到位后**只替换对应文件**，宿主、内核、流程代码都不用动。
+> **状态（2026-09-19）**：宿主（`./index.js`）与插件接口已冻结，**目录里的 14 支全部是正式实现**
+> （"有哪些玩法"以 `./manifest.js` 为唯一真相）。旧版的 `public/js/minigames.js`（1121 行 / 8 个玩法）**已删除**。
 >
-> 加一个玩法 = **加一个文件 + 在 `./manifest.js` 加两行**（import 一行、GAMES 一行）。
+> 加一个玩法 = **加一个文件（本体放 `src/`，插件放这一层）+ 在 `./manifest.js` 加两行**（import 一行、GAMES 一行）。
 > 要改的只有这两处——`main.js`、内核、别的模块都不碰。
 
 ## 一、写一个玩法：复制 `_template.js`
@@ -63,7 +62,7 @@
 # 2. ./manifest.js 里加两行：import 一行 + GAMES 一行
 # 3. tests/manual/qa-board.mjs 的 specs 里加一行（id: {title, stat, kick, after}）
 #    ↑ 不加这一行，第 4 步会报"体检表覆盖了清单里的每个玩法 ✗"
-npm run dev:check           # 约 7 秒、0 真调：能挂上 / 契约标记齐 / 无报错
+npm run dev:check           # 约 16 秒、0 真调：能挂上 / 契约标记齐 / 无报错
 npm run qa:board            # 逐屏摆上板屏点一下；含"清单 ↔ 体检表 ↔ 动作声明"三方对账
 node tests/e2e/layout-audit.mjs            # 新界面过了就顺手跑：1280 无溢出/控件出界
 node tests/e2e/layout-audit.mjs --width 820
@@ -80,13 +79,17 @@ node tests/e2e/layout-audit.mjs --width 820
 | `xx：点一下有反应 ✗` | 点了第一步之后，`after` 那个契约元素没出现（交互没接上或报错挂掉） |
 | `xx 8 秒内没摆上来`（dev:check） | 板屏没打开 / 数值签没数 / 描述符缺字段 |
 
-## 四、现在的 8 个占位实现怎么换掉
+## 四、现在有哪些支 / 换一版 / 加一支
 
-`needle/fishing/…/grab` 这 8 个文件目前只有一句 `import { runXxx } from '../../minigames.js'`
-（旧实现，临时）。正式版到位后：
+`manifest.js` 的 `GAMES` 就是清单（当前 **14 支**）：`bendhook` · `goldenhook` · `nightschool` ·
+`candy-share` · `sentry-watch` · `mud-gomoku` · `luding-chain` · `snow-grab` · `pontoon-night` ·
+`rally-river` · `skim` · `weave` · `antiphony` · `cipher`。
 
-1. 把该文件的内容换成你自己的实现（描述符字段照旧，`mount` 写你的玩法）；
-2. 删掉那句临时 import；8 个都换完之后删掉 `public/js/minigames.js`；
-3. 两个背景兜底（`sceneImage`）暂时还在 `main.js`——官方实现到位后由描述符直接给路径即可。
+1. **换一版**（拿到新实现）：新源码覆盖进 `src/`（或替换这一层对应的插件文件）→
+   `npm run intake:minigames` 重接缝合点（幂等）→ 核 `id` / `actions` 有没有变
+   （变了就同步描述符、`qa-board.mjs` 的 `specs` 与 `driver.mjs` 的 `case`）→ `npm run qa:board`。
+2. **加一支**：接线口径（插槽表 / 四处缝合点 / 欠账）以
+   [`../../../docs/MINIGAMES-INTAKE.md`](../../../docs/MINIGAMES-INTAKE.md) 为准——玩法平台里"加一支"只需
+   `manifest.js` 两行；要进**主线**还得在流程层（`flow/games-flow.js`）按槽接一次。
 
-**不用改**：`modules/games/index.js`（宿主）、`manifest.js` 的 id 行、`kernel/`、`main.js`。
+**不用改**：`modules/games/index.js`（宿主）、`kernel/`、内部装配清单。

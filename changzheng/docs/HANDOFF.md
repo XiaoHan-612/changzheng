@@ -27,11 +27,10 @@ npm start                   # http://localhost:3001
    （接四处缝合点，幂等）→ 在 `modules/games/<槽>.js` 里一行 `pluginFrom(...)` → `manifest.js` 两行
    → `qa-board` 的 specs 一行 + `driver.mjs` 一个 case → `npm run qa:board`。
 5. **人工完整玩一遍的路线**：标题 → 研学模式 → 出身三选一 → 过场 → 营地（点光点：交谈一次、抉择一次）
-   → 启程 → 知识对决 → 五幕走完。单局 **20–25 分钟**；赶时间选「快速演示」。
-   **验收捷径**：标题页「直达会宁 · 验收」，或 `http://localhost:3001/?jump=act5`（跳过序章，预置附身线与史实）。
-   重点看：**热点用过即作废** · 玩法在**玩法板**上 · 板头**「放弃本局」**可中途退出 ·
-   **史实回响** · 第四幕幕末**篝火夜**（营地**自愿**点亮 **≥2** 条附身线；强制链不计入）·
-   终局**诗笺朗诵**（全屏宋体四联、按真实 mp3 时长逐字；点画面不打断，只有「跳过」会停）· **研学报告**。
+   → 启程 → 知识对决 → 五幕走完。单局 **20–25 分钟**；赶时间选「快速演示」（约 18 分钟），
+   重点看这几处：**热点用过即作废**（变灰「已看过」）· 玩法都在**玩法板**上（题名 + 数值签）·
+   每步都有**史实回响**（你经历的 / 真实发生过的 / 虚构边界）· 第四幕幕末的**篝火夜**（需点亮 ≥3 条附身线）·
+   终局的**研学报告**。
 6. **坏了先看哪儿**：
    - 界面弹「模型调用失败」→ 点「重试」；连续失败看「设置 → 测试连通」和「记录」里那条 `source=ERROR` 的原因；
    - 一次真调 1.2–6 秒属正常（若换回赛制指定的 `glm-5.1` 约 11 秒/次）；**没有离线能力**，断网即报错（备选方案见 `OFFLINE-REPLAY.md`）；
@@ -46,26 +45,29 @@ npm start                   # http://localhost:3001
 
 ## 一、项目现状
 
-**《长征·抉择》** — 网页端长征主题 AI 科普游戏，两种核心玩法并存：
+**《星火微光·我路过他们的长征》** — 网页端长征主题 AI 科普游戏，两种核心玩法并存：
 
 | 玩法 | 入口 | 核心循环 | 状态 |
 |------|------|----------|------|
 | 五幕主线（VN） | 标题「研学模式 / 行军模式 / 快速演示」 | 暮色营地探索 → 决策 → 模型裁决 → 史实回响 → 启程 | 完整可通关 |
-| 玩法板上的十支小游戏 | 主线热点 / 强制链按槽进入 | 舞台交代任务 → 板屏做题（时机/判读/对弈…）→ 回舞台结算 | 十支全部就位（2026-09-16），见 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) |
+| 玩法板上的小游戏 | 主线热点 / 强制链按槽进入 | 舞台交代任务 → 板屏做题（时机/判读/对弈…）→ 回舞台结算 | **14 支已接线**（manifest 为准）：原 10 支 + skim/weave/antiphony/cipher；文档旧称「十支」以 manifest 与 `MINIGAMES-INTAKE` 更新后为准 |
+
+交付形态两套，**跑的是同一份代码**：
+
+| 形态 | 入口 | 说明 |
+|------|------|------|
+| 源码态 | `cd changzheng && npm install && npm start` | 开发、调试、自动化验收用 |
+| **桌面版** | 双击 `长征-抉择.exe`（对外只发单文件版） | Electron 壳，自带 Chromium，不装 Node、不装浏览器；重建与验收见 [`../../packaging/README.md`](../../packaging/README.md) |
 
 ## 二、已完成
 
-### v0.3 游玩体验与安全（已推 GitHub `a96009a`）
-总方案与勾选表：[`V0.3-PLAN.md`](V0.3-PLAN.md)。要点：
-- **纸面材质**：`components.css` 大片纸选择器曾漏 `{` → 背景透明、墨字压暗图；已修，`sheet-body` 改实心纸
-- **过场全屏放映**（`cut-theater`）：不再纸卡字幕；序章/幕间加长；字幕 42–56ms/字
-- **终局诗笺**：全屏宋体、题字常显、探测真实 mp3 时长、点按不打断朗诵
-- **板屏放弃本局** / **附身线 voluntary≥2** / **民心≥60 解锁老乡线** / **本地结局骨架**
-- **服务端**：默认 `127.0.0.1`；config/logs 仅本机；probe 不回退 Key；忽略客户端 `systemPrompt`
-
 ### 引擎与服务端
-- `/api/decide`：**15 类** callType（scene_gen / choice_hint / npc_chat / share_judge / minigame_review /
-  branch_judge / quiz_generate / quiz_answer_ai / quiz_judge / night_options / night_resolve /
+- `/api/decide`：契约表当前 **23 类** callType（唯一真源 `server/schema.js`；含主线 scene_gen /
+  choice_hint / npc_chat / share_judge / minigame_review / branch_judge / quiz_* / night_* /
+  act_review / ending_review / failure_review / study_report，以及玩法侧 candy_scene /
+  gomoku_move / school_lesson / school_quiz / cipher_draft / skim_throw / antiphony_reply / weave_note 等。
+  旧文档写「15 类」是旧口径）。
+  **主线玩法收尾一律真调 `minigame_review`**（比赛口径：尽可能使用 API；卡片 `noAi` 只表示局内不调）。
 - 两态日志：`GLM`（成功，具体模型看 `model` 字段）/ `ERROR`（重试用尽，附原因），每次调用落 JSONL；
   **没有 MOCK**。落库时盖 `contractOk` 契约戳记（`server/logger.js`），响应必过 `server/schema.js` 同一张表
 - `/api/config` 读写模型与 Key，`/api/config/test` 连通测试，`/api/logs/clear` 重置
@@ -93,12 +95,23 @@ npm start                   # http://localhost:3001
   运行时的按日日志不入库（见 [`../logs/README.md`](../logs/README.md)）
 - `npm run qa:audit` → `docs/LOG-AUDIT.md`：本版本字段缺失 0、FALLBACK 0
 
+### 桌面封装（2026-09-19）
+- [`../../packaging/`](../../packaging/README.md)：把工程套一个**自带 Chromium 的窗口**，**不改任何游戏代码**。
+  外壳只做四件事：挑一个空闲端口再起服务、开一个 1280×800 无地址栏无菜单的窗口、把会写盘的东西指到 exe 旁边的
+  `user-data/`、把主进程日志写进 `user-data/启动日志.txt`。
+- 出两件成品：便携版目录 `dist/长征-抉择/`（≈400MB）与**单文件版 `dist/长征-抉择-单文件版.exe`**（≈185MB
+  ＝启动器 + 内嵌 zip + 版本戳；首次运行展开到 `%LOCALAPPDATA%\长征-抉择\app\`，之后双击秒开）。
+- 验收：`packaging/verify-fast.mjs`（成品里的 `public/server/data` 与仓库工程**逐文件 sha256 相等** + 起得来 +
+  资源齐 + 前端与调用链通）、`verify-packaged.mjs`（发布级，慢一些）；`--single --fresh` 验真实的「首次双击」。
+- **产物不入库**（`dist/`、Electron 运行时与缓存都在 `.gitignore` 里）；**对外发布走 GitHub Releases 传单文件 exe**。
+  外壳的具体行为、体积与签名等已知取舍见 [`../../packaging/README.md`](../../packaging/README.md)。
+
 ### 测试（当前全绿）
 
 三层尺子（什么时候跑哪一档，见 [`QA.md`](QA.md) 开头）：
 
 ```powershell
-# ① 改一处就扫一眼：约 13 秒、0 真调（总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 输入 / 失败屏 / 升华 / 无报错）
+# ① 改一处就扫一眼：约 16 秒、0 真调（总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 输入 / 失败屏 / 升华 / 无报错）
 npm run dev:check
 # ② 提交前：上面那一套加动效、音频、素材、影音守卫，并行约 30 秒
 npm run verify:fast
@@ -112,19 +125,20 @@ npm run verify:full
 npm run test:e2e     # 五幕真调通关：unit 之外的总验收（~76 次调用），含不重复结算等回归断言
 npm run qa:failure   # 行军模式失败线（failure_review 真调）
 npm run qa:av        # 影音运行时审计：资源 404 / 立绘 / 环境床 / TTS 解码
-npm run test:unit    # 63 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 玩法守卫
+npm run test:unit    # 65 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 玩法守卫
 npm run qa:smoke     # 标题→营地→一次互动→回设置
-npm run qa:board     # 玩法板体检 83 项（10 个玩法的板屏壳 / 数值签 / 契约标记 / 离开清空 / 三方对账）
+npm run qa:board     # 玩法板体检 114 项（14 支玩法的板屏壳 / 数值签 / 契约标记 / 离开清空 / 三方对账）
 npm run qa:ai        # 模型口径：策略表 ↔ 服务端 schema ↔ 日志三方对账（0 真调，读 logs/）
 npm run qa:audio     # 音频逐个体检 58 个 + 场景表对账 + 诗的音频对账
-npm run intake:minigames:check   # 十支小游戏源码的缝合点还在吗（幂等检查）
+npm run intake:minigames:check   # 14 支小游戏源码的缝合点还在吗（幂等检查）
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫：字面量 / 模板 / 纸面 / 动效
 npm run qa:bus       # 总线守卫（模块化规则 + 内核运行时体检）· qa:handoff 交接文档一致性
 ```
 
-当前结果（2026-09-16 复跑）：unit 63/63 · smoke PASS · board 83/83 · motion 19/19 · bus 18/18 ·
+当前结果（2026-09-19 复跑 `dev:check` / `test:unit` / `qa:board`）：unit **65/65** · board **114/114**（14 支）·
+`dev:check` **10/10**（≈16s，0 真调）；其余为 2026-09-16 的战果：smoke PASS · motion 19/19 · bus 18/18 ·
 e2e FULL PASS（真调）· failure / loss PASS · av AUDIT PASS · audio PASS · ai ✓ ·
-tokens/frames/tone/handoff 全绿 · `dev:check` 10/10（≈13s，含"升华可跳过且不阻塞"）·
+tokens/frames/tone/handoff 全绿 ·
 `layout-audit` 1280 与 `--width 820` 各 18 屏、均零布局缺陷
 （**口径**：这些数字每次改完都会变，数字本身不是承诺；`npm run verify:fast` 绿才是"当前这棵树没问题"。）
 
@@ -134,20 +148,20 @@ tokens/frames/tone/handoff 全绿 · `dev:check` 10/10（≈13s，含"升华可�
 
 | 优先级 | 缺口 | 说明 |
 |--------|------|------|
-| P0 | **`verify:full`（五幕真调一局）还没跑** | v0.3 改动后应再跑一次 `npm run verify:full`（或 `test:e2e` + `--quick`）。**接手第一条就跑它** |
-| P1 | **v0.3 玩法手感 P1×14** | 浮桥稳流窗 UI、陡坡 decide 冻结、钓鱼起竿窗、夜校触屏/键盘等——见 `V0.3-PLAN.md` §3 |
+| P0 | **`verify:full`（五幕真调一局）还没跑** | 14 支小游戏接完只跑到 `qa:board` + `dev:check`；"整局流程顺不顺"的最终凭据是 `npm run verify:full`（或 `npm run test:e2e`）。**接手第一条就跑它**，见 [`MINIGAMES-INTAKE.md`](MINIGAMES-INTAKE.md) §四 欠账 7 |
+| P1 | **v0.3 玩法手感 P1×14** | 浮桥稳流窗 UI、陡坡 decide 冻结、钓鱼起竿窗、夜校触屏/键盘、统一放弃契约等——逐条见 `V0.3-PLAN.md` §3 |
 | P1 | 玩法侧四项欠账 | 注入样式没过 token · `miniTruth` F12 可见 · `CHOICE_SETS.cross` 成死代码 · 同事 12 个 `qa-*.mjs` 还没并入 npm |
 | P1 | 契约还差两处 | `runQuiz` 的「让两个 AI 对答」按钮与 `#quiz-auto` 靠 `data-choice-index` 兼职（建议走 `askChoice`）；`runRest` 只有一个「继续」，可直接 `waitContinue` |
 | P1 | 数值平衡未调 | 测量口径已建（`npm run qa:playtest` → `docs/PLAYTEST.md`），调参待做；v0.3 已做 P2-4（第三次休息不调 AI） |
 | P2 | v0.3 P2 其余 | 风险标签同源、营地目标 HUD、回响减负、篝火日限、quiet 覆盖等——见 `V0.3-PLAN.md` §4 |
 | P2 | 移动端不做 | 窄屏只保证到 **820**（已逐屏体检）；375 手机档明确不在交付范围 |
 | P2 | 操作音效仍是合成 | click/hook/echo 等由 WebAudio 合成；是否预录看路演音质要求 |
-| P2 | 封装未定型 | 一键启动（`start.bat` + 便携 Node）见 [`DELIVERY.md`](DELIVERY.md)，演示前收口 |
+| — | ~~封装未定型~~ | **已落地（2026-09-19）**：Electron 桌面包，便携目录 + 单文件 exe，见 [`DELIVERY.md`](DELIVERY.md) 与 [`../../packaging/README.md`](../../packaging/README.md)；对外发布走 GitHub Releases 传单文件 exe |
 | P3 | 离线回放（备选） | 现场无网/额度耗尽的风险预案，见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)，**未开发** |
 
 ## 四、接着干的话，从哪儿下手
 
-1. **先跑 `npm run verify:full`**（真调一局五幕）——十支小游戏接进来之后唯一还没验过的一档，
+1. **先跑 `npm run verify:full`**（真调一局五幕）——14 支小游戏接进来之后唯一还没验过的一档，
    也是"流程顺不顺、模块之间接得通不通"的最终凭据（欠账 7）。
 2. **补两处契约**（`runQuiz` / `runRest`）——顺手就能做，做完 `test:e2e` 复验。
 3. **数值平衡**：`qa:playtest` 跑几局看 `docs/PLAYTEST.md` 的曲线，按 HANDOFF-CODE 第 25 条同时改三处
@@ -180,7 +194,7 @@ public/js/
   main.js       组合根（启动、装配、内核起来之后 emit `app:ready`）——批 7 起只剩 500 余行
   flow/         流程层（act / camp / games-flow / end / quiz / night / …）：幕、营地、强制链、结算都在这儿
   modules/cinema/ 电影化演出（序章 / 幕间 / 终局升华）：player + beats + sequences
-  modules/games/  玩法宿主 + 十支薄适配插件（`pluginFrom(src, {...})`，玩法本体在 `games/src/`）
+  modules/games/  玩法宿主 + 薄适配插件（每支 `pluginFrom(src, {...})`，玩法本体在 `games/src/`；清单以 `manifest.js` 为准）
   step.js       交互契约（step/askChoice/choiceButton/waitContinue/markMini）
   ui.js         渲染与浮层（showScreen 按模板选入场动效、板屏清空）
   state.js      资源/好感/失败判定/粮荒（可单测）
@@ -194,9 +208,14 @@ logs/           入库样本 + 运行时日志（见 logs/README.md）
 tests/          unit / e2e（Playwright）/ manual（体检脚本）；同事的 12 个玩法体检在 tests/manual/minigames/
 ```
 
+> 仓库根还有两处与 `changzheng/` 平级、但**不属于工程本身**的东西：`packaging/`（桌面封装——外壳 `main.js`、
+> 单文件启动器 `launcher.cs`、出成品的 `build*.mjs`、验收的 `verify*.mjs`；操作口径读它的 README）与
+> `dist/`（封装产物，**不入库**）。另外 `changzheng/tools/build-portable.mjs` 是早期「便携 Node + `start.bat`」路线的
+> 构建器，留档、未采用（见 [`DELIVERY.md`](DELIVERY.md) §二）。
+
 ## 六、每轮收尾清单（**每轮结束都做，做到随时能移交**）
 
-1. **跑验收**：开工到收尾都跑 `npm run dev:check`（约 13 秒、0 真调——改一处就看一眼它绿不绿）；
+1. **跑验收**：开工到收尾都跑 `npm run dev:check`（约 16 秒、0 真调——改一处就看一眼它绿不绿）；
    收尾时按改动涉及的层级跑 `npm run verify:fast`（提交前）与 `npm run verify:full`（推送/交付前，
    真调那一档）；服务端改动后必须看到测试输出 `restarted`（否则跑的是旧进程，绿灯是假的）。
 2. **更新文档**（缺一项都算没做完）：
@@ -206,6 +225,9 @@ tests/          unit / e2e（Playwright）/ manual（体检脚本）；同事的
      玩法、界面结构、调用点、技术形态的变化，一并在本轮改掉并重新生成 docx；
    - 本文件 §二 的结果行与 §三 缺口表同步（缺口解决了就划掉）。
 3. **刷新生成物**：`qa:audit`（LOG-AUDIT）、`tts:manifest`（TTS-MANIFEST）、涉及素材时 `qa:assets`。
+   **这一版要出桌面包时**再跑一次封装：`cd packaging && node build.mjs`（和/或 `build-singlefile.mjs`）→
+   `node verify-fast.mjs`；通过标准是「成品里的 `public/server/data` 与仓库工程**逐文件 sha256 相等**」。
+   产物不入库，对外发 GitHub Releases（见 §七点七）。
 4. **交付图**：涉及页面的批次，出 1280 与 820 联系表（`qa:screens`）。
 5. **提交并推送**：一个批次一个提交，信息里写清"做了什么 + 验收结果 + 遗留"
    （格式与推送流程见 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) §二 / §四）。
@@ -286,3 +308,21 @@ tests/          unit / e2e（Playwright）/ manual（体检脚本）；同事的
 - **日志是运行产物、不入库**（只留样本）；要留全量证据：先归档当天的 `logs/ai-calls-<日期>.jsonl`，
   再只跑那一局，让当天的日志干净可交。
 - 任何"看起来能点但点了没反应"的界面状态都当缺陷修——它会让自动化卡死（2026-09-13 踩过两次）。
+
+### 七点七、桌面版：打包、发布与分发
+
+- **封装不改游戏代码**：`packaging/` 只做「起服务 + 开窗口 + 把会写盘的东西指到 exe 旁边」，玩法 / 数值 / 调用 /
+  日志格式与源码态完全一致。改完 `changzheng/` 的东西，重跑 `cd packaging && node build.mjs`
+  （和/或 `node build-singlefile.mjs`）即可，封装脚本不用动。
+- **产物不入库**：`dist/`（便携目录 + zip + 单文件 exe）与 Electron 运行时 / 打包缓存
+  （`packaging/electron-dist/`、`packaging/.electron-cache/`、`packaging/.npm-cache/`）都被 `.gitignore` 挡着，
+  **别用 `git add -f` 塞进仓库**。对外发布走 **GitHub Releases 传单文件 exe**。
+- **随包带 Key 是明文**：`.env` 会照搬进成品的 `resources/app/changzheng/`，所以拿到包的人就能看到那把 Key。
+  对外分发按 §七点一 的纪律办（该轮换就轮换），别把带 Key 的包发到公开场合。
+- **首次运行会弹 SmartScreen**：exe 没有代码签名，Windows 提示「未知发布者」——点「更多信息 → 仍要运行」即可；
+  这一条已写进成品的 `使用说明.txt`（要彻底消掉得买签名证书）。
+- **素材红线同样适用**：包里的 BGM / 音效 / 朗诵是外部素材（§七点二），**对外发布前要换**；换完重打一次包，
+  代码一行不用改。
+- **现场形态**：双击 `dist/长征-抉择/长征-抉择.exe`（或单文件版）就能玩，不需要 Node、不需要浏览器、
+  不需要从别处拷任何文件。配置与日志在 exe 旁边的 `user-data/`（单文件版在 `%LOCALAPPDATA%\长征-抉择\user-data\`），
+  演示后删掉该目录即恢复出厂。

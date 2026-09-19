@@ -50,6 +50,9 @@ export function bindHost(h = {}) {
   if (h.decide) DECIDE = h.decide;
 }
 
+// 画布自适应（同浮桥）：宽度铺满玩法板、高度让开说明与按钮区。同目录内的共享工具。
+import { fitCanvas } from './fit-canvas.js';
+
 /* ══════════════ 小工具（自包含）══════════════ */
 function h(tag, attrs = {}, kids = []) {
   const el = document.createElement(tag);
@@ -138,12 +141,11 @@ export function runStretcherNight(container, opts = {}) {
     root.append(lead, cv, acts, fbEl);
 
     const ctx = cv.getContext('2d');
-    const DPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
-    cv.width = Math.round(W * DPR);
-    cv.height = Math.round(H * DPR);
-    cv.style.width = `${W}px`;
-    cv.style.height = `${H}px`;
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // 画布按玩法板可用空间自适应（同浮桥：设计坐标不动，变换走 DPR*viewScale）。
+    // 原来 1:1 定死 460×240，纸面放大后四周一片空（2026-09-17 修）。
+    fitCanvas(cv, W, H, {
+      onSize: (s, dpr) => ctx.setTransform(dpr * s, 0, 0, dpr * s, 0, 0),
+    });
 
     const inPit = () => PITS.some((p) => Math.abs(pos - p) <= PIT_HALF);
     container.dataset.mini = opts.id || 'stretcher-run';

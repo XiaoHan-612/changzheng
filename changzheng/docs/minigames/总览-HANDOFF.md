@@ -1,5 +1,9 @@
 # 交接说明（Handoff）
 
+> 📌 **这是同事交接包里的一份快照**（打包日期 2026-09-16，索引见同目录 [`README.md`](README.md)），
+> **不是本仓库的现行口径**——它写的是那时那棵树的状态（例如"封装未定型"、"自由行军沙盘"都已是过去式）。
+> 现行状态 / 缺口 / 收尾清单看 [`../HANDOFF.md`](../HANDOFF.md)，玩法接线口径看 [`../MINIGAMES-INTAKE.md`](../MINIGAMES-INTAKE.md)。
+
 > ⚠️ **本文件是总览。分工交接请看：**
 > [`HANDOFF-CODE.md`](HANDOFF-CODE.md)（代码 agent）· [`HANDOFF-ART.md`](HANDOFF-ART.md)（生图模型）· [`HANDOFF-AUDIO.md`](HANDOFF-AUDIO.md)（音频/TTS 模型）· [`ASSETS.md`](ASSETS.md)（素材清单）· [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md)（视觉体系与逐批进度）· [`MINIGAMES-GUIDE.md`](MINIGAMES-GUIDE.md)（小游戏总览 + 玩法平台）
 

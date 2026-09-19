@@ -6,9 +6,10 @@
 //   node scripts/check-glm.mjs glm-5.3-flash --reasoning-effort low   # 默认即 low，与 server/ai.js 一致
 //   node scripts/check-glm.mjs glm-5.3-flash --extra thinking.type=low
 //   node scripts/check-glm.mjs glm-5.3-flash --extra thinking.type=enabled,thinking.level=low
-// 注意：默认请求体与 server/ai.js 保持一致（reasoning_effort=low + max_tokens 256）。
-//      glm-5.3-flash 是"始终思考"模型，若不带 reasoning_effort 又只给 64 tokens，
+// 注意：默认请求体与 server/ai.js 保持一致（chat_template_kwargs 关思考 + max_tokens 256）。
+//      天津移动网关的 glm-5.1 是"始终思考"模型，若不用 chat_template_kwargs 关掉思考，
 //      token 会被推理吃光、content 返回空、finish_reason=length —— 那是自检脚本的问题，不是接口坏了。
+//      另：本网关只认 /mgate/v1 下的路径，少这一段会静默回 204 空响应（看着像接口坏了，其实是地址写错）。
 // 注意：--key 只从命令行读取，不会写入任何文件。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,7 +30,14 @@ function loadEnv() {
   return out;
 }
 
-const env = loadEnv();
+/** 设置界面写的覆盖文件，优先级高于 .env（与 server/config.js 的取值顺序一致） */
+function loadRuntime() {
+  const p = path.join(ROOT, 'runtime-config.json');
+  if (!fs.existsSync(p)) return {};
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')) || {}; } catch { return {}; }
+}
+
+const env = { ...loadEnv(), ...loadRuntime() };
 const argv = process.argv.slice(2);
 const flag = (name, dflt = '') => {
   const i = argv.indexOf(`--${name}`);
@@ -37,7 +45,7 @@ const flag = (name, dflt = '') => {
 };
 const key = flag('key') || process.env.GLM_API_KEY || env.GLM_API_KEY || '';
 const url = flag('url') || process.env.GLM_API_URL || env.GLM_API_URL
-  || 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+  || 'http://111.32.22.35:32592/mgate/v1/chat/completions';
 const timeoutMs = Number(flag('timeout', '15000')) || 15000;
 const maxTokens = Number(flag('max-tokens', '256')) || 256;
 const reasoningEffort = flag('reasoning-effort') || process.env.GLM_REASONING_EFFORT
@@ -88,8 +96,13 @@ async function probe(model) {
     temperature: 0,
     response_format: { type: 'json_object' },
   };
-  // 与服务端同源：不设 reasoning_effort 时，思考型模型会把 token 全用在推理上
-  if (reasoningEffort && reasoningEffort !== 'none') payload.reasoning_effort = reasoningEffort;
+  // 与服务端同源（server/ai.js 的 NO_THINKING）：关思考。
+  // 必须放 chat_template_kwargs 里——直接放 body 顶层网关不认，仍会思考到撑爆 token。
+  payload.chat_template_kwargs = { enable_thinking: false };
+  // 与服务端同源：本网关不认 max 档（回 400/204 空响应），ai.js 会过滤，这里也照做
+  if (reasoningEffort && reasoningEffort !== 'none' && reasoningEffort !== 'max') {
+    payload.reasoning_effort = reasoningEffort;
+  }
   if (thinking) payload.thinking = { type: thinking };
   const extra = flag('extra', '');
   if (extra) {

@@ -22,6 +22,11 @@
 
 import { $, replayAnim } from './ui.js';
 
+/** 连贯行军等自动推进模式：选项/「继续」由流程自动落子（玩法板仍交玩家） */
+let autoPlay = false;
+export function setAutoPlay(on) { autoPlay = !!on; }
+export function isAutoPlay() { return autoPlay; }
+
 /** 开始一个步骤 */
 export function setStep(id, kind = 'choice', state = 'awaiting') {
   const b = document.body;
@@ -125,11 +130,12 @@ export function waitContinue(label = '继续', hostEl) {
     btn.id = 'btn-continue';
     btn.dataset.action = 'continue';
     btn.textContent = label;
-    btn.addEventListener('click', () => {
+    const finish = () => {
       btn.remove();
       setStepState('awaiting');
       resolve();
-    });
+    };
+    btn.addEventListener('click', finish);
     host.appendChild(btn);
   });
 }

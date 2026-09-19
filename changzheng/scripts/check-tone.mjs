@@ -85,15 +85,34 @@ for (const [name, p] of Object.entries(papers)) {
   }
 }
 
-// 面积指标：逐页截图的纸色像素占比
+// ── 面积指标：逐页截图的纸色像素占比 ──
+//
+// 两套上限，按"这一页是读字还是动手玩"分：
+//   · 阅读面板（手记/回响/答题/终局…）守 35% —— 纸面不能压过插画，眼睛要先看画；
+//   · 玩法板（批次 4/5：打铁、钓鱼、夜校、分糖、夜岗、五子棋、泸定桥、陡坡、浮桥、渡口）
+//     走 72% —— 这些页是**要动手玩的东西**：棋盘、河道、门板都得看得清、点得准，
+//     按 35% 做出来玩法区只有 592px 宽（浮桥画布 460×240、五子棋 330×330），
+//     1366×768 的笔记本上 9 支玩法有 8 支要滚动才能玩完。口径与 tokens.css 的
+//     --panel-w-board / --panel-h-board 一致（2026-09-17 起）。
+// 判页靠**批次号**（batches 由 qa:screens 写入报告），不靠页名猜——加玩法时只改 screen-sheet。
+const BOARDS = { cap: 0.72, batches: new Set(['4', '5']) };
+const READING = { cap: 0.35 };
 if (fs.existsSync(REPORT)) {
   const rep = JSON.parse(fs.readFileSync(REPORT, 'utf8'));
-  const over = Object.entries(rep.pages || {}).filter(([, v]) => v.paperRatio > 0.35);
-  console.log(`\n纸面面积（逐页，上限 35%）：`);
+  const boardPages = new Set(Object.entries(rep.batches || {})
+    .filter(([b]) => BOARDS.batches.has(String(b)))
+    .flatMap(([, names]) => names));
+  const ruleOf = (page) => (boardPages.has(page) ? BOARDS : READING);
+  const over = Object.entries(rep.pages || {}).filter(([page, v]) => v.paperRatio > ruleOf(page).cap);
+  console.log(`\n纸面面积（逐页；阅读面板上限 35%，玩法板上限 ${Math.round(BOARDS.cap * 100)}%）：`);
   for (const [page, v] of Object.entries(rep.pages || {})) {
-    console.log(`  ${page.padEnd(22)} ${(v.paperRatio * 100).toFixed(1)}%${v.paperRatio > 0.35 ? '  ← 超预算' : ''}`);
+    const rule = ruleOf(page);
+    console.log(`  ${page.padEnd(22)} ${(v.paperRatio * 100).toFixed(1)}%`
+      + `${v.paperRatio > rule.cap ? '  ← 超预算' : ''}${rule === BOARDS ? '  (玩法板)' : ''}`);
   }
-  for (const [page, v] of over) problem.push(`${page} 纸面占屏 ${(v.paperRatio * 100).toFixed(1)}%（>35%）`);
+  for (const [page, v] of over) {
+    problem.push(`${page} 纸面占屏 ${(v.paperRatio * 100).toFixed(1)}%（>${Math.round(ruleOf(page).cap * 100)}%）`);
+  }
 } else {
   console.log('\n（还没有 tone-report.json：先跑 npm run qa:screens 生成逐页截图与面积统计）');
 }

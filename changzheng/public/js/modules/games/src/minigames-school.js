@@ -438,7 +438,14 @@ function boySvg() {
 export function runNightSchoolOil(container, opts = {}) {
   ensureStyle();
   const place = PLACE_NAME[opts.place] ? opts.place : '草地';
-  const pool = Array.isArray(opts.pool) && opts.pool.length ? opts.pool : POOLS[place];
+  const poolAll = Array.isArray(opts.pool) && opts.pool.length ? opts.pool : POOLS[place];
+  // 「今晚别又教同样的字」：上一场夜校教过的词**先从候选里剔掉**（跨幕累计，
+  // 由流程层经 opts.avoid 传进来）。这是硬保证 —— 词表里没有了，模型想重复也重复不了。
+  // 剔完剩太少就不剔：词表太窄会把"可选"变成"必选"，模型反而没得挑。
+  const avoid = Array.isArray(opts.avoid) ? opts.avoid.filter((w) => poolAll.includes(w)) : [];
+  const pool = avoid.length && poolAll.length - avoid.length >= 12
+    ? poolAll.filter((w) => !avoid.includes(w))
+    : poolAll;
 
   return new Promise((resolve) => {
     let alive = true;
@@ -908,6 +915,7 @@ export function runNightSchoolOil(container, opts = {}) {
             situation: '定今晚夜校要教的三个字（口令 / 地名 / 人名 各一个），以及今晚的口令',
             state: opts.state || {},
             extraContext: `${ctx}\n【今晚可选的词】${pool.join('、')}\n`
+              + (avoid.length ? `【上一场夜校已经教过这些，今晚换一批，别再用】${avoid.join('、')}\n` : '')
               + '只能从上面的词里取 from；ch 必须是该词里真实出现的一个汉字。',
             operation: { type: 'school_lesson', attempt: attempt + 1 },
           });

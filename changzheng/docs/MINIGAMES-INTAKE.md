@@ -11,8 +11,8 @@
 
 ```bash
 cd changzheng && npm install && npm start        # http://localhost:3001
-npm run intake:minigames:check                   # 十支源码的缝合点都在吗（幂等检查，0 依赖）
-npm run qa:board                                  # 十支的板屏契约 + 三方对账（0 真调，最能说明"接上了"）
+npm run intake:minigames:check                   # 14 支源码的缝合点都在吗（幂等检查，0 依赖）
+npm run qa:board                                  # 14 支的板屏契约 + 三方对账（0 真调，最能说明"接上了"）
 node tests/e2e/layout-audit.mjs --width 820       # 窄屏版式（点按区 ≥32px 这条已经一处收口，见下）
 ```
 
@@ -22,7 +22,10 @@ node tests/e2e/layout-audit.mjs --width 820       # 窄屏版式（点按区 ≥
   `id/actions` 有没有变，变了就同步 `modules/games/<槽>.js`、`qa-board` 的 specs 与 `driver.mjs` 的 case。
 - **想加一支新的**：见第四节末尾"接线七处"，或照 `modules/games/README.md`（宿主契约）+ 本页第一节。
 
-## 一、插槽对照表（十支都在，`qa:board` 逐条对账）
+## 一、插槽对照表（当前 **14** 支已进 `manifest.js`；下列为原 10 支主对照 + 新四支）
+
+> 新四支（2026-09-18 吸收）：`skim` 于都河打水漂 · `weave` 湘江编草鞋 · `antiphony` 遵义对歌 · `cipher` 金沙江译电。
+> 它们同样走 `pluginFrom` + 主线 `minigame_review` 真调收尾（比赛口径：尽可能使用 API）。
 
 | 我们的槽（`play(id)` 的 id = `data-mini`） | 落点（位置不变） | 源码（`modules/games/src/`） | 卡片 id | 动作词（`data-mini-action`） |
 |---|---|---|---|---|

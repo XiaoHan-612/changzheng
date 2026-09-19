@@ -34,14 +34,16 @@ export function fixedEffectsFor(op) {
 }
 
 /**
- * 玩法收尾的**唯一分岔**：要模型就调 `minigame_review`，不要模型（`op.noAi`）就落固定效果。
- * 别把这个判断散回各个 doXxx——散一次就会漏一处（同事那六支标了 noAi 的玩法，
- * 早先照样每局烧一次真调）。
+ * 玩法收尾的**唯一分岔**：主线一律真调 `minigame_review`（比赛口径：尽可能使用 API）。
+ * 同事卡片上的 `noAi` 只表示「局内不调」，**不跳过**主线收尾复盘——
+ * 失败/放弃仍不编造文案，走既有 `_error` / 短旁白路径。
  *
  * **中途放弃/拆屏**（`detail.aborted` / `why:detached`）：不调模型、不改资源，
  * 返回短旁白；调用方应跳过 afterJudge/markLine（见 `isAborted`）。
  */
 export function isAborted(op) {
+  // 注意：**跳过（detail.skipped）不算 aborted** —— 放弃是"没做完、热点保留"，
+  // 跳过是"这件事过去了、算完成、不给效果"（见 reviewMain 的分岔）。
   return !!(op?.detail?.aborted || op?.detail?.why === 'detached' || op?.detail?.why === 'abandoned');
 }
 
@@ -58,12 +60,30 @@ async function finishAborted() {
   return 'aborted';
 }
 
-async function reviewOrFixed(op, body = {}) {
+/**
+ * 主线玩法收尾：**总是**走 `/api/decide` 的 `minigame_review`（或调用方指定的 callType）。
+ * 比赛要求尽可能使用 API，因此不再因 `op.noAi` 改走本地固定效果；
+ * 本地只保留「放弃 / 跳过」两条不烧真调的退出路径。
+ */
+async function reviewMain(op, body = {}) {
   if (isAborted(op)) {
     return { effects: {}, narrative: '这一局没有打完。', _aborted: true, factId: null };
   }
-  if (op?.noAi) return { effects: fixedEffectsFor(op), narrative: op.summary || '', _fixed: true };
-  return await callAI({ state: publicState(), ...body, situation: body.situation || op?.summary || '' });
+  // 「跳过本局」：玩家明说不想玩 —— 不调模型复盘、不给数值，但这件事算过去了
+  if (op?.detail?.skipped) {
+    return { effects: {}, narrative: '你把这一局放下了 —— 队伍照常往前走。', _skipped: true, factId: null };
+  }
+  return await callAI({
+    state: publicState(),
+    ...body,
+    callType: body.callType || 'minigame_review',
+    situation: body.situation || op?.summary || '',
+  });
+}
+
+/** 兼容旧名：主线请用 reviewMain；保留导出以免外部脚本瞬间失效 */
+export async function reviewOrFixed(op, body = {}) {
+  return reviewMain(op, body);
 }
 
 const decideFor = (scene) => (payload = {}) => callAI({
@@ -73,6 +93,22 @@ const decideFor = (scene) => (payload = {}) => callAI({
 });
 import { afterJudge } from './echo.js';
 
+/**
+ * 把这一场夜校用过的词记进状态（下一场据此换一批，见 state.js 的 schoolUsed）。
+ * 两条路回报的字段不同：一灯油给 detail.chars[].from（词表里的词），竞答给 detail.password。
+ * 只留最近 16 个 —— 词表一共二十来个，记满了就该允许旧词回来。
+ */
+export function rememberSchoolWords(op) {
+  const d = op?.detail || {};
+  const words = [
+    ...(Array.isArray(d.chars) ? d.chars.map((c) => c.from) : []),
+    d.password,
+  ].filter((w) => typeof w === 'string' && w);
+  if (!words.length) return;
+  const next = [...new Set([...(S.schoolUsed || []), ...words])].slice(-16);
+  st().remember('schoolUsed', next);
+}
+
 export async function doSchool() {
   step('school', 'minigame');
   showScreen('screen-stage');
@@ -80,13 +116,18 @@ export async function doSchool() {
   showNpc('文化教员', { role: '夜校', mood: '耐心' });
   setStagePanel('');                                  // 玩法不在纸卷里，正文区留空
   await say('文化教员', '跟着念。认得一个字，就能传给下一个人。', 'jiaoyuan_school');
-  const op = await gamesApi().play('nightschool', { params: { decide: decideFor('夜校识字') } });
+  // avoid：上一场夜校教过的词。两场夜校（第二幕遵义 / 第四幕草地）共用一张固定词表，
+  // 不传的话第二次又教同样那几个字 —— 玩家看到的就是"每次都是这几个字"（用户反馈）。
+  const op = await gamesApi().play('nightschool', {
+    params: { decide: decideFor('夜校识字'), avoid: S.schoolUsed || [] },
+  });
   showScreen('screen-stage');                         // 结算回到对白屏：人物 + 叙事 + 继续
   if (isAborted(op)) { return finishAborted(); }
   st().remember('tonightPassword', op.detail?.password || '瑞金');
+  rememberSchoolWords(op);                            // 记下这一场用过的词（下一场据此换一批）
   markLine('school', { voluntary: true });
   let result;
-  result = await reviewOrFixed(op, {
+  result = await reviewMain(op, {
     scene: '夜校识字',
     callType: 'minigame_review',
     situation: `识字正确率 ${(op.score * 100) | 0}%`,
@@ -98,6 +139,115 @@ export async function doSchool() {
   st().pushCampLog('夜校', `口令「${S.tonightPassword}」`);
   await waitBtn('继续');
   await afterJudge(result, '行军中的文化学习', 'h_nightschool');
+}
+
+/* ══════════ 2026-09-18 吸收的四支（同事单独开发那条线）══════════
+ * 都是"手感/工序/闲聊"类玩法（局内可不调模型；**主线收尾仍一律 minigame_review 真调**，见 reviewMain）：
+ *   · 打水漂（skim）  第一幕 · 于都河 · 河滩
+ *   · 编草鞋（weave） 第二幕 · 湘江 · 宿营
+ *   · 对歌（antiphony）第三幕 · 遵义 · 歌台
+ *   · 译电（cipher）  第四幕 · 金沙江 · 电台（入口两档：简单照着译 / 挑战真译一遍）
+ * 四支都不点亮附身线（附身线是篝火夜的固定五条，见 enterCampDay 的提示）。
+ */
+
+/** 第一幕 · 于都河 · 河滩打水漂（输赢都在手劲和选石头上） */
+export async function doSkim() {
+  step('skim', 'minigame');
+  showScreen('screen-stage');
+  setStageBanner('河滩上', sceneImage('/assets/scenes/depart_bridge.jpg', '/assets/scenes/depart_pano.jpg'));
+  setPortrait('红小鬼', '16岁小战士', '鬼', '顽皮', '/assets/characters/xiaogui.png');
+  setStagePanel('');
+  await say('红小鬼', '等船的工夫，敢不敢比一把？石头你挑，我可不让你。');
+  const op = await gamesApi().play('skim');
+  showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
+  const result = await reviewMain(op, {
+    scene: '于都河·打水漂',
+    callType: 'minigame_review',
+    situation: op.summary || '在河滩上跟红小鬼比打水漂',
+    state: publicState(),
+    operation: { type: 'skim', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('打水漂', op.summary || '');
+  await waitBtn('继续');
+  await afterJudge(result, '河滩上的一夜', 'h_depart');
+}
+
+/** 第二幕 · 湘江 · 宿营补草鞋（六道工序，灯油是唯一预算） */
+export async function doWeave() {
+  step('weave', 'minigame');
+  showScreen('screen-stage');
+  setStageBanner('宿营', sceneImage('/assets/scenes/xiangjiang_night.jpg', '/assets/scenes/xiangjiang_pano.jpg'));
+  showNpc('老班长', { role: '宿营 · 补鞋', mood: '疲惫' });
+  setStagePanel('');
+  await say('老班长', '都湿透了。趁这会儿火没灭，把手上的鞋补一补 —— 明天还有一百里。');
+  const op = await gamesApi().play('weave');
+  showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
+  const result = await reviewMain(op, {
+    scene: '湘江·宿营补草鞋',
+    callType: 'minigame_review',
+    situation: op.summary || '夜里补一只草鞋',
+    state: publicState(),
+    operation: { type: 'weave', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('编草鞋', op.summary || '');
+  await waitBtn('继续');
+  await afterJudge(result, '脚上的一双鞋', 'h_xiangjiang');
+}
+
+/** 第三幕 · 遵义 · 街头歌台对歌（没有失败线，唱岔了就笑一场） */
+export async function doAntiphony() {
+  step('antiphony', 'minigame');
+  showScreen('screen-stage');
+  setStageBanner('街头歌台', sceneImage('/assets/scenes/zunyi_street.jpg', '/assets/scenes/zunyi_pano.jpg'));
+  showNpc('歌师', { role: '街头歌台', mood: '爽朗' });
+  setStagePanel('');
+  await say('歌师', '远来的客人，接一句？接岔了不打紧，笑一场再唱。');
+  const op = await gamesApi().play('antiphony');
+  showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
+  const result = await reviewMain(op, {
+    scene: '遵义·街头对歌',
+    callType: 'minigame_review',
+    situation: op.summary || '在街头歌台接了几句',
+    state: publicState(),
+    operation: { type: 'antiphony', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('对歌', op.summary || '');
+  await waitBtn('继续');
+  await afterJudge(result, '唱给谁听', 'h_zunyi');
+}
+
+/** 第四幕 · 金沙江 · 电台译电（入口两档：简单照着译 / 挑战真译一遍） */
+export async function doCipher() {
+  step('cipher', 'minigame');
+  showScreen('screen-stage');
+  setStageBanner('电台', sceneImage('/assets/events/ev_night_march.jpg', '/assets/scenes/jinsha_pano.jpg'));
+  setPortrait('你', '译电员', '你', '专注');
+  setStagePanel('');
+  await say('你', '敌台又发报了。这一封，得在天亮前译出来。');
+  const op = await gamesApi().play('cipher', { params: { decide: decideFor('译电'), state: publicState() } });
+  showScreen('screen-stage');
+  if (isAborted(op)) { return finishAborted(); }
+  const result = await reviewMain(op, {
+    scene: '金沙江·译电',
+    callType: 'minigame_review',
+    situation: op.summary || '夜里译一封截获的电报',
+    state: publicState(),
+    operation: { type: 'cipher', ...op.detail },
+  });
+  st().applyEffects(result.effects);
+  await say('叙事', result.narrative || '');
+  st().pushCampLog('译电', op.summary || '');
+  await waitBtn('继续');
+  await afterJudge(result, '纸上的八个字', 'h_jinsha');
 }
 
 /** 红小鬼 · 分糖：三颗糖，AI 逐颗判定。`fromForced` 时不算自愿附身线 */
@@ -143,7 +293,7 @@ export async function doSentry(fromForced = false) {
   st().remember('sentryScore', op.score);
   markLine('sentry', { voluntary: !fromForced });
   let result;
-  result = await reviewOrFixed(op, {
+  result = await reviewMain(op, {
     scene: '夜岗·哨位',
     callType: 'minigame_review',
     situation:
@@ -174,7 +324,7 @@ export async function doGomoku() {
   if (isAborted(op)) { return finishAborted(); }
   markLine('gomoku', { voluntary: true });
   let result;
-  result = await reviewOrFixed(op, {
+  result = await reviewMain(op, {
     scene: '泥地五子棋',
     callType: 'minigame_review',
     situation: op.summary || '两个小鬼下了一盘棋',
@@ -187,19 +337,27 @@ export async function doGomoku() {
   await waitBtn('继续');
 }
 
-/** 雪山陡坡 · 拽住同伴（时机操作） */
+/**
+ * 雪山陡坡 · 拽住同伴（时机操作）
+ *
+ * 2026-09-17：**先对话、再进玩法**（用户口径："进行完对话之后弹出游戏"）。
+ * 原来只有一句画外音就进玩法，玩家不知道绳子和那个人是怎么来的；
+ * 现在由滑脱的战友先喊一句、你在回一句，玩法里的风雪与绳端标记才有来处。
+ * 台词不带 voiceId —— 固定台词要走 tts-lines.json 离线合成，没合成时静默降级（照演不误）。
+ */
 export async function doGrab() {
   step('grab', 'minigame');
   showScreen('screen-stage');
   setStageBanner('陡坡上', sceneImage('/assets/scenes/snow_climb.jpg', '/assets/scenes/snow_pano.jpg'));
-  setPortrait('你', '年轻战士', '你', '咬牙');
+  showNpc('滑脱的战友', { role: '雪山 · 陡坡', mood: '急' });
   setStagePanel('');
-  await say('你', '他的手在滑。前面的雪是硬的，下面是空的。');
+  await say('滑脱的战友', '别过来！这儿站不住——脚底下是空的！');
+  await say('你', '把手给我。绳子在你右手边，抓住了。');
   const op = await gamesApi().play('snow-grab');
   showScreen('screen-stage');
   if (isAborted(op)) { return finishAborted(); }
   let result;
-  result = await reviewOrFixed(op, {
+  result = await reviewMain(op, {
     scene: '雪山·拽住同伴',
     callType: 'minigame_review',
     situation: op.summary || '在陡坡上拉住同伴',
@@ -227,7 +385,7 @@ export async function doPontoonNight() {
   const op = await gamesApi().play('pontoon-night');
   showScreen('screen-stage');
   if (isAborted(op)) { return finishAborted(); }
-  const result = await reviewOrFixed(op, {
+  const result = await reviewMain(op, {
     scene: '于都河·夜搭浮桥',
     callType: 'minigame_review',
     situation: op.summary || '夜里搭浮桥，把队伍送过河',
@@ -256,7 +414,7 @@ export async function doRallyRiver() {
   const op = await gamesApi().play('rally-river');
   showScreen('screen-stage');
   if (isAborted(op)) { return finishAborted(); }
-  const result = await reviewOrFixed(op, {
+  const result = await reviewMain(op, {
     scene: '湘江·东岸收拢',
     callType: 'minigame_review',
     situation: op.summary || '天亮之前，把东岸的人接回来',
@@ -324,10 +482,11 @@ export async function doFishing(act, forced) {
   st().remember('fishingBest', Math.max(S.fishingBest || 0, op.score));
   markLine('fishing', { voluntary: !forced });
   let result;
-  result = await reviewOrFixed(op, {
+  result = await reviewMain(op, {
     scene: '钓鱼·咬钩起竿',
     callType: 'minigame_review',
     situation: '钓鱼小游戏结束',
+    state: publicState(),
     operation: { type: 'fishing', ...op },
   });
   st().applyEffects(result.effects);
@@ -359,7 +518,7 @@ export async function doLuding(act) {
   // 战友拉住的那一下，先落到状态里再交给模型写后果
   if (op.detail?.retry) st().applyEffects({ 体力: -10 });
   let result;
-  result = await reviewOrFixed(op, {
+  result = await reviewMain(op, {
     scene: `${act.title}·飞夺泸定桥`,
     callType: 'minigame_review',
     situation: op.summary || '突击队过桥',

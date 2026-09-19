@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 行军模式失败线真调：覆盖 15 类 AI 契约里唯一从没跑过的 failure_review。
  *
  * 做法（不靠硬刷体力，稳定复现）：开一局行军模式 → 把存档改成「断粮 + 体力见底」
@@ -92,7 +92,7 @@ async function run() {
   await page.click('#btn-mode-march');
   await page.waitForTimeout(400);
 
-  // 2) 把存档改成"断粮 + 体力见底"：幕间 applyStarvation 扣 10 → 体力归零 → checkFailure 命中
+  // 2) 把存档改成"断粮 + 体力见底"：幕间 applyStarvation 扣 8 → 体力归零 → checkFailure 命中
   const patched = await page.evaluate((key) => {
     const raw = sessionStorage.getItem(key);
     if (!raw) return null;

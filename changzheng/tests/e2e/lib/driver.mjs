@@ -65,6 +65,45 @@ export async function tap(page, sel) {
 }
 
 /**
+ * 弹弓手势（拖拽类玩法用，目前是打水漂）：在画布上按住 → 往后下方拖 → 松手。
+ *
+ * 为什么不能用 tap：这类玩法的推进量是**拖拽向量**（长度=力道、方向=出手角），
+ * 画布上没有"点一下就往前走"的按钮，只会白等。
+ * 为什么要边拖边读：画布逻辑尺寸（720×400）与屏幕上的显示尺寸不是一个数，
+ * 同一个 170px 在两边对应的力道不同——所以拖的过程中读它自己报的
+ * `data-mini-power` / `data-mini-angle`（打水漂在 aim 阶段一直写这两个），
+ * 到位了再松手。这样换画布尺寸/换机器都不用重标定。
+ * @param {string} hostSel 宿主容器选择器（游戏把 data-mini-* 写在它身上）
+ * @param {string} canvasSel 可拖拽的画布
+ * @param {{wantPower:number, wantDeg:number}} [want] 目标：满力 + 甜区角（K.IDEAL_DEG=18°）
+ */
+export async function slingshotDrag(page, hostSel, canvasSel, { wantPower = 90, wantDeg = 18 } = {}) {
+  const box = await page.locator(canvasSel).first().boundingBox().catch(() => null);
+  if (!box) return false;
+  const sx = box.x + box.width * 0.5;
+  const sy = box.y + box.height * 0.45;
+  await page.mouse.move(sx, sy);
+  await page.mouse.down();
+  // 方向：拖到**左下方**（"往后下方拖"）→ rawDeg 约 29°，乘 0.62 落在 18° 甜区
+  const dirX = -Math.cos(29 * Math.PI / 180);
+  const dirY = Math.sin(29 * Math.PI / 180);
+  const maxLen = Math.max(box.width, box.height) * 0.55;
+  let last = null;
+  for (let i = 1; i <= 14; i++) {
+    const len = (maxLen * i) / 14;
+    await page.mouse.move(sx + dirX * len, sy + dirY * len);
+    const st = await page.evaluate((sel) => {
+      const h = document.querySelector(sel);
+      return h ? { p: Number(h.dataset.miniPower || 0), a: Number(h.dataset.miniAngle || 0) } : null;
+    }, hostSel).catch(() => null);
+    if (st) last = st;
+    if (st && st.p >= wantPower && st.a >= wantDeg - 3 && st.a <= wantDeg + 6) break;
+  }
+  await page.mouse.up();
+  return last ? `${last.p}%/$${last.a}°` : true;
+}
+
+/**
  * 小游戏操作策略（唯一实现，回归与试玩共用）。
  * @returns {string} 动作标签；空字符串表示本轮没有可做的动作
  */
@@ -96,6 +135,42 @@ export async function applyMiniAction(page, s) {
     case 'snow-grab': return prefer(['pull', 'throw', 'bare', 'leg', 'foot0', 'foot1', 'foot2'], 'grab');
     case 'pontoon-night': return prefer(['reinforce', 'anchor', 'seg', 'lamp', 'mode-plank', 'mode-boat'], 'pontoon');
     case 'rally-river': return prefer(['ferry', 'callout', 'search'], 'rally');
+    // 2026-09-18 吸收的四支：先点入口动作，再点局内推进
+    case 'skim':
+    case 'skim-v3': {
+      // 挑石是按钮；甩出去是**手势**，必须真拖一把（只点 aim 那个画布等于没出手）。
+      for (const k of ['pick-flat', 'pick-tile', 'pick-round']) {
+        if (has(k)) { await tap(page, `[data-mini-action="${k}"]`); return `skim-${k}`; }
+      }
+      if (has('aim')) {
+        const info = await slingshotDrag(page, '[data-mini]:not([class~="hidden"])', '[data-mini-action="aim"]');
+        await page.waitForTimeout(300);
+        return info ? `skim-throw(${info})` : 'skim-aim';
+      }
+      await page.waitForTimeout(180);
+      return '';
+    }
+    case 'weave': return prefer([
+      'finish-hold', 'ear-pick-cloth', 'ear-pick-hemp', 'ear-pick-straw',
+      'weave-insert', 'weave-undo',
+      'warp-tighten', 'warp-cord-0', 'warp-cord-1', 'warp-cord-2', 'warp-cord-3',
+      'warp-pick-hemp', 'warp-pick-straw', 'twist-done', 'twist-left', 'twist-right',
+      'pound-end', 'pound-tap', 'pull-hold',
+    ], 'weave');
+    case 'antiphony': return prefer([
+      'end', 'next', 'beat',
+      'sing-2-a', 'sing-2-b', 'sing-2-c',
+      'sing-1-a', 'sing-1-b', 'sing-1-c',
+      'sing-0-a', 'sing-0-b', 'sing-0-c',
+    ], 'antiphony');
+    case 'cipher':
+    case 'cipher-entry': return prefer([
+      'report-rush', 'report-calm', 'report-lie',
+      'opt', 'report', 'material', 'copy', 'pick',
+      'mat-order', 'mat-scout', 'mat-yesterday',
+      'book-a', 'book-b', 'key-turn', 'key-back',
+      'mode-easy', 'mode-hard',
+    ], 'cipher');
     default:
       await page.waitForTimeout(250);
       return '';
@@ -251,6 +326,7 @@ export async function playThrough(page, {
   const visited = new Set();
   const asked = new Set();          // 同一场交谈最多问一句
   const trace = [];
+  const boardStall = { key: '', since: 0, lastLabel: '', sameLabel: 0 };   // 板屏兜底：没进展/原地重复（见下面 mini 分支）
   let pacedFor = '';
   let lastSig = '';
   let lastProgress = Date.now();
@@ -258,7 +334,14 @@ export async function playThrough(page, {
 
   // resume=true 用于"注入存档后从中途续跑"的场景（调用方已自己回到营地）
   if (!resume) {
-    await page.click(mode === 'quick' ? '#btn-mode-quick' : mode === 'march' ? '#btn-mode-march' : '#btn-mode-study');
+    // v0.3 起标题页只剩 行军 / 连贯行军 / 择点穿行 / 游戏模式（DESIGN.md §1「已移除研学/快速」）。
+    // 历史模式名（study / quick）一律落到「行军模式」——它就是评审口径要跑的真闭环。
+    const MODE_BTN = {
+      march: '#btn-mode-march',
+      march_auto: '#btn-mode-auto', auto: '#btn-mode-auto',
+      select: '#btn-mode-select', arcade: '#btn-mode-arcade',
+    };
+    await page.click(MODE_BTN[mode] || '#btn-mode-march');
   }
 
   for (;;) {
@@ -300,8 +383,37 @@ export async function playThrough(page, {
     if (s.aiRetry) { trace.push('ai-retry'); await tap(page, '[data-action="ai-retry"]'); continue; }
     if (s.state === 'busy') { await page.waitForTimeout(300); continue; }
     if (s.mini) {
+      // 兜底：有些玩法的推进是**手势 / 等待**型的（打水漂要弹弓拖拽、夜搭浮桥要等乡亲送门板），
+      // 机器人可能长时间推不动。同一支玩法同一状态连续 12 秒既没换状态、也没做成任何动作，
+      // 就按板屏右上那个**真按钮**「跳过本局」——走的是玩家那条路
+      // （modules/games 的 btn-board-skip：热点算完成、不给效果、不烧复盘调用），整局才走得完。
+      // 判据用**整屏签名**（含已可点的动作清单）：有些玩法点了有反应、状态却长时间不动
+      // （夜搭浮桥门板不够时反复点空格是合法空操作），只盯"有没有动作"会漏掉这种卡法。
+      const key = `${sig}|${s.miniActions.join(',')}`;
+      if (boardStall.key !== key) { boardStall.key = key; boardStall.since = Date.now(); }
+      if (Date.now() - boardStall.since > 20000) {
+        const skipped = await tap(page, '#btn-board-skip');
+        trace.push(skipped ? `board-skip(${s.mini})` : 'board-skip-miss');
+        boardStall.since = Date.now();
+        await page.waitForTimeout(400);
+        continue;
+      }
       const label = await applyMiniAction(page, s);
-      if (label) trace.push(label);
+      if (label) {
+        trace.push(label);
+        // 第二个兜底判据：**同一个动作被反复做却没换来状态变化**。
+        // 有些玩法的按钮在"当前这一步没它的事"时也是可点的（点了只回一句提示），
+        // 只按签名判会一直等下去（卢定桥的 cling 就这么卡过 40 秒）。
+        if (boardStall.lastLabel === label) boardStall.sameLabel += 1;
+        else { boardStall.lastLabel = label; boardStall.sameLabel = 1; }
+        if (boardStall.sameLabel >= 12) {
+          const skipped = await tap(page, '#btn-board-skip');
+          trace.push(skipped ? `board-skip(${s.mini}:重复${boardStall.sameLabel}次${label})` : 'board-skip-miss');
+          boardStall.sameLabel = 0;
+          boardStall.lastLabel = '';
+          await page.waitForTimeout(400);
+        }
+      }
       continue;
     }
     // 交谈：先问一句（贴近真人）再结束。必须排在通用选项之前：快捷问句也带 data-choice-index。

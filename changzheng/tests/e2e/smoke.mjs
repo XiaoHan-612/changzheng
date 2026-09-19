@@ -49,7 +49,7 @@ async function run() {
   page.on('pageerror', (e) => errs.push(e.message));
 
   await page.goto(`${BASE}/?smoke=${Date.now()}`, { waitUntil: 'networkidle' });
-  await page.click('#btn-mode-study');
+  await page.click('#btn-mode-march');
   await page.waitForTimeout(200);
   await passOrigin(page);              // 开场出身设定：冒烟只关心主流程
   try { await page.click('#btn-cut-skip'); } catch { /* optional */ }

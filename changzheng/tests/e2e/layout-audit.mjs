@@ -108,7 +108,7 @@ async function main() {
   await shot(page, '01-title');
 
   // ── 序章（电影化拍子）：题字 → 路线图（拍子自己会走，不点按）──
-  await page.click('#btn-mode-study');
+  await page.click('#btn-mode-march');
   await page.waitForTimeout(900);
   await shot(page, '01b-prologue-title');
   await page.waitForTimeout(3600);
@@ -256,7 +256,7 @@ async function main() {
   // 让它自己跑一整幕既慢又烧调用。展示开关关着时钩子不存在，跳过并说明。
   await page.evaluate(() => localStorage.setItem('czjc_devtools', '1'));
   await page.reload({ waitUntil: 'networkidle' });
-  await page.click('#btn-mode-study').catch(() => {});
+  await page.click('#btn-mode-march').catch(() => {});
   await page.waitForTimeout(200);
   await passOrigin(page);                                 // 序章 + 出身 + 幕间过场，一并清掉
   await page.waitForTimeout(500);

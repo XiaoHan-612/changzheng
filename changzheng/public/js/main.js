@@ -42,6 +42,7 @@ import { showEcho, afterJudge, bindEcho, closeEcho } from './flow/echo.js';
 import { CHOICE_SETS, REPEATABLE_HOTSPOTS } from './flow/tables.js';
 import { doSchool, doCandy, doSentry, doGomoku, doGrab, doRoster, doFishing, doLuding } from './flow/games-flow.js';
 import { runQuiz } from './flow/quiz.js';
+import { runArcade } from './flow/arcade.js';
 import { runNightChoice, nightContext } from './flow/night.js';
 // 一幕的推进（含营地）与收尾（批 7 二·5；main.js 从此只剩组合根）
 import {
@@ -49,6 +50,7 @@ import {
   renderFireMenu, renderPathZones,
 } from './flow/act.js';
 import { runEnding } from './flow/end.js';
+import { openSelectMode, bindSelectChrome } from './flow/modes.js';
 
 const { $, showScreen, setTopbar,
   toast, showThinking, say, setPortrait, setStageBanner, setStagePanel,
@@ -160,7 +162,20 @@ function exposeSheetHooks() {
       if (!hasS()) return false;
       const g = gamesApi();
       if (!g?.has?.(name)) return false;
-      g.play(name, { params: { password: S.tonightPassword } });
+      // 与剧情、游戏模式**同一条口径**：必须带 decide，否则玩法里的模型调用拿不到回调，
+      // 一律走固定兜底内容 —— 体检脚本看不出毛病，但"模型到底在不在调"会被误判成没调
+      // （我排查夜校时就先用这个钩子踩过：结论是"一次都没调模型"，实际是钩子没给回调）。
+      g.play(name, {
+        params: {
+          password: S.tonightPassword,
+          avoid: S.schoolUsed || [],
+          decide: (payload = {}) => callAI({
+            ...payload,
+            scene: payload.scene || `玩法调试·${name}`,
+            state: payload.state || publicState(),
+          }),
+        },
+      });
       return true;
     },
   };
@@ -169,17 +184,62 @@ function exposeSheetHooks() {
   exposeDevFacade();     // 注册完再挂一次：这时才有东西可镜像
 }
 
+// ── 行军记录（大模型调用日志）的实时刷新与导出 ──
+// 比赛要求"随时能看到模型调用日志、并能导出文件"：屏开着时每 2 秒拉一次 /api/logs；
+// 关屏自停——tick 先看屏是否还开着再决定发不发请求，Esc 与「关闭」两条路都盖得住。
+let logsLiveTimer = null;
+function stopLogsLive() {
+  if (logsLiveTimer) {
+    clearInterval(logsLiveTimer);
+    logsLiveTimer = null;
+  }
+}
+async function refreshLogs() {
+  const data = await fetchLogs();
+  renderLogs(data.logs || []);
+  return data;
+}
+function startLogsLive() {
+  stopLogsLive();
+  logsLiveTimer = setInterval(async () => {
+    if ($('screen-logs')?.classList.contains('hidden')) return stopLogsLive();
+    try {
+      await refreshLogs();
+    } catch { /* 本地服务抖一下不打断：下一拍再试 */ }
+  }, 2000);
+}
+/** 导出原始 JSONL（走后端白名单接口；浏览器与桌面外壳都会弹「另存为」） */
+async function exportLogs() {
+  let data;
+  try {
+    data = await fetchLogs();
+  } catch {
+    return toast('读日志失败：本地服务没响应');
+  }
+  if (!data.count) return toast('还没有调用记录，先玩一局再来导出');
+  const a = document.createElement('a');
+  a.href = '/api/logs/export?file=session-full.jsonl';
+  a.download = 'session-full.jsonl';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast('已开始导出：弹出的「另存为」里选个位置即可', 3500);
+}
+
 function bindChrome() {
   $('btn-logs').onclick = async () => {
     showOverlay('screen-logs');
-    const data = await fetchLogs();
-    renderLogs(data.logs || []);
+    try {
+      await refreshLogs();
+    } catch { /* 打开时读失败也不拦：屏上列表为空，下一拍自动重试 */ }
+    startLogsLive();
   };
-  $('btn-logs-close').onclick = () => hideOverlay('screen-logs');
-  $('btn-logs-refresh').onclick = async () => {
-    const data = await fetchLogs();
-    renderLogs(data.logs || []);
+  $('btn-logs-close').onclick = () => {
+    stopLogsLive();
+    hideOverlay('screen-logs');
   };
+  $('btn-logs-refresh').onclick = () => refreshLogs();
+  $('btn-logs-export').onclick = () => exportLogs();
   $('btn-facts').onclick = () => {
     showOverlay('screen-facts');
     renderFacts(getFacts(), S?.unlockedFacts || []);
@@ -329,30 +389,217 @@ async function openDefense() {
 }
 
 function bindTitle() {
-  const study = $('btn-mode-study');
   const march = $('btn-mode-march');
-  if (study) study.onclick = () => startRun('study');
-  if (march) march.onclick = () => startRun('march');
-  const quick = $('btn-mode-quick');
-  if (quick) quick.onclick = () => startRun('quick');
-  const jump = $('btn-jump-huining');
-  if (jump) jump.onclick = () => jumpToAct('study', 'act5');
-  // URL 直达：/?jump=act5 或 #act5
-  const q = new URLSearchParams(location.search).get('jump') || (location.hash || '').replace('#', '');
-  if (q && /^act\d$/.test(q)) {
-    setTimeout(() => jumpToAct('study', q), 400);
+  if (march) march.onclick = () => startRun('march').catch((e) => toast(String(e?.message || e), 3000));
+  const auto = $('btn-mode-auto');
+  if (auto) auto.onclick = () => startRun('march_auto').catch((e) => toast(String(e?.message || e), 3000));
+  const select = $('btn-mode-select');
+  if (select) {
+    // 双保险：onclick + 监听器；打开列表失败也会 toast，避免「点了没反应」
+    const openSelect = () => {
+      Promise.resolve(openSelectMode()).catch((e) => {
+        console.error(e);
+        toast(`择点穿行打不开：${e?.message || e}`, 3200);
+      });
+    };
+    select.onclick = openSelect;
+    select.addEventListener('click', openSelect);
+  }
+  bindSelectChrome();
+  // 游戏模式：不进剧情，直接把玩法清单摆出来（见 flow/arcade.js）
+  const arcade = $('btn-mode-arcade');
+  if (arcade) {
+    arcade.onclick = async () => {
+      setTopbar(true);
+      await runArcade();
+      setTopbar(false);
+      showScreen('screen-title');
+    };
   }
   const judge = $('btn-judge');
   if (judge) {
-    // 只在展示开关打开时绑定：关掉后按钮不可见，也不该有任何入口能触发答辩实况
     judge.onclick = isDevToolsOn() ? () => {
       setJudgeMode(true);
-      startRun('study');
+      startRun('march');
     } : null;
   }
   $('btn-how').onclick = () => showOverlay('screen-how');
   $('btn-how-back').onclick = () => hideOverlay('screen-how');
+  bindTitleExtras();
   $('btn-inspect-close') && ($('btn-inspect-close').onclick = () => setJudgeMode(false));
+}
+
+/** 标题页角落：意见与反馈 + 九十周年纪念感言（本机 localStorage，不进 API/评分） */
+function bindTitleExtras() {
+  const open = (id) => showOverlay(id);
+  const close = (id) => { hideOverlay(id); showScreen('screen-title'); };
+
+  const fbText = $('fb-text');
+  const fbStatus = $('fb-status');
+  const refText = $('ref-text');
+  const refStatus = $('ref-status');
+  const FB_KEY = 'czjc_feedback_v1';
+  const REF_KEY = 'czjc_reflection_v1';
+
+  const loadText = (key, el, statusEl, tip) => {
+    try {
+      const saved = localStorage.getItem(key) || '';
+      if (el) el.value = saved;
+      if (statusEl) statusEl.textContent = saved ? tip : '';
+    } catch { /* ignore */ }
+  };
+  const saveText = (key, el, statusEl, label) => {
+    const v = (el?.value || '').trim();
+    try {
+      localStorage.setItem(key, v);
+      if (statusEl) statusEl.textContent = v
+        ? `${label}已保存到本机（${new Date().toLocaleString()}）`
+        : `${label}已清空`;
+      toast(v ? `${label}已保存` : `${label}为空`, 2200);
+    } catch (e) {
+      if (statusEl) statusEl.textContent = '保存失败：' + (e?.message || e);
+    }
+  };
+  const copyText = async (el, statusEl, label) => {
+    const v = el?.value || '';
+    if (!v.trim()) {
+      if (statusEl) statusEl.textContent = '还没有内容可复制';
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(v);
+      if (statusEl) statusEl.textContent = `${label}已复制到剪贴板`;
+      toast('已复制', 1800);
+    } catch {
+      if (statusEl) statusEl.textContent = '复制失败，请手动全选复制';
+    }
+  };
+
+  const fbBtn = $('btn-feedback');
+  if (fbBtn) fbBtn.onclick = () => {
+    loadText(FB_KEY, fbText, fbStatus, '已读取本机上次保存的意见');
+    open('screen-feedback');
+  };
+  $('btn-fb-close') && ($('btn-fb-close').onclick = () => close('screen-feedback'));
+  $('btn-fb-save') && ($('btn-fb-save').onclick = () => saveText(FB_KEY, fbText, fbStatus, '意见'));
+  $('btn-fb-copy') && ($('btn-fb-copy').onclick = () => copyText(fbText, fbStatus, '意见'));
+
+  const refBtn = $('btn-reflection');
+  if (refBtn) refBtn.onclick = () => {
+    loadText(REF_KEY, refText, refStatus, '已读取本机上次保存的感想');
+    open('screen-reflection');
+  };
+  $('btn-ref-close') && ($('btn-ref-close').onclick = () => close('screen-reflection'));
+  $('btn-ref-save') && ($('btn-ref-save').onclick = () => saveText(REF_KEY, refText, refStatus, '感想'));
+  $('btn-ref-copy') && ($('btn-ref-copy').onclick = () => copyText(refText, refStatus, '感想'));
+
+  bindMarchIntro();
+}
+
+/**
+ * 标题页「了解中国工农红军长征」：点击即调用指定模型生成详细介绍（JSONL 有日志）。
+ * 失败时明说原因，不编造离线文案。
+ */
+function bindMarchIntro() {
+  const bodyBox = $('march-intro-body');
+  const qaOut = $('march-qa-out');
+  const qaInput = $('march-qa-input');
+  let qaBusy = false;
+
+  const openIntro = async () => {
+    showOverlay('screen-march-intro');
+    if (!bodyBox) return;
+    bodyBox.innerHTML = '<p class="muted">正在调用大模型，生成「中国工农红军长征」详细介绍…</p>';
+    try {
+      const r = await kernel.api('ai')?.ask({
+        callType: 'march_intro',
+        scene: '了解中国工农红军长征',
+        situation: '标题页科普入口：请求详细介绍',
+        state: {},
+        extraContext: '用途：教育科普与赛制演示；输出将直接展示在界面上。',
+      });
+      if (!r || r._error) {
+        bodyBox.innerHTML = `<p class="muted">模型未返回详细介绍：${escapeHtml(r?.message || '未知错误')}。可点「重新生成介绍」，或到设置里检查接口与 Key。</p>`;
+        return;
+      }
+      const sections = Array.isArray(r.sections) ? r.sections : [];
+      const points = Array.isArray(r.key_points) ? r.key_points : [];
+      const timeline = Array.isArray(r.timeline) ? r.timeline : [];
+      bodyBox.innerHTML = `
+        <p class="intro-ai-note"><strong>此内容由 AI 生成</strong> · callType=march_intro · 仅供科普参考，请以权威史料为准。</p>
+        <h3 class="intro-title">${escapeHtml(r.title || '中国工农红军长征')}</h3>
+        <p class="intro-summary">${escapeHtml(r.summary || '')}</p>
+        ${sections.map((s) => `
+          <section class="intro-sec">
+            <h4>${escapeHtml(s?.heading || '')}</h4>
+            <p>${escapeHtml(s?.body || '')}</p>
+          </section>`).join('')}
+        ${points.length ? `<section class="intro-sec"><h4>要点</h4><ul class="how-list">${points.map((p) => `<li>${escapeHtml(String(p))}</li>`).join('')}</ul></section>` : ''}
+        ${timeline.length ? `<section class="intro-sec"><h4>时间线</h4><ul class="how-list">${timeline.map((t) => `<li><strong>${escapeHtml(String(t?.when || ''))}</strong> — ${escapeHtml(String(t?.what || ''))}</li>`).join('')}</ul></section>` : ''}
+        ${r.note ? `<p class="how-note">${escapeHtml(r.note)}</p>` : ''}
+        <p class="intro-ai-note">运行态真调 · 记录见顶栏「记录」</p>
+      `;
+    } catch (e) {
+      bodyBox.innerHTML = `<p class="muted">调用失败：${escapeHtml(String(e?.message || e))}</p>`;
+    }
+  };
+
+  const askQa = async () => {
+    if (qaBusy) return;
+    const q = (qaInput?.value || '').trim();
+    if (!q) {
+      if (qaOut) qaOut.innerHTML = '<p class="muted sm">请先输入问题。</p>';
+      return;
+    }
+    qaBusy = true;
+    const askBtn = $('btn-march-qa');
+    if (askBtn) { askBtn.disabled = true; askBtn.textContent = '回答中…'; }
+    if (qaOut) qaOut.innerHTML = '<p class="muted">正在向模型提问，请稍候…</p>';
+    try {
+      const r = await kernel.api('ai')?.ask({
+        callType: 'march_qa',
+        scene: '长征常识问答',
+        situation: q,
+        state: {},
+        extraContext: `【问题】${q}\n请就长征相关常识作答。`,
+      });
+      if (!r || r._error) {
+        if (qaOut) qaOut.innerHTML = `<p class="muted">未能得到回答：${escapeHtml(r?.message || '未知错误')}。可换一种问法，或检查设置里的接口与 Key。</p>`;
+        return;
+      }
+      const tips = Array.isArray(r.tips) ? r.tips : [];
+      if (qaOut) {
+        qaOut.innerHTML = `
+          <p class="intro-qa-q"><strong>问：</strong>${escapeHtml(q)}</p>
+          <p class="intro-qa-a">${escapeHtml(r.answer || '')}</p>
+          ${tips.length ? `<ul class="how-list">${tips.map((t) => `<li>${escapeHtml(String(t))}</li>`).join('')}</ul>` : ''}
+          <p class="intro-ai-note"><strong>此回答由 AI 生成</strong> · 请自行鉴别 · callType=march_qa</p>
+        `;
+      }
+    } catch (e) {
+      if (qaOut) qaOut.innerHTML = `<p class="muted">调用失败：${escapeHtml(String(e?.message || e))}</p>`;
+    } finally {
+      qaBusy = false;
+      if (askBtn) { askBtn.disabled = false; askBtn.textContent = '提问'; }
+    }
+  };
+
+  const btn = $('btn-march-intro');
+  if (btn) btn.onclick = openIntro;
+  const refresh = $('btn-march-intro-refresh');
+  if (refresh) refresh.onclick = openIntro;
+  const closeBtn = $('btn-march-intro-close');
+  if (closeBtn) closeBtn.onclick = () => {
+    hideOverlay('screen-march-intro');
+    showScreen('screen-title');
+  };
+  const askBtn = $('btn-march-qa');
+  if (askBtn) askBtn.onclick = askQa;
+  if (qaInput) {
+    qaInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); askQa(); }
+    });
+  }
 }
 
 
@@ -393,7 +640,16 @@ async function openSettings() {
       .join('');
   }
   $('set-key').value = '';
-  $('set-url').value = cfg.apiUrl?.replace('/***', '/chat/completions') || '';
+  // 接口地址回填用**完整地址**（apiUrlFull）。掩码串 `…/chat/***` 拼不回原值：
+  // 早先这里是 `cfg.apiUrl.replace('/***','/chat/completions')`，但掩码只替换了最后一段，
+  // 前面的 `chat/` 还在，拼出来成了 `…/chat/chat/completions` —— 于是"打开设置页、
+  // 什么都不改直接点保存"会把地址写坏，那之后每次调用都是 204 空响应（2026-09-17 修）。
+  // 老服务端没有 apiUrlFull 时就留空 + 提示，绝不拿掩码猜（留空 = 保存时不改这一项）。
+  const urlBox = $('set-url');
+  if (urlBox) {
+    urlBox.value = cfg.apiUrlFull || '';
+    urlBox.placeholder = cfg.apiUrlFull ? '' : `当前：${cfg.apiUrl || '（未配置）'}（留空 = 不改这一项）`;
+  }
   const devToggle = $('set-devtools');
   if (devToggle) devToggle.checked = isDevToolsOn();
   renderSettingsStatus(cfg);

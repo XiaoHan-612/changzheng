@@ -10,10 +10,10 @@
  *   · **史实卡优先**：`afterJudge(result, fallbackTitle, defaultFactId)` 先按 `factId` 找史实卡，
  *     找不到才用兜底标题与通用说明；`narrative` 为空且没有史实卡时**不弹回响**（不给玩家空屏）。
  */
-import { $, showOverlay, hideOverlay, replayAnim } from '../ui.js';
+import { $, showOverlay, hideOverlay, replayAnim, toast } from '../ui.js';
 import { markAction } from '../step.js';
 import { kernel } from '../kernel/index.js';
-import { st, getFacts } from './kit.js';
+import { S, st, getFacts } from './kit.js';
 import { sceneImage } from './view.js';
 
 /** 「明白了」键没按之前的那个 resolve（同一时刻只会有一个回响层） */
@@ -65,10 +65,26 @@ export function showEcho({ title, play, real, fic }) {
 
 export async function afterJudge(result, fallbackTitle, defaultFactId) {
   const fid = result.factId || result.fact_id || defaultFactId;
-  if (fid) st().unlockFact(fid);
+  const added = fid ? !!st().unlockFact(fid) : false;
   const fact = getFacts()?.[fid];
   const play = result.narrative || result.scene_text || result.reply || '';
   if (!fact && !play) return;
+
+  // 史实回响：只有**本局首次解锁**的卡才全屏 + 出声。
+  // 同一幕多个任务常绑同一张卡（如于都河多处都是 h_depart）——
+  // 重复时若每次再 voice 标题，会变成「做完一个任务就喊一遍」（用户反馈）。
+  if (fact && !added) {
+    if (play) st().pushCampLog(fact.title || fallbackTitle || '回响', String(play).slice(0, 60));
+    toast(`史实「${fact.title}」已记入手记`, 1800);
+    return;
+  }
+  if (!fact && play) {
+    const brief = String(play).slice(0, 40);
+    st().pushCampLog(fallbackTitle || '回响', String(play).slice(0, 60));
+    // 无史实卡的短叙事：只记手记 + 轻 toast，不重复播报
+    toast(fallbackTitle ? `${fallbackTitle}` : '已记入手记', 1600);
+    return;
+  }
   await showEcho({
     title: fact?.title || fallbackTitle || '史实回响',
     play: play || '（你刚完成一次操作）',

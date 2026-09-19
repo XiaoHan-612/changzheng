@@ -90,22 +90,32 @@ async function main() {
 
   // ── 立绘接线回归：非同伴 NPC 必须立自己的立绘，不能一律显示老班长的脸
   //    （2026-09-13 修复：同伴兜底写在专属立绘之前，导致母亲/船工/宣传员等全显示老班长）
-  await page.click('#btn-mode-study');
-  await passOrigin(page);              // 开场出身设定：本用例只关心立绘接线，直接过
-  const skipBtn = page.locator('#btn-cut-skip');
-  await skipBtn.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
-  if (await skipBtn.isVisible()) await skipBtn.click();
-  const mother = page.locator('.hotspot[data-hotspot-label="母亲"]');
-  await mother.waitFor({ state: 'visible', timeout: 20000 });
-  await mother.click();
-  await page.waitForTimeout(400);
-  const shownPortrait = await page.evaluate(() => ({
-    name: document.getElementById('portrait-name')?.textContent || '',
-    bg: document.getElementById('portrait-art')?.style.backgroundImage || '',
-  }));
-  if (shownPortrait.name !== '母亲') throw new Error(`母亲交谈位显示的角色名不对：${shownPortrait.name}`);
-  if (!shownPortrait.bg.includes('mother.png')) {
-    throw new Error(`母亲交谈位没有立 mother.png，实际：${shownPortrait.bg || '(空，退回文字头像)'}`);
+  // 换到**老船工**（第三幕）来验这条接线：
+  //   · 母亲那一格现在是 `acts.json` 的 `preDone`（序章已经演过"与母亲告别"，进幕即显示"已看过"），
+  //     点不动了 —— 拿它做用例会永远红，而且红的不是接线。
+  //   · 船工正是当年那条 bug 的当事人之一（非同伴 NPC 一律显示老班长的脸）。
+  // 用「择点穿行」直接跳到第三幕的交谈任务，不用为了验一张立绘跑两幕真调。
+  await page.click('#btn-mode-select');
+  const boatTask = page.locator('#select-list .select-tasks button', { hasText: '老船工' }).first();
+  await boatTask.waitFor({ state: 'visible', timeout: 15000 });
+  await boatTask.click();
+  // 进幕 → 幕间过场 → 自动点开那个热点。**等状态，不等固定 sleep**：
+  // 这条链上有一段真调，机器一忙固定等待就会读到"立绘还没挂上"的空值（本用例踩过）。
+  const shownPortrait = { name: '', bg: '' };
+  const t0 = Date.now();
+  for (;;) {
+    const now = await page.evaluate(() => ({
+      name: document.getElementById('portrait-name')?.textContent || '',
+      bg: document.getElementById('portrait-art')?.style.backgroundImage || '',
+    }));
+    if (now.name && now.name !== '—') { Object.assign(shownPortrait, now); break; }
+    if (Date.now() - t0 > 20000) { Object.assign(shownPortrait, now); break; }
+    await page.click('#btn-cut-skip').catch(() => {});
+    await page.waitForTimeout(300);
+  }
+  if (shownPortrait.name !== '船工') throw new Error(`船工交谈位显示的角色名不对：${shownPortrait.name}`);
+  if (!shownPortrait.bg.includes('boatman.png')) {
+    throw new Error(`船工交谈位没有立 boatman.png，实际：${shownPortrait.bg || '(空，退回文字头像)'}`);
   }
   await browser.close();
 

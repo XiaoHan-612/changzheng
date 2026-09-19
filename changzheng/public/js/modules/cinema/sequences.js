@@ -36,7 +36,7 @@ export const SEQUENCES = {
       kind: 'map',
       img: '/assets/scenes/map_route.jpg',
       stageClass: 'is-map',
-      text: '地图上是一条线，走过去，是一年。',
+      text: '地图上是一条线，走过去，是约两年。',
       lit: 'all',
       revealMs: 380,
       holdMs: 4200,
@@ -111,14 +111,15 @@ export const SEQUENCES = {
    * 节奏全部来自 `data/poem.json`：有整段朗诵就跟着它（逐句窗口是量出来的），没有就按 pace 走。
    * 可跳过（一跳到底）、可加速（1×/1.5×，同时作用于语音与逐字）。
    */
-  'ending-poem': ({ photoImg = '/assets/scenes/huining_pano.jpg', paperImg = '' } = {}) => [
+  'ending-poem': ({ photoImg = '/assets/scenes/huining_pano.jpg', paperImg = '', gallery = [] } = {}) => [
     {
       kind: 'photo',
       img: photoImg,
       text: '会宁的城墙下，三支队伍站到了一起。',
       holdMs: 1600,
     },
-    { kind: 'poem', img: paperImg || undefined },
+    // 诗拍：gallery 为各幕 pano，朗读期间在过场底片上轮播
+    { kind: 'poem', img: paperImg || undefined, gallery },
     { kind: 'seal' },
   ],
 

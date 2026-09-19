@@ -1,60 +1,89 @@
 # 封装交付方案（路演/答辩）
 
-> 目标形态：**一个文件夹，双击就跑，不装 Node、不装数据库、不连开发机**。
-> 现状：`npm start` 起 Express（`server/index.js`），静态资源在 `public/`，AI 走网关代理，**没有 MOCK**。
-> 结论：可以用，但**必须在联网环境跑**；下面的清单是封装前要先做完的代码侧准备。
+> 目标形态：**一个文件，双击就跑，不装 Node、不装浏览器、不连开发机**。
+>
+> **现状：已落地。** 封装在 [`../../packaging/`](../../packaging/README.md)，产出两件：
+> ① 便携版目录 `dist/长征-抉择/`（整个文件夹拷走即用）② **单文件版 `dist/长征-抉择-单文件版.exe`**（对外只发这一个）。
+> 操作口径（怎么出成品、怎么验收）以 `packaging/README.md` 为准；**本文记录为什么这么做、封装改了什么、发布口径是什么。**
+>
+> 历史：早期还写过一条「便携文件夹 + 便携 Node + `start.bat`」的路线，脚本留档在
+> [`../tools/build-portable.mjs`](../tools/build-portable.mjs)。**它不是现行交付形态**（那条路仍要求目标机器有浏览器，
+> 窗口也还是网页的样子）；两种路线的取舍见 §二。
 
 ## 一、跑起来到底需要什么
 
-| 项 | 现状 | 说明 |
+| 项 | 源码态 | 说明 |
 |---|---|---|
-| 运行时 | Node ≥ 18 | 唯一硬依赖 |
-| 依赖包 | `express`（+ 开发期 `playwright`） | `node_modules` 20MB，其中 playwright 只在测试用 |
-| 静态资源 | `public/` **27MB**（字体 6.9 + 音频 8.8 + 场景图 7.8 + 立绘 1.8 + 事件图 1.5 + 代码 0.2） | 全部本地文件，无 CDN；五族中文字体随包分发，换机器字形不变 |
-| 配置 | `.env` → `runtime-config.json` → 环境变量（后者覆盖前者） | 设置界面写入的是 `runtime-config.json`，**明文存 Key** |
-| 端口 | `CONFIG.PORT`，默认 3001 | 被占用时现在会直接起不来 |
-| 日志 | `logs/`，按日文件 `ai-calls-<日期>.jsonl` + 8MB 轮转（运行产物，不入库） | 目录必须可写；仓库里另有一份入库样本 `logs/sample-full-run.jsonl` 供离线查看 |
+| 运行时 | Node ≥ 18 | **封装后不需要**：Electron 自带 Node 与 Chromium，玩家只要一个 exe |
+| 依赖包 | `express`（+ 开发期 `playwright`） | 封装包只带生产依赖，不含 playwright |
+| 静态资源 | `public/` 约 27MB（字体 / 音频 / 场景 / 立绘 / 事件图 / 代码） | 全部本地文件，无 CDN；五族中文字体随包分发，换机器字形不变 |
+| 配置 | `.env` → `runtime-config.json` → 环境变量（后者覆盖前者） | 源码态在项目根；**封装后在 `user-data/`**：便携版是 exe 同级的 `user-data/`，单文件版是 `%LOCALAPPDATA%\长征-抉择\user-data\`。设置界面写入 `runtime-config.json`，**明文存 Key** |
+| 端口 | `CONFIG.PORT`，默认 3001 | 源码态被占用会起不来；**封装后由外壳先挑一个空闲端口**再拉起服务，不会撞端口 |
+| 日志 | `logs/ai-calls-<日期>.jsonl` + 8MB 轮转（运行产物，不入库） | 封装后落在 `user-data/logs/`；仓库里另有一份入库样本 `logs/sample-full-run.jsonl` 供离线查看 |
 | 网络 | **必需** | AI 调用走网关；已删 MOCK，断网即报错并写 `source=ERROR` |
 
-## 二、三种封装形态
+## 二、三种封装形态与实测结论
 
-| 方案 | 产物 | 优点 | 代价 |
-|---|---|---|---|
-| **A. 便携文件夹（推荐）** | `长征·抉择/` ＝ `node.exe` + `server/` + `public/` + `data/` + `start.bat` | 双击即用；路径全部保持相对结构，`config.js` 的 `__dirname` 定位不变；改素材/换 Key 只需替换文件 | 体积 ≈ Node 80MB + 项目 22MB ≈ 100MB |
-| B. 单文件 exe（pkg / Node SEA） | 一个 exe | 看着干净 | 静态资源要重新做路径解析（现在全靠 `__dirname` 相对定位），`public/` 往往还得外置，收益远小于踩坑成本 |
-| C. Docker 镜像 | `docker run` | 适合服务器 | 现场要装 Docker，答辩机上有风险 |
+| 方案 | 产物 | 结论 |
+|---|---|---|
+| A. 便携文件夹（便携 Node + `start.bat`） | `星火微光…/` ＝ `node.exe` + `server/` + `public/` + `data/` + `start.bat` | **未采用**。改素材最方便，但形态仍是"网页"：要开浏览器、有地址栏、窗口不像软件。脚本留档在 [`../tools/build-portable.mjs`](../tools/build-portable.mjs) |
+| **B. Electron 桌面包（现行）** | 便携目录 `dist/长征-抉择/` + 单文件版 `dist/长征-抉择-单文件版.exe` | **采用**。自带 Chromium：双击即软件、无地址栏菜单、F11 全屏、窗口/任务栏图标与单实例都是桌面软件该有的行为。代价是体积（≈400MB，其中约 350MB 是 Chromium） |
+| C. Docker 镜像 | `docker run` | 未采用：现场要装 Docker，答辩机上有风险 |
+| （早期评估）pkg / Node SEA 单文件 exe | 一个 exe | 未采用：静态资源要重做路径解析（工程全靠 `__dirname` 相对定位），收益远小于踩坑成本。**现在的"单文件版"不是这条路**——它是「启动器 + 内嵌 zip」，见 §五 |
 
-**推荐 A**：文件夹形态对"素材还在迭代"最友好——生图/音频模型产出新文件，直接覆盖进 `public/` 就生效，不用重新打包。
-> 开发目录现在约 151MB，多出来的部分是**测试产物**（`tests/e2e/artifacts/` 的交付图与 `logs/` 的运行日志）与 `node_modules`——都不进交付包。
+一句话结论：**换壳（Electron）比"把工程塞进一个 exe"划算**——工程一行不改，素材照旧落盘即生效，
+只是把"浏览器的窗口"换成"软件的窗口"。
 
-## 三、封装前的代码侧清单（每条都要改代码，不只是拷文件）
+## 三、封装落地清单（每条对应 `packaging/` 里的实现）
 
-1. **启动器**：`start.bat` 要能 ① 切到脚本所在目录（`cd /d %~dp0`，否则日志与 `runtime-config.json` 会落到别处）；② 起服务；③ 用默认浏览器打开 `http://localhost:<port>`。
-2. **端口占用**：3001 被占时现在是 EADDRINUSE 直接退出。要么自动 +1 探测空闲端口再打印实际端口，要么给出明确提示。
-3. **工作目录与权限**：日志、`runtime-config.json` 都写在项目根。若装进 `C:\Program Files\` 会因权限失败 —— 便携包要明确"解压到桌面/任意可写目录再运行"。
-4. **Key 策略（要先定）**：
-   - 「随包携带」：`.env` 或 `runtime-config.json` 直接打包 —— 现场零配置，但**任何拿到文件夹的人都能看到明文 Key**；
-   - 「首次填写」：包内不带 Key，启动后走「设置 → 填 Key → 测试连接」，Key 只落在本机 `runtime-config.json`。**答辩现场建议用带 Key 的包 + 演示后回收**，但要清楚这是明文。
-5. **离线兜底（备选，暂不开发）**：本项目已**彻底删除 MOCK**，断网 = AI 内容全部报错。风险预案见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)（录制真实响应 + 按指纹回放 + 全程标注 `source=REPLAY`，约 2 天工作量）。当前不实施；只有现场无网／网关不可达／额度耗尽时才启用。
-6. **依赖裁剪**：生产包不需要 `playwright`（`node_modules` 里最大的部分），只留 `express` 即可把依赖降到 ~1MB。
-7. **验收**：在一台**没装 Node 的干净 Windows** 上解压运行，走完「标题 → 设置测试连接 → 五幕通关 → 终局」。
+1. **启动器**：`packaging/main.js` 同进程 `import` `changzheng/server/index.js`（不用解析子进程 stdout 猜端口、也不会多出一个黑窗口）；
+   `packaging/launcher.cs` 是单文件版的外壳（首次展开 + 拉起游戏）。
+2. **端口**：外壳先挑一个空闲端口，**再**设 `PORT` / `ENV_FILE` / `RUNTIME_CONFIG` / `LOG_DIR` 并 import 服务端
+   —— 这四个值 `server/config.js` 在模块加载时就读走了，必须赶在 import 之前设。
+3. **写盘位置**：配置与日志放 exe 同级的 `user-data/`；该目录不可写（例如装进 `C:\Program Files\`）时退回 `%APPDATA%`。
+   删掉 `user-data/` ＝ 恢复出厂。
+4. **Key 策略**：随包带一份可用的 `.env`（**明文**，现场零配置），玩家在「设置」里改的值写进
+   `user-data/runtime-config.json` 覆盖它。对外分发要清楚：拿到包的人就能看到随包那份 Key（见 [`HANDOFF.md`](HANDOFF.md) §七点七）。
+5. **离线兜底**：**仍然没有**（项目彻底删除了 MOCK）。风险预案见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)，**未开发**。
+6. **依赖裁剪**：包内只含生产依赖（express），不含 playwright。
+7. **验收**：`packaging/verify-fast.mjs`（成品与仓库工程逐文件 sha256 相等 + 起得来 + 资源齐 + 前端与调用链通）
+   与 `packaging/verify-packaged.mjs`（发布级，慢一些）；`--single --fresh` 用真实的"首次双击"验单文件版。
 
-## 四、顺序建议
+## 四、发布口径
 
-素材（已全清）→ 数值与内容打磨 → **再封装**。
-理由：封装不改变玩法，但会把"改文件即生效"的便利换成"重新打包"，所以它应该是最后一步；在此之前保持文件夹形态运行。
+- **对外只发单文件版**：`dist/长征-抉择-单文件版.exe` 作为 **GitHub Releases 的附件**。
+  产物**不入仓库**（`dist/` 被 `.gitignore` 挡），仓库里只保留脚本与说明。
+- 便携版目录与 zip 是**内部/现场**用：现场演示直接双击 `dist/长征-抉择/长征-抉择.exe`，不依赖解压工具。
+- **没有代码签名**：首次运行 Windows SmartScreen 会拦一下（「更多信息 → 仍要运行」），这写在成品里的 `使用说明.txt`。
+- **素材来路的红线对成品同样成立**：包里的 BGM / 音效 / 朗诵是外部素材，**对外发布前要换**（见 [`HANDOFF.md`](HANDOFF.md) §七点二）。
 
-## 五、封包内容对照
+## 五、成品长什么样
 
 ```
-长征·抉择/
-  node.exe              ← 便携运行时（或要求现场已装 Node）
-  start.bat             ← 双击入口
-  .env                  ← 可选：预置 Key（明文，注意回收）
-  server/               ← Express + AI 代理 + schema
-  public/               ← 全部素材与前端（唯一需要频繁更新的目录）
-  data/                 ← 五幕/史实/视觉映射/TTS 清单
-  docs/                 ← 交接与验收文档（可留，便于现场排查）
-  logs/                 ← 运行日志（演示后可见 aiCount / source；可清空）
-                          ← 另含 sample-full-run.jsonl：一份真实全程样本，随包走
+dist/长征-抉择/
+  长征-抉择.exe          Electron 运行时（由 electron.exe 改名；图标已换）
+  *.dll *.pak locales/   Chromium 运行时，全部自带
+  长征-抉择.ico            图标（代码画的红星，见 make-icon.mjs）
+  使用说明.txt            给玩家/评委看的一页纸（含 SmartScreen 提示）
+  user-data/             运行时才写：配置、日志、审计 JSONL（删掉 = 恢复出厂）
+  resources/app/
+    main.js              外壳（起服务 / 开窗口 / 定端口 / 指配置目录）
+    package.json         Electron 入口声明
+    icon.png             窗口与任务栏图标
+    changzheng/          原工程照搬：server / public / data / .env / package.json / node_modules
+
+dist/长征-抉择-单文件版.exe   一个约 290KB 的启动器（launcher.cs）+ 上面那套目录的 zip + 16 字节尾巴
 ```
+
+单文件版首次运行会展开到 `%LOCALAPPDATA%\长征-抉择\app\`，玩家数据留在 `%LOCALAPPDATA%\长征-抉择\user-data\`；
+换新版 exe 覆盖过去时会按数据指纹**自动重新展开**，`user-data` 不会被冲掉。
+
+> 体积：打包目录 ≈ 400MB（其中约 350MB 是 Chromium）；单文件 exe ≈ 185MB。
+> 都是 `.gitignore` 之外的东西，不进仓库。
+
+## 六、顺序建议（历史结论，已兑现）
+
+素材 → 数值与内容打磨 → **再封装**。
+理由：封装不改变玩法，但会把"改文件即生效"的便利换成"重新打包"，所以它应该是最后一步。
+现状正是如此：`changzheng/` 的内容仍在迭代，**改完重跑一次 `node build.mjs`（和/或 `build-singlefile.mjs`）即可**，
+封装脚本本身不用动（要换 Electron 版本或图标才动 `build.mjs` / `make-icon.mjs`）。

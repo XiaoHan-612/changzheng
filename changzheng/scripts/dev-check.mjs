@@ -199,7 +199,7 @@ await step('内核启动', async () => {
 await step('开局到营地', async () => {
   assert(!bail, '上一步没过');
   const before = errs.length;
-  await page.click('#btn-mode-study');
+  await page.click('#btn-mode-march');
   await page.waitForTimeout(150);
   // passOrigin 现在连过场一起清（序章/幕间都是过场屏，见 tests/e2e/lib/driver.mjs）——
   // 这里**不要**再补一次 `click('#btn-cut-skip')`：按钮此时已经不可见，
@@ -315,19 +315,25 @@ await step('终局失败也不空屏', async () => {
   });
   assert(reachable.ok, `「跳过」键被盖住了（该点最上层是 ${reachable.top}）——玩家点不动`);
   await page.click('[data-action="ai-skip"]');
+  // 跳过之后终局自己会把升华演起来（会宁空镜 → 诗 → 钤印）：这里再跳一次，
+  // 否则一段 60 秒的过场会残留到下一步去（下一步还要自己 play 一次 ending-poem）。
+  await page.waitForTimeout(600);
+  await page.click('#btn-cut-skip').catch(() => {});
   await page.waitForTimeout(400);
   const end = await page.evaluate(() => ({
     title: (document.getElementById('end-title').textContent || '').trim(),
     paras: (document.getElementById('end-paras').textContent || '').trim(),
-    retry: !!document.querySelector('[data-action="end-retry"]'),
+    note: (document.getElementById('end-local-note')?.textContent || '').trim(),
     rel: (document.getElementById('end-rel').textContent || '').trim().length,
   }));
   await page.unroute('**/api/decide');
-  assert(end.title === '结算未完成', `终局失败时标题是「${end.title}」，应该是「结算未完成」`);
+  // v0.3 P2-10 的口径：终局总评拿不到时**本地骨架顶上**（保证有结局可读），
+  // 但必须在屏上明说"这几段不是模型写的"——红线是不许把兜底装成模型产出。
+  assert(end.title.length > 0 && end.title !== '—', `终局失败时标题是空的（玩家看到空壳结算）`);
   assert(end.paras.length >= 20, '终局失败时没有给出任何说明（玩家只看到空屏）');
-  assert(end.retry, '终局失败时没有「重新结算」的入口');
+  assert(end.note.length >= 10, '模型没返回终局总评时屏上没有明说（不许把本地兜底装成模型写的）');
   assert(end.rel > 0, '终局失败时连本局关系都没渲染（这部分不依赖模型）');
-  return '键点得到 · 明说 + 可重试 · 关系照旧';
+  return '键点得到 · 本地骨架 + 屏上明说 · 关系照旧';
 });
 
 await step('升华可跳过且不阻塞', async () => {

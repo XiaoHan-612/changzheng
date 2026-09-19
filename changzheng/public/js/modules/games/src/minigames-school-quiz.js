@@ -350,7 +350,13 @@ function kidSvg() {
 export function runNightSchoolQuiz(container, opts = {}) {
   ensureStyle();
   const place = PLACE_NAME[opts.place] ? opts.place : '草地';
-  const pool = Array.isArray(opts.pool) && opts.pool.length ? opts.pool : POOLS[place];
+  const poolAll = Array.isArray(opts.pool) && opts.pool.length ? opts.pool : POOLS[place];
+  // 同一套「换一批」口径（见 minigames-school.js 同一段）：剔掉上一场用过的词，
+  // 剔完太少就不剔。出题的词从 pool 里取，所以剔了词 = 题目必然换。
+  const avoid = Array.isArray(opts.avoid) ? opts.avoid.filter((w) => poolAll.includes(w)) : [];
+  const pool = avoid.length && poolAll.length - avoid.length >= 12
+    ? poolAll.filter((w) => !avoid.includes(w))
+    : poolAll;
   const SEC = Number.isFinite(opts.secPerQ) && opts.secPerQ > 0 ? opts.secPerQ : 14;
 
   return new Promise((resolve) => {
@@ -634,6 +640,7 @@ export function runNightSchoolQuiz(container, opts = {}) {
             situation: '出今晚夜校的三道识字题（4 选 1），并定今晚的口令',
             state: opts.state || {},
             extraContext: `${ctx}\n【今晚可选的词】${pool.join('、')}\n`
+              + (avoid.length ? `【上一场夜校已经出过这些，今晚换一批，别再用】${avoid.join('、')}\n` : '')
               + '口令只能从上面的词里取。三道题的正确答案位置要打散，别都放 A。',
             operation: { type: 'school_quiz', attempt: attempt + 1 },
           });

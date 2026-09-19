@@ -17,10 +17,14 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const acts = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/acts.json'), 'utf8'));
 
 // 由 main.js 实现的热点类型；改玩法时要同步这张表
+// （luding 2026-09-17 从"只在强制链里"挪成热点：它原来挂在 act3 的 forced 上，
+//   等于走到幕末自己弹出来 —— 玩家一个点都没点，就被塞了一整支玩法，用户反馈过这条）
 const KIND_HANDLED = new Set(['talk', 'fishing', 'school', 'rest', 'share', 'candy', 'sentry',
-  'gomoku', 'grab', 'roster', 'choice', 'fire', 'march', 'pontoon', 'rally', 'path']);
+  'gomoku', 'grab', 'roster', 'choice', 'fire', 'march', 'pontoon', 'rally', 'path', 'luding',
+  // 2026-09-18 吸收的四支
+  'skim', 'weave', 'antiphony', 'cipher']);
 // 只出现在强制链、不挂热点的节点（runForcedChain / finishAct 里单独实现）
-const FORCED_ONLY = new Set(['fishing', 'soup', 'candy', 'sentry', 'path', 'luding', 'night', 'pontoon']);
+const FORCED_ONLY = new Set(['fishing', 'soup', 'candy', 'sentry', 'path', 'night', 'pontoon']);
 
 /**
  * 从**整个流程层**源码里取 CHOICE_SETS 的顶层键。
@@ -125,13 +129,23 @@ test('本轮新增：二幕「油灯下的地图」独立热点已挂上且不�
   assert.equal(sameSpot.length, 1, '油灯地图与其他热点坐标重叠');
 });
 
-test('每幕的可点热点数 ≥ 行动点预算（否则玩家会"有行动点却无事可做"）', () => {
+// 可重复热点（与 public/js/flow/tables.js 的 REPEATABLE_HOTSPOTS 一致）：能反复点
+const REPEATABLE_KINDS = new Set(['fire', 'rest']);
+
+test('每幕：行动点花得完（可点热点数 ≥ 预算，或有可反复点的休息/篝火）', () => {
   for (const id of acts.order) {
     const a = acts.acts[id];
     const budget = a.apDays * a.apPerDay;
-    const count = eachDay(a).reduce((n, d) => n + d.hotspots.filter((h) => h.kind !== 'march').length, 0);
-    assert.ok(count >= budget,
-      `${id}：行动点 ${budget} 但只有 ${count} 个可点热点 —— 加天数时别忘了补内容`);
+    const days = eachDay(a);
+    const count = days.reduce((n, d) => n + d.hotspots.filter((h) => h.kind !== 'march').length, 0);
+    // 2026-09-17 校正口径：原来只数一次性热点，没算「休息/篝火**能反复点**」——
+    // 有可重复热点的幕，剩下行动点时永远有点可点，不会"无事可做"。
+    // 而且暮色是**每天的上限**：上限略高于当天任务数（每天 2~3 个任务）是正常配速，
+    // 不是浪费（用户要的就是"任务都做得完、每天 2~3 个"）。
+    // 真正要拦的是：既没有可重复热点、热点又少于行动点 —— 那才是白给行动点。
+    const hasRepeatable = days.some((d) => d.hotspots.some((h) => REPEATABLE_KINDS.has(h.kind)));
+    assert.ok(count >= budget || hasRepeatable,
+      `${id}：行动点 ${budget}、可点热点只有 ${count} 个，且没有可重复热点（休息/篝火）—— 会有行动点却无事可做`);
   }
 });
 

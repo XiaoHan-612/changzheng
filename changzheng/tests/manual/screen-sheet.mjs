@@ -81,7 +81,7 @@ async function settle(page, timeout = 3000) {
 
 /** 开局：标题 → 出身设定 → 过场 → 营地（后面所有屏都从这里出发） */
 async function intoCamp(page) {
-  await page.click('#btn-mode-study');
+  await page.click('#btn-mode-march');
   await page.waitForTimeout(300);
   await passOrigin(page);
   await page.click('#btn-cut-skip').catch(() => {});
@@ -141,7 +141,7 @@ const BATCHES = {
       setup: async (p) => {
         await p.click('#btn-settings-close').catch(() => {});
         await p.waitForTimeout(150);
-        await p.click('#btn-mode-study');
+        await p.click('#btn-mode-march');
         await p.waitForTimeout(900);
       },
     },

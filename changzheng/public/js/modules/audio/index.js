@@ -43,6 +43,8 @@ export default {
     scenes: () => ({ ACT_SOUNDS, DAY_SOUNDS, SCENE_SOUNDS, BGM_FILE, sfx: SFX_NAMES }),
     /** 可用语速档位（终局升华的 1x/1.5x 从这里取，别在业务里再抄一份数） */
     voiceRates: () => audio.voiceRates(),
+    /** 量一条音频的真实时长（ms，拿不到 0）——终局升华按它拉长时间轴；只读 metadata */
+    durationOf: (url, timeoutMs) => audio.durationOf(url, timeoutMs),
   },
 
   init(kernel) {

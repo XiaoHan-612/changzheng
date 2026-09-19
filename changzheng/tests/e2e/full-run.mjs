@@ -75,8 +75,8 @@ async function run() {
   const titleModel = await page.locator('#title-model').innerText();
   if (!titleModel) throw new Error('title model missing');
 
-  const QUICK = process.argv.includes('--quick');
-  await page.click(QUICK ? '#btn-mode-quick' : '#btn-mode-study');
+  // v0.3 起没有「快速演示」模式了（DESIGN.md §1），一律行军模式跑完整闭环
+  await page.click('#btn-mode-march');
   await page.waitForTimeout(120);
   try { await page.click('#btn-cut-skip'); } catch { /* ok */ }
 
@@ -254,21 +254,21 @@ async function run() {
   if (errs.length) throw new Error('PAGE_ERRORS: ' + errs.join(' | '));
   if (!ended) throw new Error('未到达终局');
   // 快速模式跳过营地，没有 #act-title，幕次无从统计
-  if (!QUICK && seenActs.length < 6) throw new Error('幕次不足: ' + seenActs.length);
+  if (seenActs.length < 6) throw new Error('幕次不足: ' + seenActs.length);
   if (logCount < 20) throw new Error('日志过少: ' + logCount);
   if (soupTimes !== 1) throw new Error(`分汤重复结算: ${soupTimes} 次`);
   if (fishTimes !== 1) throw new Error(`钓鱼重复结算: ${fishTimes} 次`);
   // 标准模式：强制链会跑 candy/sentry/luding；快速模式只跑每幕 forced[0]，这些可能不出现
-  if (!QUICK && candyTimes !== 1) throw new Error(`分糖未按预期触发: ${candyTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
-  if (!QUICK && sentryTimes !== 1) throw new Error(`夜岗未按预期触发: ${sentryTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  if (candyTimes !== 1) throw new Error(`分糖未按预期触发: ${candyTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  if (sentryTimes !== 1) throw new Error(`夜岗未按预期触发: ${sentryTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
   // 快速模式跳过营地日，可选的五子棋不会触发
-  if (!QUICK && gomokuTimes !== 1) throw new Error(`五子棋未按预期触发: ${gomokuTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
-  if (!QUICK && ludingTimes !== 1) throw new Error(`泸定桥未按预期触发: ${ludingTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  if (gomokuTimes !== 1) throw new Error(`五子棋未按预期触发: ${gomokuTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  if (ludingTimes !== 1) throw new Error(`泸定桥未按预期触发: ${ludingTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
   // 快速模式跳过篝火夜（runQuickAct → finishAct({quick})）
-  if (!QUICK && nightTimes !== 2) throw new Error(`夜间抉择应有 night_options + night_resolve 两条: ${nightTimes}`);
+  if (nightTimes !== 2) throw new Error(`夜间抉择应有 night_options + night_resolve 两条: ${nightTimes}`);
   // 快速模式跳过开场设定与营地日
-  if (!QUICK && !seenSteps.has('origin')) throw new Error('开场出身设定（step=origin）未出现');
-  if (!QUICK && oillampTimes !== 1) throw new Error(`二幕「油灯下的地图」未按预期触发: ${oillampTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
+  if (!seenSteps.has('origin')) throw new Error('开场出身设定（step=origin）未出现');
+  if (oillampTimes !== 1) throw new Error(`二幕「油灯下的地图」未按预期触发: ${oillampTimes} 次；营地历次热点 apN:[…]：${campSeen.slice(-8).join(' → ')}`);
   if (sources.some((s) => s !== 'GLM')) throw new Error('出现非真调来源（已移除 MOCK）: ' + sources.join(','));
   if (ttsHits.length < 5) throw new Error(`语音缓存命中过少（${ttsHits.length}），检查 say() 的文本与 voiceId 是否与 TTS 清单一致`);
 

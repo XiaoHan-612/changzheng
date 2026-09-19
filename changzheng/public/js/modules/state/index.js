@@ -18,7 +18,7 @@
 import {
   createState, applyEffects, applyStarvation, checkFailure, addLoss, resolveLoss,
   unlockFact, markLineDone, linesDoneCount, canNight, loadState, saveState,
-  checkVillageUnlock, pickEndingId,
+  checkVillageUnlock, pickEndingId, consumeActFood, resourceWarnText,
 } from '../../state.js';
 
 let S = null;            // 唯一的持有者（模块级变量，不挂描述符）
@@ -86,7 +86,11 @@ export default {
       apply(label, (s) => {
         changes = applyEffects(s, effects);
         unlockedVillage = checkVillageUnlock(s);
-      }, Object.keys(effects || {}));
+        if (unlockedVillage) {
+          if (!Array.isArray(s.campLog)) s.campLog = [];
+          s.campLog.push({ tag: '系统', text: '民心到了，老乡支线解锁' });
+        }
+      }, [...Object.keys(effects || {}), 'villageUnlocked', 'campLog']);
       if (unlockedVillage) {
         changes = [...(changes || []), '老乡支线解锁'];
       }
@@ -96,6 +100,18 @@ export default {
     /** 花行动点 */
     spendAp(n = 1, why = '') {
       apply(why || '花行动点', (s) => { s.ap = Math.max(0, s.ap - n); s.行动日志.push(why); }, ['ap', '行动日志']);
+    },
+
+    /** 幕间口粮（方案 A：行军类 −1）；返回实扣 */
+    actFoodBurn() {
+      let n = 0;
+      apply('过幕口粮', (s) => { n = consumeActFood(s); }, ['粮食']);
+      return n;
+    },
+
+    /** 营地临界提示文案（粮/体力/士气） */
+    safetyText() {
+      return resourceWarnText(S) || '';
     },
 
     /** 进入营地日：重置当日计数并设置天数与行动点 */

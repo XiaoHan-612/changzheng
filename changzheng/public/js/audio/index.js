@@ -66,6 +66,35 @@ export class Audio {
   /** 可选语速档位（终局升华的 1x/1.5x）——值在 mix.js，别在业务里再抄一份 */
   voiceRates() { return MIX.voice.rates.slice(); }
 
+  /**
+   * 量一条音频的**真实时长**（ms）；拿不到就返回 0，绝不抛错、绝不阻塞。
+   *
+   * 为什么归门面：`new Audio(...)` 只有音频框架能碰（qa:audio 的框架一致性守卫按这条查）。
+   * 目前只有终局升华用它——朗诵文件若比 `data/poem.json` 标定的时间轴更长，
+   * 逐字就要按真实长度拉长，否则收尾的 `voice:stop` 会在朗读没完时掐断（用户反馈过）。
+   * 只读 metadata：不占通道、不进混音、不改任何播放状态。
+   */
+  durationOf(url, timeoutMs = 4000) {
+    return new Promise((resolve) => {
+      if (!url || typeof document === 'undefined') { resolve(0); return; }
+      const el = new Audio();
+      let done = false;
+      const fin = (ms) => {
+        if (done) return;
+        done = true;
+        el.onloadedmetadata = null;
+        el.onerror = null;
+        try { el.src = ''; } catch { /* 已释放 */ }
+        resolve(ms);
+      };
+      el.preload = 'metadata';
+      el.onloadedmetadata = () => fin(Math.round((Number(el.duration) || 0) * 1000));
+      el.onerror = () => fin(0);
+      setTimeout(() => fin(0), timeoutMs);
+      el.src = url;
+    });
+  }
+
   /** 游戏内静音（顶栏 🔊）：停声、保留意图，取消即恢复 */
   setMuted(on) { this.core.setMuted(on); }
   get muted() { return this.core.muted; }

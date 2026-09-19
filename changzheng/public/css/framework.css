@@ -45,12 +45,22 @@
 }
 
 /* 5 玩法板：钓鱼/夜校/分糖/夜岗/五子棋/泸定桥/陡坡 */
-.tpl-board { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+/* 玩法板用**自己那套面积预算**（--panel-w-board / --panel-h-board，见 tokens.css）：
+   比阅读面板大得多是故意的 —— 棋盘与河道要看得清、点得准，而且纵向装不下就得滚屏，
+   玩到一半滚来滚去最难受。原来跟阅读面板共用 640×74vh：内容区只有 592px 宽，
+   浮桥画布 460×240、五子棋 330×330，1366×768 上 9 支玩法有 8 支要滚动（rally-river 超出 462px）。
+   顺带把竖向留白收了一档（padding sp-5→sp-4、gap sp-3→sp-2），省下的高度全给玩法区。
+   面积口径见 scripts/check-tone.mjs：玩法板另有上限，不按阅读面板的 35% 判。 */
+.tpl-board {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  /* 给顶栏让出上边（顶栏是 absolute，纸面顶上去会被压住）——见 tokens.css 的 --topbar-h */
+  padding-top: var(--topbar-h);
+}
 .tpl-board .tpl-body, .tpl-board .sheet {
-  width: min(var(--panel-w), 92vw);
-  max-height: calc(var(--panel-h) + 6vh);
-  padding: var(--sp-5) var(--sp-5) var(--sp-4);
-  display: flex; flex-direction: column; gap: var(--sp-3);
+  width: min(var(--panel-w-board), 94vw);
+  max-height: var(--panel-h-board);
+  padding: var(--sp-4) var(--sp-5) var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-2);
   overflow: auto;
 }
 
@@ -64,7 +74,26 @@
   padding: var(--sp-6) var(--sp-6) var(--sp-5);
 }
 
-/* 7 世界面板：自由行军沙盘（同时匹配语义类与既有 DOM 类） */
+/* 游戏模式 · 玩法画廊（不进剧情的十支玩法，点开即玩）。
+   屏用的是既有模板 tpl-title（图上居中一列）—— 不新造模板类（lint-frames 拦的就是自造），
+   这里只写这一屏自己的排布；材质与卡片长相在 components.css，
+   尺寸预算沿用玩法板那一套（--panel-w-board / --panel-h-board）：十张卡要排得开。 */
+.arcade-bg {
+  position: absolute; inset: 0; background-size: cover; background-position: center;
+  filter: saturate(0.92) brightness(0.62);
+}
+.arcade-wrap {
+  position: relative; z-index: 2;
+  width: min(var(--panel-w-board), 94vw);
+  max-height: var(--panel-h-board); overflow: auto;
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  padding: var(--sp-5);
+  text-align: center;
+}
+.arcade-head { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.arcade-head .blk-lead { max-width: 640px; }
+
+/* 8 世界面板：自由行军沙盘（同时匹配语义类与既有 DOM 类） */
 .tpl-world .tpl-rail, .tpl-world .sb-world {
   position: absolute; left: var(--sp-4); top: 64px; bottom: var(--sp-5);
   width: 240px; padding: var(--sp-4); overflow: auto;

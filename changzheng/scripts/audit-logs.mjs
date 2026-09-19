@@ -135,6 +135,13 @@ function main() {
     lines.push('| 时间 | callType | 缺字段 | 来源文件 |');
     lines.push('|---|---|---|---|');
     for (const v of violations.slice(0, 50)) lines.push(`| ${v.ts} | ${v.callType} | ${v.miss.join(', ')} | ${v.file} |`);
+    // 契约变更的过渡记录：这类"带戳记但不满足新表"的记录会被当成红灯，得让读报告的人一眼看懂成因
+    if (violations.some((v) => v.callType === 'gomoku_move' && v.miss.includes('pick'))) {
+      lines.push('');
+      lines.push('> 上面 `gomoku_move` 缺 `pick` 的那些是 **2026-09-17 契约变更前的过渡记录**：');
+      lines.push('> 那天之前提示词让模型返回 `{"move":"h8"}`，而游戏读的是 `pick`（候选序号）——两边对不上，');
+      lines.push('> 模型的落子其实**从来没被采纳过**（每次都被引擎兜底顶掉）。两边改齐之后新记录都会带 `pick`。');
+    }
   }
   lines.push('');
   lines.push('## 历史记录（无戳记）');

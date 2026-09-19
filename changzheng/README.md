@@ -1,4 +1,4 @@
-# 《长征·抉择》
+# 《星火微光·我路过他们的长征》
 
 五幕 AI 科普互动游戏 · 赛道二
 （赛制指定 **glm-5.1**；本机网络受限时可在 `.env` 用 `glm-5.3-flash` 替代，日志 `model` 字段如实记录）
@@ -12,14 +12,16 @@ npm start
 # http://localhost:3001
 ```
 
-入口：**研学模式**（不会失去战友）· **行军模式**（资源见底会掉队、高风险抉择会有人留下）· **快速演示**（每幕只跑主玩法与对决）。
+不想装 Node、或者要把成品发给别人：用仓库的**桌面封装**——双击 `长征-抉择.exe` 就进标题页，
+单文件版（只发一个 exe）在 GitHub Releases；自己重打见 [`../packaging/README.md`](../packaging/README.md)。
+封装不改游戏代码，玩法与日志格式与这里完全一致。
+
+入口：**研学模式**（不会失去战友）· **行军模式**（资源见底会掉队、高风险抉择会有人留下）· **快速演示**（每幕只跑主玩法与对决，约 18 分钟）。
 中途刷新后，标题页会出现「继续上一局」。
-**验收捷径**：标题页「直达会宁 · 验收」，或打开 `http://localhost:3001/?jump=act5`（跳过序章，预置附身线与史实，方便测终局诗笺与报告）。
-v0.3 体验/安全整改说明见 [`docs/V0.3-PLAN.md`](docs/V0.3-PLAN.md)；代码踩坑见 [`docs/HANDOFF-CODE.md`](docs/HANDOFF-CODE.md)。
 
 ## 测试
 
-三层尺子：改一处先跑 `dev:check`（约 13 秒、0 次真调），提交前 `verify:fast`，推送与交付前 `verify:full`。
+三层尺子：改一处先跑 `dev:check`（约 16 秒、0 次真调），提交前 `verify:fast`，推送与交付前 `verify:full`。
 
 ```powershell
 npm run dev:check     # 开发快检（批次中间随手跑）：总线规矩 / 单元测试 / 文档一致 / 内核启动 / 玩法板 / 终局失败不空屏 / 升华可跳过
@@ -30,15 +32,15 @@ npm run test:e2e      # 五幕真调通关（加 --quick 跑快速模式）
 npm run qa:failure    # 行军模式失败线 · qa:loss 减员线
 npm run qa:av         # 影音运行时审计（资源 404 / 立绘 / 环境床 / TTS 能否解码）
 npm run test:unit     # 状态层 / 契约 / 配置层 / 玩法守卫 · qa:smoke UI 冒烟
-npm run qa:board      # 玩法板体检：十支玩法逐屏摆上板 + 清单/体检表/actions 三方对账
+npm run qa:board      # 玩法板体检：14 支玩法逐屏摆上板 + 清单/体检表/actions 三方对账
 npm run qa:bus        # 总线守卫：模块化规则（六条）+ 内核运行时体检
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫（字面量/模板/纸面/动效）
 npm run qa:handoff    # 交接文档与代码一致
 npm run qa:ai         # AI 调用体检：预算表 ↔ 字段契约（15 类）↔ 真调日志三方对账
-npm run intake:minigames:check   # 十支小游戏的缝合点还在吗（幂等检查）
+npm run intake:minigames:check   # 14 支小游戏的缝合点还在吗（幂等检查）
 npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md · tts:manifest 语音清单 · poem:manifest 诗清单
 ```
-`dev:check` 10 步约 13 秒（不真调）· `test:unit` 63 项 · `qa:board` 83 项 · `qa:motion` 19 项；`test:e2e` 一次真调约 76 次。
+`dev:check` 10 步约 16 秒（不真调）· `test:unit` **65** 项 · `qa:board` **114** 项（14 支）· `qa:motion` 19 项；`test:e2e` 一次真调约 76 次。
 （数字随改动变，绿不绿看命令本身。）
 
 ## 玩法一句话
@@ -53,7 +55,7 @@ npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md · tts:manife
 - **史实回响**：你刚经历的 / 真实发生过的 / 虚构边界
 - 顶栏 **答辩**：按 call_type 聚合的调用统计，路演用
 - **玩法板**：小游戏都在专属板屏上玩（题名 + 数值签 + 玩法区）；人物在舞台屏交代任务，结算回舞台屏
-- 十支小游戏：浮桥夜搭（一幕）· 东岸还有人（一幕）· 夜校识字（二幕）· 弯针成钩 → 金色鱼钩（四幕）· 分糖 · 夜岗 · 泥地五子棋 · 陡坡拽人 · 飞夺泸定桥（三幕）——接法与插槽见 `docs/MINIGAMES-INTAKE.md`
+- 小游戏（清单以 `public/js/modules/games/manifest.js` 为准，现 **14 支**）：浮桥夜搭（一幕）· 东岸还有人（一幕）· 夜校识字（二幕）· 弯针成钩 → 金色鱼钩（四幕）· 分糖 · 夜岗 · 泥地五子棋 · 陡坡拽人 · 飞夺泸定桥（三幕）· 于都河打水漂 · 湘江编草鞋 · 遵义对歌 · 金沙江译电——接法与插槽见 `docs/MINIGAMES-INTAKE.md`
 - **篝火夜**（第四幕幕末）：由模型生成互斥抉择，选完写「当夜之后」
 
 ## 设置
@@ -72,4 +74,5 @@ npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md · tts:manife
 - **`docs/HANDOFF-ART.md`** / **`docs/HANDOFF-AUDIO.md`** — 给生图 / 音频模型
 - `docs/ASSETS.md` — 素材清单（可勾选）· `docs/TTS-MANIFEST.md` — 语音哈希清单 · `public/audio/poem/README.md` — 终局朗诵（怎么换、怎么重量时间轴）
 - `docs/ARCHITECTURE.md` · `docs/QA.md` · `docs/SCORING.md` · `docs/PITCH.md`
+- `../packaging/README.md` — **桌面封装**（出单文件 exe / 成品目录 / 外壳行为 / 验收 / 已知取舍）
 - `../design/asset-prompts.md` — 生图 prompt 包；`../长征-抉择-设计方案.docx` — 完整策划案

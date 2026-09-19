@@ -98,6 +98,7 @@ export default {
         return { score: 0, detail: {}, summary: '' };
       }
       destroy();                       // 上一局的残留（即使旧定时器还持着引用，写入也落在废弃节点上）
+      let exitReason = '';             // '' | 'abandon' | 'skip' —— 由板屏右上那两个按钮写
       const t0 = Date.now();
       showScreen('screen-board');
       const day = kernel.api('state')?.raw?.()?.day || 1;   // 只读；kicker 兜一个"第 N 日"
@@ -114,13 +115,27 @@ export default {
       live = { id, host, exit: [] };
       kernel.emit('game:start', { id, title: title || spec.title || '' });
 
-      // 「放弃本局」：换回舞台屏 → screens.own 的 destroy → adapter onExit settle aborted。
-      // 流程层对 detail.aborted 应跳过 minigame_review（见 games-flow 的 aborted 短路）。
+      // 板屏两个出口（都走"换回舞台屏 → screens.own 的 destroy → adapter onExit"这一条路，
+      // 差别只在这里记下的 exitReason：见下面 out 的改写）：
+      //   跳过本局 = 不玩这一局，这件事就过去了 —— 流程层据此 markDone、不给效果、不再复盘；
+      //   放弃本局 = 先不玩、回营地 —— 热点保持可点，随时能再来。
+      // 流程层对 detail.aborted 会跳过 minigame_review（见 games-flow 的 aborted 短路）。
+      exitReason = '';
       const abandonBtn = $('btn-board-abandon');
       if (abandonBtn) {
         abandonBtn.hidden = false;
         abandonBtn.onclick = () => {
           abandonBtn.onclick = null;
+          exitReason = 'abandon';
+          showScreen('screen-stage');
+        };
+      }
+      const skipBtn = $('btn-board-skip');
+      if (skipBtn) {
+        skipBtn.hidden = false;
+        skipBtn.onclick = () => {
+          skipBtn.onclick = null;
+          exitReason = 'skip';
           showScreen('screen-stage');
         };
       }
@@ -149,11 +164,20 @@ export default {
         console.error(`[games] 玩法「${id}」挂载/运行出错：`, err);
         result = { score: 0, detail: { error: String(err?.message || err) }, summary: '这一局没有完成' };
       } finally {
-        const ab = $('btn-board-abandon');
-        if (ab) { ab.onclick = null; ab.hidden = true; }
+        for (const bid of ['btn-board-abandon', 'btn-board-skip']) {
+          const b = $(bid);
+          if (b) { b.onclick = null; b.hidden = true; }
+        }
       }
       const out = { score: 0, detail: {}, summary: '', noAi: !!spec.noAi, ...(result || {}) };
-      kernel.emit('game:end', { id, score: Number(out.score) || 0, ms: Date.now() - t0 });
+      // 「跳过本局」与「放弃本局」走同一条离场路径，adapter 的 onExit 一律 settle 成 aborted:true，
+      // 所以跳过要在这里**改写**：清掉 aborted、标上 skipped —— 流程层靠这两个字段分岔
+      // （aborted = 没做完、热点保留；skipped = 过了、热点算完成但不给效果）。
+      if (exitReason === 'skip') {
+        out.detail = { ...(out.detail || {}), aborted: false, skipped: true };
+        out.summary = '这一局跳过了 —— 这件事就过去了';
+      }
+      kernel.emit('game:end', { id, score: Number(out.score) || 0, ms: Date.now() - t0, exitReason });
       return out;
     },
   },

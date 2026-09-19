@@ -166,9 +166,15 @@ export function mulberry32(seed) {
 /* ══════════════ 常量 ══════════════ */
 
 export const N = 9;                 // 9×9 —— 泥地上用树枝刮得出来的尺寸
-export const CELL = 34;             // 每格 CSS 像素
-export const PAD = 12;              // 泥地留白（篝火光就落在这圈上）
-export const BOARD_PX = N * CELL + PAD * 2;   // 330
+// 2026-09-17 放大：34/12 → 52/16（棋盘 330 → 500，面积 2.3 倍）。
+// 原来 330 的盘在 960 宽的玩法板里明显偏小，落子点要瞄；用户反馈"把棋盘做大一点"。
+// 放大是**成比例**的：石子半径、格线、命中格都从 CELL 推出来（见 r = CELL/2 - 0.8、
+// CSS 里的 ${CELL}），所以只动这两个常量 + 下面那段参数化样式就够了。
+// 校验：qa-gomoku 的像素对账读的是 dataset.miniBoard 里的 pad/cell（不是写死的），
+// 采样半径 13*dpr 仍在半格（52/2=26）之内，分类阈值不受影响。
+export const CELL = 52;             // 每格 CSS 像素
+export const PAD = 16;              // 泥地留白（篝火光就落在这圈上）
+export const BOARD_PX = N * CELL + PAD * 2;   // 500
 
 export const PUDDLE_MAX = 3;
 export const PUDDLE_FIRST = 8;      // 第 8 手（总手数）渗第一处
@@ -194,10 +200,12 @@ export const AI_WINDOW_MS = 10000;  // 用户定的窗口：超过 10 秒就当�
  *
  * 血统检查（`tests/manual/qa-gomoku.mjs` A5 + 临时 diag）：hard > mid > easy，且硬档自对自要能分胜负。
  */
+// tier 是**给玩家看的难度档**（原来只有文艺腔那半句，玩家看不出哪个简单哪个难 —— 用户反馈
+// "AI 难度要分简单中等困难三种"）。flavor 那半句保留，摆在档位后面当注释。
 export const LEVELS = {
-  easy: { label: '他今天心不在焉', oppW: 0.20, noise: 0.55, slip: 0.30, killer: false, deep: false, head: 4, oppHead: 0 },
-  mid: { label: '他认真起来了', oppW: 0.50, noise: 0.08, slip: 0, killer: true, deep: false, head: 6, oppHead: 5 },
-  hard: { label: '他把老兵教的使出来了', oppW: 0.40, noise: 0, slip: 0, killer: true, deep: true, head: 12, oppHead: 8 },
+  easy: { tier: '简单', label: '他今天心不在焉', oppW: 0.20, noise: 0.55, slip: 0.30, killer: false, deep: false, head: 4, oppHead: 0 },
+  mid: { tier: '中等', label: '他认真起来了', oppW: 0.50, noise: 0.08, slip: 0, killer: true, deep: false, head: 6, oppHead: 5 },
+  hard: { tier: '困难', label: '他把老兵教的使出来了', oppW: 0.40, noise: 0, slip: 0, killer: true, deep: true, head: 12, oppHead: 8 },
 };
 
 /** 没到"杀招"档时，自己成四/成三的加分（rank 3/4 由阶梯直接短路，不走这里） */
@@ -850,23 +858,27 @@ function ensureStyle() {
   //    （position:relative）里；**格心与画布共用同一套坐标**（都是 PAD + i*CELL + CELL/2），
   //    所以"看见的位置 = 判定的位置"是构造保证的，不是靠运气（夜校那轮栽在这一点上）。
   // ⚠️ CSS 注释里不要出现反引号。
+  // ⚠️ 盘面尺寸**全部由 N / CELL / PAD 推出来**（原来是写死的 330/306/12/34）：
+  //    改棋盘大小只需要动上面那三个常量，样式、画布、命中格、导出几何会一起跟着走。
+  //    写死过一次的代价：把 CELL 从 34 调到 52 时，四处尺寸得手工对齐，漏一处就"看着能点、点下去不是那格"。
+  const DOT = Math.round(CELL * 0.26);            // 落点预览的小圆点（随格子成比例）
   s.textContent = `
 .smini8-wrap { display:flex; flex-direction:column; gap:10px; }
 .smini8-lead { margin:0; font-size:13px; line-height:1.8; color:#3f3524; }
 .smini8-lead .dim { color:#7a6c53; }
 .smini8-mid { display:flex; gap:14px; align-items:flex-start; }
-.smini8-boardwrap { position:relative; width:330px; height:330px; flex:0 0 auto;
+.smini8-boardwrap { position:relative; width:${BOARD_PX}px; height:${BOARD_PX}px; flex:0 0 auto;
   border-radius:5px; overflow:hidden;
   box-shadow: inset 0 0 0 1px rgba(58,46,28,.55), 0 2px 7px rgba(40,32,20,.30); }
-.smini8-cv { position:absolute; left:0; top:0; width:330px; height:330px; display:block; }
-.smini8-grid { position:absolute; left:12px; top:12px; width:306px; height:306px;
-  display:grid; grid-template-columns:repeat(9,34px); grid-template-rows:repeat(9,34px);
+.smini8-cv { position:absolute; left:0; top:0; width:${BOARD_PX}px; height:${BOARD_PX}px; display:block; }
+.smini8-grid { position:absolute; left:${PAD}px; top:${PAD}px; width:${N * CELL}px; height:${N * CELL}px;
+  display:grid; grid-template-columns:repeat(${N},${CELL}px); grid-template-rows:repeat(${N},${CELL}px);
   z-index:2; }
-.smini8-cell { width:34px; height:34px; padding:0; margin:0; border:0;
+.smini8-cell { width:${CELL}px; height:${CELL}px; padding:0; margin:0; border:0;
   background:transparent; position:relative; cursor:default; border-radius:50%; }
 .smini8-cell[data-mini-action="place"] { cursor:pointer; }
 .smini8-cell[data-mini-action="place"]::after { content:''; position:absolute;
-  left:50%; top:50%; width:9px; height:9px; margin:-4.5px 0 0 -4.5px; border-radius:50%;
+  left:50%; top:50%; width:${DOT}px; height:${DOT}px; margin:-${DOT / 2}px 0 0 -${DOT / 2}px; border-radius:50%;
   background:rgba(250,244,228,.46); box-shadow:0 0 0 1px rgba(60,48,28,.35); }
 .smini8-cell[data-mini-action="place"]:hover::after { background:rgba(255,252,240,.86); }
 .smini8-cell[data-mini-action="place"]:focus-visible { outline:2px solid #6b7f52; outline-offset:-3px; }
@@ -927,7 +939,11 @@ export function runMudGomoku(container, opts = {}) {
     let moves = 0;
     let handicap = !!opts.handicap;
     let level = opts.level || DEFAULT_LEVEL;
-    let aiOn = !!opts.ai;
+    // 2026-09-17：**默认走模型**（原来默认关，对手每一手都由本地引擎算 —— 赛制要求
+    // "游戏 AI 决策必须通过指定大模型实现，不得用独立算法替代"，默认关等于每局都没有
+    // 一次 gomoku_move 调用、日志里也拿不出证据）。显式传 ai:false 仍可关掉；
+    // 模型的每一手仍受 10 秒窗口与合法性校验约束，超时/不合法就落回引擎（看到"他在想"时催一手更快）。
+    let aiOn = opts.ai !== false;
     let aiPending = false;
     let kidSeq = 0;                     // 小鬼这一手的序号：催他/结算都会 +1，作废在飞的请求
     // 小鬼这一手要说的话。⚠️ 必须由 `afterMove` 消费 —— 换手时会把状态栏刷成固定嘲讽，
@@ -1172,12 +1188,14 @@ export function runMudGomoku(container, opts = {}) {
         // 对手档位。三档的差别是"他看得见多远的杀招"（见文件头 LEVELS 那段），
         // 不是噪声大小 —— 所以这个选择是真的，不是换个名字。
         const pick = h('div', { class: 'smini8-pick' });
+        const cur = LEVELS[level] || LEVELS[DEFAULT_LEVEL];
         pick.appendChild(h('div', {
           class: 'smini8-picklab',
-          html: `对面坐的是：<b>${LEVELS[level] ? LEVELS[level].label : level}</b>`,
+          html: `对面坐的是：<b>${cur.tier}</b>（${cur.label}）`,
         }));
         for (const key of ['easy', 'mid', 'hard']) {
-          const b = btn(LEVELS[key].label, 'level', key === level ? 'pri' : '');
+          // 按钮上把难度档写在前面：玩家一眼能选"我要简单还是困难"
+          const b = btn(`${LEVELS[key].tier} · ${LEVELS[key].label}`, 'level', key === level ? 'pri' : '');
           b.dataset.level = key;
           b.setAttribute('aria-pressed', key === level ? 'true' : 'false');
           b.onclick = () => { level = key; renderActs(); renderKv(); syncData(); };
@@ -1188,7 +1206,10 @@ export function runMudGomoku(container, opts = {}) {
         ba.onclick = () => startGame(true);
         const bb = btn('「实打实来」 —— 你先落一子（输了别赖地滑）', 'fair', 'pri wide');
         bb.onclick = () => startGame(false);
-        const bc = btn('不下了，蹲一边看他俩下', 'spectate');
+        // 「不玩了」要**明确写成跳过**：原来只写"蹲一边看他俩下"，玩家不知道这就是不玩、
+        // 更不知道点完流程照走（用户反馈：要有个不想玩的选项，而且不玩也要继续）。
+        // 机制本来就是现成的——观棋按 SPECTATE_SCORE（0.5，中性分）结算，剧情照常往下走。
+        const bc = btn('不玩了，让他们自己下（跳过这局，剧情照常走）', 'spectate');
         bc.onclick = () => startSpectate();
         actsEl.append(pick, ba, bb, h('div', { class: 'smini8-acts' }, [bc]));
         return;
@@ -1225,8 +1246,8 @@ export function runMudGomoku(container, opts = {}) {
           cb,
           h('span', {
             text: aiOn
-              ? '让小鬼子自己想办法（每一手最多等 10 秒，可随时「催他一手」）'
-              : '让小鬼子自己想办法（默认关：他随手就落，不用等）',
+              ? '让小鬼自己想（每一手都由模型来定，最多等 10 秒，可随时「催他一手」）'
+              : '不用等：他随手就落（快，但这一局的走棋不由模型决定）',
           }),
         ]));
       }

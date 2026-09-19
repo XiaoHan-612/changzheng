@@ -59,8 +59,8 @@ export function pluginFrom(mod, { id, cardId = id, kicker = '', bg = '', stats }
       // qa:board 的"数值签"断言就是查这个）——所以由插件给，卡片没写就用传进来的
       stats: stats || card.stats || [],
       actions: card.actions || [],
-      // 卡片声明"纯铺垫、不产生复盘调用"→ 流程层据此**跳过 minigame_review**（省一次真调），
-      // 改用固定效果（见 flow/games-flow.js 的 reviewOrFixed）。字段名与他们的注册表口径一致。
+      // 卡片上的 noAi 表示「玩法局内不调模型」。**主线结算不因它跳过真调**——
+      // 比赛要求尽可能使用 API，flow/games-flow.js 的 reviewMain 仍会对主线玩法调 minigame_review。
       noAi: !!card.noAi,
       mount(mountHost, ctx) {
         // 注入宿主能力（对应源码里的 bindHost；见 tools/intake-minigames.mjs 的说明）。

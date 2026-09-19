@@ -27,7 +27,7 @@ await page.evaluate(() => {
 await page.reload({ waitUntil: 'networkidle' });
 
 // 进营地拿到 run 状态（钩子需要 S）
-await page.click('#btn-mode-study');
+await page.click('#btn-mode-march');
 await page.waitForTimeout(300);
 await passOrigin(page);
 await page.click('#btn-cut-skip').catch(() => {});
@@ -68,6 +68,12 @@ const specs = {
   'snow-grab': { title: '陡坡 · 拽住他', stat: '他离你', kick: '[data-mini-action="leg"]', after: '[data-mini-action="throw"]' },
   'pontoon-night': { title: '夜搭浮桥', stat: '夜色', kick: '[data-mini-action="mode-boat"]', after: '[data-mini-action="mode-boat"]' },
   'rally-river': { title: '收拢', stat: '天光', kick: '[data-mini-action="search"]', after: '[data-mini-action="search"]' },
+  // 2026-09-18 吸收的四支（打水漂 / 编草鞋 / 对歌 / 译电）——体检表必须覆盖清单里的每一个，
+  // 漏一支 "体检表覆盖了清单里的每个玩法" 就红（这一条本身就是防漏的）。
+  skim: { title: '打水漂', stat: '轮', kick: '[data-mini-action="pick-flat"]', after: '[data-mini-action="aim"]' },
+  weave: { title: '编草鞋', stat: '工序', kick: '[data-mini-action="pull-hold"]', after: '[data-mini-action]' },
+  antiphony: { title: '对歌 · 火塘边', stat: '巡', kick: '[data-mini-action="sing-0-a"]', after: '[data-mini-action]' },
+  cipher: { title: '译电 · 选难度', stat: '档位', kick: '[data-mini-action="mode-easy"]', after: '[data-mini-action]' },
 };
 
 for (const [name, spec] of Object.entries(specs)) {

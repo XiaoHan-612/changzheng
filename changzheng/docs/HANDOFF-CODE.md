@@ -1,6 +1,6 @@
 # 交接说明 · 代码（给下一个代码 agent）
 
-> 你接手的是《长征·抉择》的**唯一可运行工程** `changzheng/`。
+> 你接手的是《星火微光·我路过他们的长征》的**唯一可运行工程** `changzheng/`。
 > 历史版本在 `../_archive/`（`sample/` 是最初的营地四线原型、`demo-v1/` 是五幕中间版），**只读参考，不要在那里开发**。
 > 素材与音频分别交给生图/音频模型，见同目录 `HANDOFF-ART.md`、`HANDOFF-AUDIO.md`。
 
@@ -10,7 +10,8 @@
 cd changzheng
 npm install
 npm start                 # http://localhost:3001
-npm run test:unit         # 65 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 民心与结局
+npm run dev:check         # 批次中间的快检（约 16 秒、0 真调）：总线规矩 / 单元 / 文档一致 / 内核启动
+npm run test:unit         # 65 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 玩法守卫
 npm run test:e2e          # 五幕**真调**通关（含快速模式：node tests/e2e/full-run.mjs --quick）
 npm run qa:smoke          # 标题→营地→一次互动
 npm run qa:audit          # 日志 schema 审计 → docs/LOG-AUDIT.md
@@ -24,11 +25,12 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
 
 | 文件 | 职责 | 改动注意 |
 |---|---|---|
-| `public/js/main.js` | 主线状态机：五幕、营地日、强制链、对决、失败/终局、篝火夜；**玩法宿主** `openBoard()` + `mountMini()` | 最大的文件；热点用 `HOTSPOT_HANDLERS` 映射表分发，**加玩法只加一行**；玩法一律挂板屏（见第 27 条） |
+| `public/js/main.js` | **组合根**（批 7 起约 535 行）：启动、装配、chrome 绑定、把流程入口接到按钮/热点 | 主线状态机已拆到 `flow/*`；加玩法入口看 `flow/games-flow.js`（主线按槽）与 `flow/arcade.js`（从玩法清单起一局） |
+| `public/js/flow/` | **流程层**：`act`（幕 + 营地）/ `games-flow`（强制链与玩法结算）/ `echo` / `tables` / `quiz` / `night` / `end` / `arcade` / `modes`（标题页四种模式）/ `kit` / `view` | 流程层只写"怎么走"；玩法本体在 `modules/games/src/`，**玩法不自调模型**（结算一律回流程层） |
 | `public/js/kernel/` | **内核**（新）：`bus`（事件总线）/ `contracts`（事件契约唯一真源）/ `plugins`（模块描述符）/ `kernel`（注册·接线·ready·诊断）/ `wiring`（模块清单）/ `resources`（显式锁）/ `snapshot`（只读快照）/ `diag`（事件流黑匣子） | 架构与规矩见 [`BUS.md`](BUS.md)；**模块集合不写死**——加模块只动 `wiring.js` 清单与模块自己的文件 |
 | `public/js/modules/` | **IP 模块**（新）：已挂 `audio`（声音总入口）/ `shell`（外壳反应）/ `screens`（屏生命周期归属）/ **`state`（状态唯一持有者：写走动作并广播）/ `hud`（订阅 state:change 渲染读数）**；`games/` 是交互游戏插件契约 + 模板；`cinema/` 是**电影化三处的播放器**（拍子 `beats.js` + 编排 `sequences.js` + 播放 `player.js`，见坑 52 与 [`BUS.md`](BUS.md) §八） | 批 2 起逐个迁入；**业务发声音只发事件**（`sfx:play`/`voice:say`/`scene:enter`/`flow:act-enter`），`qa:audio` 会拦直接 import 音频门面的写法 |
 | `public/js/step.js` | **交互契约**：`step()` / `askChoice()` / **`choiceButton()`（选项唯一构建处）** / `waitContinue()` / `markMini()` | 新增玩法只要声明契约，测试与自动化无需改动；详见 ARCHITECTURE 的「交互契约」 |
-| `public/js/minigames.js` | **8 个玩法**：钓鱼/弯针/夜校识字/分糖/夜岗/五子棋/泸定桥/陡坡 | 统一返回 `{score, detail, summary?}`，本地只判手感，结算走 `/api/decide`；状态经 `stats(host, [...])` 写进板头数值签 |
+| `public/js/modules/games/` | **玩法插件 + 清单**：`manifest.js`（有哪些玩法）/ `index.js`（板屏宿主）/ 各支薄适配；玩法本体在 `src/minigames-*.js` | 旧版 `public/js/minigames.js`（8 个玩法）**已删除**；加一支只动 `manifest.js` 两行（主线还要在 `flow/games-flow.js` 按槽接一次），契约见该目录 README |
 | `public/js/state.js` | 资源/好感/附身线/行动点/每日场景/失败判定 | 纯函数、可单测；新增资源维度要同时改 `applyEffects` 的钳制表 |
 | `public/js/origin.js` | 开场设定：出身三选一 + 出发前一问（纯数据 + 纯函数） | 三条出身的收益刻意对称（各 +5/−2），别加出唯一最优解；问答必须留在本地题库，开局第一屏不能依赖网络 |
 | `public/js/audio/` | **音频框架**（批 1 重写）：`index`（门面）/ `mix`（混音表）/ `core`（desired-actual + reconcile）/ `channels/*` | 见坑 28；调用一律从 `index.js` 进，`qa:audio` 的框架一致性段强制 |
@@ -57,9 +59,7 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
    → 终局 runEnding（ending_review + 研学报告 study_report）
 ```
 
-**附身线门控（v0.3）**：`state.linesDone` 记全部点亮；`state.voluntaryLines` 只记**营地自愿**玩过；
-`canNight(2)` 看 **voluntary ≥2**（强制链 `markLine(id)` 不传 voluntary）。手记仍显示 `N/5`。
-验收捷径：`?jump=act5` 或标题「直达会宁」。
+**附身线门控**：`state.linesDone` 记 5 条营地线（fishing/candy/sentry/school/gomoku），`canNight()` ≥3 才解锁篝火夜；手记面板显示 `N/5`。
 
 **防重入**：`S.busy` + `withLock`。注意历史约定：在锁内要调用 `runForcedChain` 时先手动 `S.busy = false`（见 `onHotspot` 的 march 分支与 `runQuickAct`），否则嵌套 `withLock` 会静默 return。
 
@@ -292,20 +292,6 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
     - 现在的三道自保：① 页数打印出来（`共 17 屏`）；② 脚本里写死一张"**必到的屏**"清单（`REQUIRED`）并对账，少跑一屏就计入问题、非零退出；③ 有 defects 就 `process.exitCode = 1`。
     - 更一般的教训：**机械重构之后，验收脚本要"跑一次并读它的输出形状"**，不能只看绿不绿。同类信号：条数从 N 变成 M、少了一屏、少了一个"检查了 x 个文件"的计数——本项目已经吃过三次（坑 47 的"空切片换绿"、坑 51 的"手列清单漏文件"、这一条）。所以凡体检脚本，**必须打印它体检了几样东西**，并对自己有个下限断言。
 53. **对"可能不在的元素"用默认超时的 `page.click` 会让快检慢 4 倍**（批 C 顺手修掉） —— 序章上线后，`dev:check` 的"开局到营地"从 1.4s 变成 31.9s。原因不是序章慢，而是那一步里有一句历史遗留的 `page.click('#btn-cut-skip')`：`passOrigin` 已经把过场都清掉了，按钮此时**不可见**，Playwright 会按默认 **30s** 死等可交互性，超时抛错后被 `.catch(() => {})` 吞掉——于是"什么都没做，但花了 30 秒"。
-
-54. **大片纸选择器漏 `{` = 整段材质静默失效**（v0.3 实锤，玩家「黑字压暗图」） —— `components.css` 曾写成
-   `.panel, .sheet, …,\n  background-color: var(--paper-veil);`（选择器列表后没有 `{`）。浏览器丢弃整条规则，
-   纸面透明、墨字直接落在插画上。改材质时用 `qa:frames`/肉眼对照**截图**，别只信"类名在 HTML 里"。
-
-55. **过场字幕区若复用 `.cut-caption-wrap` 的纸面，会和「电影」定位打架** —— v0.3 把过场改成
-   `cut-theater` 全屏放映：底部暗场托字 + `cut-btn`，诗/钤印用 `is-poem` 撑满屏。**不要再给过场上纸卡**。
-
-56. **终局诗：点按曾会中止逐字并切拍** —— 播放器 `tap()` 置 `aborted` → `gone()` 为真 → `revealByAnchor` 提前返回；
-   同时 `cleanup` 的 `voice:stop` 掐断朗诵。v0.3 起诗拍 `ignoreTap:true`，并 `probeAudioMs` 按真实 mp3 拉长时间轴、
-   播完再进钤印。改诗只动 `beats.js` 的 `poem` 与 `data/poem.json`。
-
-57. **小游戏「放弃」≠ 完成** —— 板头「放弃本局」→ adapter `onExit` → `detail.aborted`；
-   `games-flow` 返回 `'aborted'` 时**不** `markDone`、不调 `minigame_review`。强制链同理。
     - 规矩：**对"可能不存在/可能不可见"的元素，要么先判 `count()/isVisible()`，要么显式给 `{ timeout: 1500 }`**。快检的每一秒都是开发者耐心，别把它花在等一个注定超时的点击上。
 
 ## 六、下一步建议（按价值排序）
@@ -322,7 +308,9 @@ npm run poem:manifest     # 生成 docs/POEM-TTS.md（终局升华那首诗：8 
 3. **数值平衡（进行中）**：测量口径已建好 —— `npm run qa:playtest` 按人类节奏跑局，输出时长/分幕耗时/五维终值/AI 调用数，结果表落 `docs/PLAYTEST.md`。热点已是一次性（第 20 条）；行军模式失败条件是「体力≤0」或「粮食=0 且体力≤30」，调参待做。
 4. **素材已全清**（2026-09-13）：场景图 21/21、立绘 14/14、环境床 8 条 Ogg、TTS 缓存 20 条全部就位，**14 张立绘全部在用**（`xianggui.png` 由第三幕「老乡 · 问渡」热点接上）。
 5. **音频剩余项**：操作音效仍是 WebAudio 合成（click/hook/echo 等），是否需要预录由路演音质要求决定。
-7. **封装交付**：见 [`DELIVERY.md`](DELIVERY.md)，演示前把"一键启动"定型（离线能力**不存在**，别按离线规划演示）。
+7. **封装交付**：**已定型（2026-09-19）**——Electron 桌面包在 [`../../packaging/`](../../packaging/README.md)，
+   产出便携目录与**单文件 exe**（对外只发这一个，走 GitHub Releases）；方案取舍见 [`DELIVERY.md`](DELIVERY.md)。
+   离线能力**不存在**，别按离线规划演示。
 8. **离线回放（备选，未开发）**：现场无网／网关不可达／额度耗尽时的风险预案在 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)。它从日志（运行时的 `logs/ai-calls-*.jsonl` 或入库样本 `logs/sample-full-run.jsonl`）转换出回放包，服务端按指纹命中重放真实响应，日志标 `source=REPLAY`。**当前代码里没有任何回放能力，勿当成现有功能**；断网就是 `source=ERROR` + 界面重试提示。
 
 ## 七、验收清单（每轮收尾跑这一套）

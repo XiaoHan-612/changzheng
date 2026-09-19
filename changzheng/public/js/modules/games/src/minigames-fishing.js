@@ -60,6 +60,9 @@
  *   stats(items)  数值签：宿主唯一实现，返回句柄（{标签: <b>元素}）
  *   decide(payload) 需要模型时由流程层注入（玩法自己不发请求，见 docs/MINIGAMES-INTAKE.md）
  */
+// 画布自适应（宽度铺满玩法板、高度让开状态与按钮区）。同目录（src/）内的共享工具，规则允许 import。
+import { fitCanvas } from './fit-canvas.js';
+
 let SFX = () => {};
 let STATS = (items) => items;
 let DECIDE = null;
@@ -121,7 +124,7 @@ function ensureStyle() {
   s.id = 'fishing-mini-style';
   s.textContent = `
 .hmini-wrap { display: flex; flex-direction: column; gap: 8px; align-items: center; }
-.hmini-canvas { display: block; width: 100%; max-width: 720px; height: auto; margin: 0 auto;
+.hmini-canvas { display: block; margin: 0 auto;
   border-radius: 6px; border: 1px solid var(--rule-strong); background: #173034; }
 .hmini-status { min-height: 22px; margin: 0; text-align: center; font-size: var(--fs-label, 14px);
   color: var(--ink-0); font-family: var(--font-kai, var(--font)); letter-spacing: .02em; }
@@ -528,12 +531,12 @@ export function runGoldenHook(container, opts = {}) {
     const btnHook = container.querySelector('#hk-hook');
     const btnReel = container.querySelector('#hk-reel');
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(W * dpr);
-    canvas.height = Math.round(H * dpr);
-    canvas.style.width = '100%';
-    canvas.style.height = 'auto';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // 画布按玩法板可用空间自适应：宽度铺满（原来被样式里的 max-width:720 卡住，
+    // 纸面放大到 960 之后右边空一截）、高度让开状态文字与按钮区。
+    // 后备缓冲同步放大 —— 只把 CSS 拉宽会让 720 的底图被拉伸发虚（2026-09-17 修）。
+    fitCanvas(canvas, W, H, {
+      onSize: (s, dpr) => ctx.setTransform(dpr * s, 0, 0, dpr * s, 0, 0),
+    });
 
     const fishes = SPAWN.map(makeFish);
     let hooked = null;

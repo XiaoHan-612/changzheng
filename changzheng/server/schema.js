@@ -16,9 +16,17 @@ export const REQUIRED = {
   share_judge: ['effects', 'narrative', 'choice'],
   minigame_review: ['effects', 'narrative'],
   // ↓ 同事重做的玩法带来的四类（它们原来自行 POST /api/decide；现在由 flow 层经 modules/ai 发起）：
-  //   字段是各自解析处真正要读的键（candy 读 .scene / gomoku 读 .move / 夜校读 .lesson、.questions）
+  //   字段是各自解析处真正要读的键（candy 读 .scene / gomoku 读 .pick / 夜校读 .lesson、.questions）
+  // 译电（简单档）后台预取的新题面：玩法读 book_a / book_b（各 8 个汉字，见 gateTelegram）
+  cipher_draft: ['book_a|bookA', 'book_b|bookB'],
+  // 2026-09-18 吸收的四支里、要模型参与的三处（打水漂娃那一手 / 对歌歌师反应 / 编草鞋收尾）
+  skim_throw: ['pick'],
+  antiphony_reply: ['reply'],
+  weave_note: ['note|reply'],
   candy_scene: ['scene'],
-  gomoku_move: ['move'],
+  // gomoku 读的是 .pick（候选序号，见 minigames-gomoku 的 requestKidMove），
+  // 不是坐标 —— 原来这张表写 'move'，和提示词一起错，导致模型的答案永远被丢掉（2026-09-17 两边一起修）
+  gomoku_move: ['pick'],
   school_lesson: ['lesson'],
   school_quiz: ['questions'],
   branch_judge: ['effects', 'scene_text|narrative'],
@@ -31,6 +39,9 @@ export const REQUIRED = {
   act_review: ['title', 'lines'],
   failure_review: ['paragraphs'],
   study_report: ['summary'],
+  // 标题页「了解中国工农红军长征」：教学向详细介绍 + 常识问答（真调 + 日志）
+  march_intro: ['title', 'summary', 'sections'],
+  march_qa: ['answer'],
 };
 
 /** 返回缺失的字段名数组（空数组 = 合规）；未登记的 callType 不做判定 */

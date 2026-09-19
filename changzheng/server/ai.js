@@ -6,6 +6,26 @@ import { normalizeEffects } from './balance.js';
 /**
  * 所有运行态智能决策必须走这里。禁止用独立算法替代模型判断。
  */
+
+/**
+ * 天津移动网关（111.32.22.35:32592）的 glm-5.1 是「始终思考」模型：回复先写一大段
+ * reasoning 再写 content，而 reasoning 同样吃 max_tokens。实测（2026-09-17，同一句分糖氛围请求）：
+ *   不关思考                → 16.2s / 691 tokens；预算是 260/300/400 的小玩法调用 reasoning 吃满、content 为空
+ *   reasoning_effort=max    → 网关直接空响应（HTTP 204）或 HTTP 400，该档位不被支持
+ *   chat_template_kwargs 关思考 → 0.4–1.7s / 23–42 tokens，JSON 正常
+ * 所以运行态**一律关思考**：这是"跑得通"与"跑不通"的分界，不是可调项。
+ * `enable_thinking: false` 必须放在 chat_template_kwargs 里，直接放 body 顶层网关不认
+ * （`thinking: {type:'disabled'}` 也不认，别换回去）。
+ */
+const NO_THINKING = { chat_template_kwargs: { enable_thinking: false } };
+
+/** 推理档位：空值 = 不传；max 会被本网关拒（400/204 空响应），同样按不传处理 */
+function effortField(effort) {
+  const v = String(effort ?? '').trim();
+  if (!v || v === 'max') return {};
+  return { reasoning_effort: v };
+}
+
 /**
  * 设置页「测试连通」专用：单次探测，不写日志、不重试。
  * 允许传入未保存的表单值（model / apiKey / apiUrl / reasoningEffort）。
@@ -13,7 +33,8 @@ import { normalizeEffects } from './balance.js';
  * ⚠️ 两处收口（本地演示的对外面）：
  *   ① Key **只用请求体里显式传来的那把**，不回退服务器已保存的 `CONFIG.GLM_API_KEY` ——
  *      否则局域网里的任何人都能拿演示机的 Key 打一次真调用（额度与日志都被别人花掉）。
- *   ② apiUrl 过 `assertSafeApiUrl`：只认 https，host 在白名单（见 config.js）。
+ *   ② apiUrl 过 `assertSafeApiUrl`：host 在白名单（见 config.js；https 一律放行，
+ *      http 只放行赛制指定网关与本机已保存的那个）。
  */
 export async function probeGlm({ model, apiKey, apiUrl, reasoningEffort, timeoutMs = 25000 } = {}) {
   const model0 = (model || '').trim() || CONFIG.GLM_MODEL;
@@ -47,13 +68,14 @@ export async function probeGlm({ model, apiKey, apiUrl, reasoningEffort, timeout
       model: cfg.model,
       messages: [
         { role: 'system', content: '只返回 JSON，不要其他文字。' },
-        { role: 'user', content: '返回：{"ok":true,"echo":"长征·抉择"}' },
+        { role: 'user', content: '返回：{"ok":true,"echo":"星火微光·我路过他们的长征"}' },
       ],
       temperature: 0,
       max_tokens: 1500,
       response_format: { type: 'json_object' },
+      ...NO_THINKING,
+      ...effortField(cfg.effort),
     };
-    if (cfg.effort) body.reasoning_effort = cfg.effort;
     const res = await fetch(cfg.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
@@ -65,6 +87,16 @@ export async function probeGlm({ model, apiKey, apiUrl, reasoningEffort, timeout
     const base = { model: cfg.model, reasoningEffort: cfg.effort || '', latencyMs };
     if (!res.ok) {
       return { ...base, ok: false, httpStatus: res.status, error: text.slice(0, 300) };
+    }
+    // 204/空体也算失败：网关对"路径写错"和"参数不认"都这么回，报成"连通成功"
+    // 会让设置页给出假绿灯（早先就是这样：地址少 /mgate/v1 仍显示 ✓ 连通成功，但游戏里每次都失败）
+    if (!text.trim()) {
+      return {
+        ...base,
+        ok: false,
+        httpStatus: res.status,
+        error: `接口返回空响应（HTTP ${res.status}）：多为地址写错（如缺 /mgate/v1 前缀）或参数不被网关支持`,
+      };
     }
     let data = null;
     try { data = JSON.parse(text); } catch { /* 保持 null */ }
@@ -159,7 +191,8 @@ export async function callGlm51(payload) {
               { role: 'user', content: userMessage },
             ],
             temperature: temper,
-            ...(CONFIG.GLM_REASONING_EFFORT ? { reasoning_effort: CONFIG.GLM_REASONING_EFFORT } : {}),
+            ...NO_THINKING,
+            ...effortField(CONFIG.GLM_REASONING_EFFORT),
             // 额度按调用类型给（见 modules/ai/registry.js）：短结论类收窄，既省额度也少"写太长"
             max_tokens: budgetTokens,
             response_format: { type: 'json_object' },
@@ -174,7 +207,14 @@ export async function callGlm51(payload) {
         clearTimeout(timeout);
       }
 
-      const data = await res.json();
+      // 网关的「静默失败」是 204 + 空响应体：地址写错（如少 /mgate/v1 前缀）、
+      // 或带了它不认的参数（如 reasoning_effort=max），都是这个回法。不点破的话，
+      // 报出来的是 "Unexpected end of JSON input"，看着像模型抽风，实际是配置问题。
+      const rawBody = await res.text();
+      if (!rawBody.trim()) {
+        throw new Error(`接口返回空响应（HTTP ${res.status}）：多为地址写错（如缺 /mgate/v1 前缀）或参数不被网关支持`);
+      }
+      const data = JSON.parse(rawBody);
       const content = data.choices?.[0]?.message?.content || '{}';
       let parsed;
       try {
@@ -240,7 +280,7 @@ export async function callGlm51(payload) {
 }
 
 function buildSystemPrompt(callType, scene, operation) {
-  const base = `你是《长征·抉择》的叙事与裁决引擎。题材：1934–1936 中国工农红军长征关键节点（于都河、湘江、遵义、金沙江、泸定桥、雪山草地、腊子口、会宁）。
+  const base = `你是《星火微光·我路过他们的长征》的叙事与裁决引擎。题材：1934–1936 中国工农红军长征关键节点（于都河、湘江、遵义、金沙江、泸定桥、雪山草地、腊子口、会宁）。
 【语气】第二人称、克制、具体、有画面感；不堆口号，不戏说，不编造具体真实历史人物姓名。
 【史实】以提供的事实为锚；文学典型须可辨认为文学化记述。
 【护栏】禁止丑化红军战士；失败写代价与成长，不写羞辱。
@@ -261,6 +301,35 @@ call_type=choice_hint。为每个选项生成「倾向预告」——只写方�
 返回：
 {"hints":[{"label":"与选项原文一致","trend":"体力↓ 信念↑","risk":"低|中|高","blurb":"10字内气质"}]}`;
   }
+  if (callType === 'march_intro') {
+    // 标题页「了解中国工农红军长征」：教学向科普，不是游戏内第二人称叙事。
+    return `你撰写面向玩家与评委的党史军史科普。主题：中国工农红军长征（1934—1936）。
+【语气】庄重、平实、清楚；分点可读；不戏说，不编造具体人物对话。
+【史实】以通行教材与权威纪念表述为准；不确定数字用稳妥表述。
+【输出】只返回 JSON 对象，键名必须完全如下，不要 markdown、不要解释。
+{
+  "title": "主标题",
+  "summary": "150-250字总述",
+  "sections": [
+    {"heading": "小标题", "body": "200-400字"},
+    {"heading": "小标题", "body": "200-400字"},
+    {"heading": "小标题", "body": "200-400字"},
+    {"heading": "小标题", "body": "200-400字"}
+  ],
+  "key_points": ["要点", "要点", "要点"],
+  "timeline": [{"when": "时间", "what": "事件"}],
+  "note": "一句给读者的话"
+}
+sections 至少 4 项：历史背景、出发与初期、遵义与转折、极端困难与会师/意义。
+现在直接输出上述 JSON。`;
+  }
+  if (callType === 'march_qa') {
+    return `你是严谨的长征史科普助手。只回答与中国工农红军长征（1934—1936）及紧密相关的历史常识。
+用户的问题写在后续消息的【情境】或【补充】里；必须直接回答该问题，不要说"问题缺失"。
+【要求】准确、简洁、可读；分点或短段；不确定的数字用稳妥表述；不编造具体人物对话。
+【范围外】若问题明显与长征无关，礼貌说明可问：出发原因、路线节点、重要会议、重大战役、困难与意义等。
+【输出】只返回 JSON：{"answer":"对问题的详细回答（200-450字，可分点）","tips":["可选延伸要点1-3条"]}`;
+  }
   if (callType === 'failure_review') {
     return `${base}
 call_type=failure_review。玩家在行军模式下失败（掉队/减员/断粮）。写一段克制的失败结算：不羞辱、不喊口号，写代价与队伍仍在前进。
@@ -275,10 +344,71 @@ call_type=candy_scene。夜里的营地，队伍分三颗糖之前的氛围一�
 {"scene":"一句景/气氛（20-40字，克制，不出现现代词）"}`;
   }
   if (callType === 'gomoku_move') {
+    // ⚠️ 这里要的是 **pick（候选序号）**，不是坐标：游戏那边（minigames-gomoku 的
+    // requestKidMove）读的是 `cands[Number(out.pick)]`，候选表来自它自己的引擎
+    // （topCandidates：活四 > 挡活四 > 双活三 > 位置分，且已排除水洼格）。
+    // 2026-09-17 修：原来这里写的是 {"move":"h8"} —— 于是**模型的话从来没被采纳过**：
+    // 每次都能拿到合法 JSON、日志里也记了一条 gomoku_move，但 pick 缺失 → 一律落回引擎，
+    // "游戏按模型返回执行"这条在棋类玩法上等于没做到（探针实测 moveFrom 恒为 engine）。
     return `${base}
-call_type=gomoku_move。你是泥地上画棋盘的那位对手，按局面走一手。
+call_type=gomoku_move。你是泥地上画棋盘的那位对手。局面在【操作结果】里：
+board 是当前棋盘（X = 对手，O = 你自己，~ = 水洼格落不住，. = 空地），
+candidates 是**你这一步可以落的位置**（每项含 i / x / y / note，note 写的是这一手的用意）。
+你**只能从 candidates 里挑一个**（自己造坐标会被判非法、这一手作废）：
+挑对你最有利的那个，返回它的 i。
 返回：
-{"move":"棋盘坐标，如 h8（小写字母+数字）","say":"一句嘴硬的话（10-24字，口语，不骂人）"}`;
+{"pick":0,"say":"一句嘴硬的话（10-24字，口语，不骂人）"}`;
+  }
+  if (callType === 'skim_throw') {
+    // 打水漂：娃这一手怎么扔。候选是**玩法自己按他的性格参数算好的**（三个），
+    // 模型只回答"挑哪一个"？—— 物理与画面不动，换掉的只是"挑哪一手"这个决策。
+    return `${base}
+call_type=skim_throw。你是河边那个十五六岁的红小鬼，正跟人比打水漂。局面在【操作结果】里：
+you / kid 是两边已经跳出的总数，round / rounds 是第几轮，pool 是石堆还剩什么，
+candidates 是**你这一步可以怎么扔**（每项含 i / stone 石头 / power 力道% / angle 出手角 / note 用意）。
+你**只能从 candidates 里挑一个**（自己编一个会被判非法、这一手作废）：
+想赢就挑对你最有利的那个 —— 落后时可以搏，领先时求稳；挑完返回它的 i。
+返回：
+{"pick":0,"say":"一句嘴硬的话（10-24字，口语，不骂人）"}`;
+  }
+  if (callType === 'antiphony_reply') {
+    // 对歌：歌师接玩家那一句。**只写反应，不改唱词** —— 唱句是史料原句，一个字都不能动。
+    return `${base}
+call_type=antiphony_reply。你是遵义街头歌台上的歌师，刚听对面接了一句。局面在【操作结果】里：
+master 是你唱的那一句，mine 是对方接的那一句，tier 是这一句的性质（good 合韵合意 / ok 意思对韵跑了 / miss 答岔了）。
+写你（和围观乡亲）**当场的一句话反应**：口语、热闹、不刻薄，答岔了是笑一场、不是挖苦。
+不要复述唱词，不要解释韵脚，不要写旁白视角。
+返回：
+{"reply":"你这一句反应（15-40字）"}`;
+  }
+  if (callType === 'weave_note') {
+    // 编草鞋收尾：老班长看鞋。这局的数据很具体（六道工序各自的完成度、灯油、经料），
+    // 本地只会翻成"质量 0.72"，而"这鞋哪儿不靠谱、明天谁穿"正是模型该说的人话。
+    return `${base}
+call_type=weave_note。你是长征队伍里的老班长。夜里有人补了一只草鞋，你看了一眼。
+局面在【操作结果】里：outcome（done 成鞋 / worn 会散 / unfinished 没打成）、li 能走多少里、
+nightLeft 还剩多少灯油、warp 经料（hemp 麻绳结实 / straw 稻草泡水就散）、steps 是六道工序各自的完成度。
+按**实际数据**说一句：哪儿不靠谱、明天这鞋给谁穿、要不要返工。语气像老兵，不夸不骂。
+不要复述数字，不要喊口号，不要提"模型"。
+返回：
+{"note":"你这一句（20-60字）"}`;
+  }
+  if (callType === 'cipher_draft') {
+    // 译电（简单档）后台预取的"换一封信"：只补一句题面，玩家看不到这次调用。
+    // 硬约束来自玩法那边的闸门（minigames-cipher.js 的 gateTelegram）——**过不了闸就白调**，
+    // 所以规则必须写清楚（实测约四成能过闸，这是正常的）。
+    return `${base}
+call_type=cipher_draft。你在为"译电"出一封**新的**截获电报题面：同一组密码，用两本密本各译一遍，
+得到两句**方向相反**的读法。两句都必须是**恰好 8 个汉字**（不能多不能少、不能用数字或标点）。
+返回：
+{"book_a":"甲本译出的八个字","book_b":"乙本译出的八个字"}
+硬约束（缺一条就作废）：
+1. 两句**至少 3 个字不同**，且**至少 1 个字相同**（完全相同的那几位才像"同一封报"）；
+2. 甲本那句要读出**危险/急迫**：至少含一个「${'追扑攻击犯截突逼压占'.slice(0, 9)}」里的字，或方向急迫字「东向速急抵尾进据」；
+3. 乙本那句要读出**按兵不动**：至少含一个「休驻退待守缓回原地按固整撤停防暂」里的字；
+4. 乙本**不许**出现无歧义的进攻字「追扑攻击犯截突逼压占」（极性反了，陷阱就不成立）；
+5. 不许出现任何真实历史人名。
+军事电文口吻（"匪""职部""截击""固守"这类），不要编故事。`;
   }
   if (callType === 'school_lesson') {
     return `${base}
@@ -381,6 +511,11 @@ call_type=study_report。生成一份「研学报告」摘要，供带队者课�
 }
 
 function buildUserMessage({ scene, situation, state, options, extraContext, operation, callType, agent }) {
+  // 标题页科普问答：问题本身是全部输入，去掉游戏资源噪音，避免模型答偏
+  if (callType === 'march_qa') {
+    const q = String(situation || extraContext || '').replace(/^【问题】/, '').trim();
+    return `【问题】${q || '请介绍长征常识'}\n请以严格 JSON 返回：{"answer":"...","tips":[...]}`;
+  }
   const parts = [
     `【场景】${scene}`,
     `【call_type】${callType}`,

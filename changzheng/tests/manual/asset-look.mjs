@@ -36,7 +36,7 @@ async function main() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('dialog', (d) => d.accept().catch(() => {}));
   await page.goto(`${BASE}/?look=${Date.now()}`, { waitUntil: 'networkidle' });
-  await page.click('#btn-mode-study');
+  await page.click('#btn-mode-march');
   await page.waitForTimeout(300);
   await page.click('#btn-cut-skip').catch(() => {});
   await page.waitForTimeout(1500);

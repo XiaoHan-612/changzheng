@@ -106,7 +106,7 @@ export const BEATS = {
     speeds: [1, 1.5],
     /** 收尾：把这首朗诵停掉——它的尾巴不该盖到钤印那一拍上 */
     cleanup() { kernel.emit('voice:stop', {}); },
-    async render(ctx, b) {
+    async render(ctx, b, extra = {}) {
       let poem = null;
       try { poem = await fetchPoem(); } catch { poem = null; }
       // 取不到数据也要演：内嵌形制与 data/poem.json 一致的骨架，避免一拍就跳走
@@ -128,7 +128,23 @@ export const BEATS = {
           ],
         };
       }
-      ctx.stage.style.backgroundImage = b.img ? `url('${b.img}')` : 'none';
+      // 朗读期间轮播各幕全景（用户：诗读完前用从头到尾的幕图当背景）
+      const gallery = [...(b.gallery || extra?.gallery || [])].filter((u) => typeof u === 'string' && u);
+      let slideTimer = 0;
+      let slideIdx = 0;
+      if (gallery.length) {
+        ctx.stage.style.backgroundImage = `url('${gallery[0]}')`;
+      } else {
+        ctx.stage.style.backgroundImage = b.img ? `url('${b.img}')` : 'none';
+      }
+      const stopSlides = () => { if (slideTimer) { clearInterval(slideTimer); slideTimer = 0; } };
+      if (gallery.length >= 2) {
+        slideTimer = setInterval(() => {
+          if (ctx.gone?.()) { stopSlides(); return; }
+          slideIdx = (slideIdx + 1) % gallery.length;
+          ctx.stage.style.backgroundImage = `url('${gallery[slideIdx]}')`;
+        }, 4800);
+      }
       const lines = poem.lines || [];
       const chars = (t) => [...String(t || '')];
       // 四联横排：传统诗笺版式（不用 display 毛笔族——缺字太多，用系统宋体/serif）
@@ -185,6 +201,7 @@ export const BEATS = {
           await sleep(120);
         }
       }
+      stopSlides();
     },
   },
 
@@ -284,18 +301,14 @@ async function revealByAnchor(ctx, plan, rows, anchor, rate, endMs, { ignoreTap 
   }
 }
 
-/** 量一下朗诵文件的真实时长（ms）；失败返回 0 */
-function probeAudioMs(url) {
-  return new Promise((resolve) => {
-    const el = new Audio();
-    let done = false;
-    const fin = (ms) => { if (!done) { done = true; resolve(ms); } };
-    el.preload = 'metadata';
-    el.onloadedmetadata = () => fin(Math.round((el.duration || 0) * 1000));
-    el.onerror = () => fin(0);
-    setTimeout(() => fin(0), 4000);
-    el.src = url;
-  });
+/** 量一下朗诵文件的真实时长（ms）；失败返回 0。
+ *  走音频模块的门面（`new Audio` 只有框架能碰，见 docs/AUDIO-SYSTEM.md 与 qa:audio 的一致性守卫） */
+async function probeAudioMs(url) {
+  try {
+    return await kernel.api('audio')?.durationOf?.(url) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 /** 拍子词汇的封闭列表（文档、体检、序列数据都对着它） */

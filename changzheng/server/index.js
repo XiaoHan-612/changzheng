@@ -83,6 +83,23 @@ app.get('/api/logs', localOnly, (_req, res) => {
   res.json({ ok: true, count: logs.length, logs });
 });
 
+// 导出原始日志文件：比赛/审计要"把这份模型调用日志拿走"，这里把磁盘上的 JSONL 原样发给他。
+// 白名单只两种文件（session 全量 / 当天 ai-calls），并禁止任何路径成分——目录穿越从文件名开始就被挡死。
+app.get('/api/logs/export', localOnly, (req, res) => {
+  const name = String(req.query.file || 'session-full.jsonl');
+  const allowed = name === 'session-full.jsonl' || /^ai-calls-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name);
+  if (!allowed) {
+    return res.status(400).json({ ok: false, error: '只能导出 session-full.jsonl 或 ai-calls-YYYY-MM-DD.jsonl' });
+  }
+  const file = path.join(CONFIG.LOG_DIR, name);
+  if (!fs.existsSync(file)) {
+    return res.status(404).json({ ok: false, error: '这份日志还不存在（本机还没有过调用，或已重置）' });
+  }
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+  fs.createReadStream(file).pipe(res);
+});
+
 app.post('/api/logs/clear', localOnly, (_req, res) => {
   clearSessionLogs();
   res.json({ ok: true, count: 0 });
@@ -100,6 +117,12 @@ app.get('/api/config', localOnly, (_req, res) => {
     codeStamp: CODE_STAMP,
     port: CONFIG.PORT,
     apiUrl: CONFIG.GLM_API_URL.replace(/\/[^/]*$/, '/***'),
+    // 完整接口地址：**只为设置页回填输入框**。
+    // 掩码是有损的（`…/chat/***` 里丢的是最后一段），前端拿它拼不回原值 ——
+    // 早先前端做 `.replace('/***', '/chat/completions')`，拼出来是 `…/chat/chat/completions`，
+    // 于是"打开设置页不改任何东西直接点保存"就把地址写坏了，之后每次调用都是 204 空响应。
+    // 这个接口是 localOnly（只有本机能读），地址又不像 Key 那样是凭证，回给操作者本人没问题。
+    apiUrlFull: CONFIG.GLM_API_URL,
     // 只回传掩码，不回传完整 key
     keyMask: CONFIG.GLM_API_KEY
       ? CONFIG.GLM_API_KEY.slice(0, 6) + '…' + CONFIG.GLM_API_KEY.slice(-4)
@@ -180,11 +203,31 @@ app.use((req, res) => {
 // 本机默认只绑 127.0.0.1：演示机常常在会场/公司局域网里，默认不该让整个网段都能打开它。
 // 需要对外（例如手机看效果）就 `HOST=0.0.0.0 npm start`，自己清楚在做什么。
 const HOST = process.env.HOST || '127.0.0.1';
-app.listen(CONFIG.PORT, HOST, () => {
-  console.log('══════════════════════════════════════════════');
-  console.log('  《长征·抉择》正式工程 v0.1');
-  console.log(`  地址: http://localhost:${CONFIG.PORT}　（只监听 ${HOST}）`);
-  console.log(`  模型: ${CONFIG.GLM_MODEL}`);
-  console.log(`  模式: ${CONFIG.GLM_API_KEY ? '真实调用 ' + CONFIG.GLM_MODEL : '⚠ 未配置 GLM_API_KEY（调用会报错并写日志）'}`);
-  console.log('══════════════════════════════════════════════');
-});
+const preferredPort = Number(CONFIG.PORT) || 3001;
+let listenPort = preferredPort;
+function startServer(port) {
+  const server = app.listen(port, HOST, () => {
+    const bound = server.address()?.port || port;
+    console.log('══════════════════════════════════════════════');
+    console.log('  《星火微光·我路过他们的长征》正式工程 v0.1');
+    console.log(`  地址: http://localhost:${bound}　（只监听 ${HOST}）`);
+    console.log(`  模型: ${CONFIG.GLM_MODEL}`);
+    console.log(`  模式: ${CONFIG.GLM_API_KEY ? '真实调用 ' + CONFIG.GLM_MODEL : '⚠ 未配置 GLM_API_KEY（调用会报错并写日志）'}`);
+    console.log('══════════════════════════════════════════════');
+  });
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE' && port - preferredPort < 10) {
+      const next = port + 1;
+      console.error(`端口 ${port} 已被占用，改试 ${next}…`);
+      startServer(next);
+      return;
+    }
+    console.error('服务启动失败：', err.message);
+    if (err.code === 'EADDRINUSE') {
+      console.error(`端口 ${port} 被占用。请关闭占用进程，或设置 PORT=<其他端口> 后重试。`);
+    }
+    process.exit(1);
+  });
+  return server;
+}
+startServer(listenPort);

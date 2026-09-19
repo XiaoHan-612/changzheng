@@ -77,7 +77,7 @@ export function actionHost() {
  * 与 `entranceTarget` 是两个用途、两张表，别合并：入场动效要的是"看起来该动的那一层"，
  * 这里要的是"点得到的那一层"（营地屏两者就不一样：入场动的是侧栏，插行该插在底部操作区）。
  */
-const FACE = '.tpl-body, .sheet, .panel, .title-card, .sb-world, .hud-bottom,'
+const FACE = '.tpl-body, .sheet, .panel, .title-card, .arcade-wrap, .sb-world, .hud-bottom,'
   + ' .cut-caption-wrap, .path-head, .journal, .echo-cinema';
 export function contentFace(screenEl) {
   if (!screenEl || !screenEl.querySelector) return screenEl || null;
@@ -402,7 +402,9 @@ export function escapeHtml(s) {
 
 export function renderLogs(logs) {
   const list = $('logs-list');
-  $('logs-meta').textContent = `共 ${logs.length} 条调用 · source 可辨 GLM / ERROR，具体模型与推理档位见 model 字段`;
+  const stamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  $('logs-meta').textContent = `共 ${logs.length} 条调用 · 屏开着时每 2 秒自动刷新（本次更新 ${stamp}） · `
+    + '「导出日志」下载原始 JSONL：含 prompt、模型响应、耗时与来源，模型名见 model 字段';
   list.innerHTML = logs
     .slice()
     .reverse()
@@ -415,6 +417,7 @@ export function renderLogs(logs) {
         <div class="row">
           <span class="type">${escapeHtml(l.callType || l.scene || 'decide')}</span>
           <span class="${cls ? `src src-${cls}` : 'src'}">${escapeHtml(l.source || '—')}</span>
+          <span class="muted">${escapeHtml(l.model || '')}</span>
           <span class="muted">${escapeHtml((l.timestamp || '').slice(11, 19))}</span>
           <span class="muted">${l.durationMs ?? '—'}ms</span>
         </div>

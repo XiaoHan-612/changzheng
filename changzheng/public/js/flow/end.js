@@ -5,12 +5,19 @@
  * 所以这里**不许**反向 import act（那会成环）。三处"模型没返回就不能摆空壳"的兜底都在这里
  * （失败结算、终局总评、以及报告缺失时不留死键，见 HANDOFF-CODE 坑 41）。
  */
-import { $, toast, typeText, escapeHtml, showScreen } from '../ui.js';
+import { $, toast, typeText, escapeHtml, showScreen, registerLiveTyping } from '../ui.js';
 import { markAction } from '../step.js';
 import { kernel } from '../kernel/index.js';
 import { COMPANIONS } from '../data.js';
-import { S, hasS, st, callAI, step, publicState, cinemaApi } from './kit.js';
+import { S, hasS, st, callAI, step, publicState, cinemaApi, getActsData } from './kit.js';
 import { originText, sceneImage } from './view.js';
+
+/** 模式展示名（标题页只保留行军 / 连贯 / 择点 / 游戏模式） */
+export function modeLabel(mode) {
+  if (mode === 'march_auto' || mode === 'auto') return '连贯行军';
+  if (mode === 'select') return '择点穿行';
+  return '行军模式';
+}
 
 /** 四套本地结局骨架：模型只填段落；失败/无 Key 时也能给出可读终局（v0.3 P2-10） */
 const ENDING_SHELLS = {
@@ -49,7 +56,7 @@ export async function runFailure(fail, act) {
   };
   const failBg = Object.keys(FAIL_BG).find((k) => String(fail?.kind || '').includes(k));
   if ($('end-bg')) $('end-bg').style.backgroundImage = `url('${FAIL_BG[failBg] || FAIL_BG.体力}')`;
-  $('end-eyebrow').textContent = `${S.mode === 'march' ? '行军模式' : '研学模式'} · ${fail.kind}`;
+  $('end-eyebrow').textContent = `${modeLabel(S.mode)} · ${fail.kind}`;
   $('end-title').textContent = '结算中…';
   $('end-paras').innerHTML = '';
   $('end-history').innerHTML = '';
@@ -72,17 +79,21 @@ export async function runFailure(fail, act) {
     $('end-history').innerHTML = '';
     $('end-rel').innerHTML = renderRelations();
     $('end-personal').textContent = '';
+    // 失败屏没有本局报告：解绑复制键，避免残留上一局闭包（v0.3 P3-2）
+    bindEndActions(null);
     return;
   }
   $('end-title').textContent = end.title || '掉队';
   for (const t of end.paragraphs || []) {
     const p = document.createElement('p');
     $('end-paras').appendChild(p);
-    await typeText(p, t, 14);
+    const typing = registerLiveTyping(typeText(p, t, 14));
+    try { await typing.promise; } finally { registerLiveTyping(null); }
   }
   $('end-history').innerHTML = (end.history_points || []).map((h) => `<li>${escapeHtml(h)}</li>`).join('');
   $('end-rel').innerHTML = renderRelations();
   $('end-personal').textContent = end.personal || '';
+  bindEndActions(end);
 }
 
 export function renderRelations() {
@@ -101,6 +112,7 @@ export async function runEnding() {
   $('end-title').textContent = '结算中…';
   $('end-paras').innerHTML = '';
   $('end-history').innerHTML = '';
+  document.getElementById('end-local-note')?.remove();   // 上一局留下的"本地结语"提示不要带到这一局
   let end;
   const localId = st().pickEnding() || '同行';
   end = await callAI({
@@ -127,13 +139,22 @@ export async function runEnding() {
   // 本地骨架已保证 end 可读；若模型成功则用模型文案，失败用 shell（上方）
   if (end._localShell) {
     st().pushCampLog('终局', `本地结局骨架：${end.title}（模型未返回总评）`);
+    // **屏上也要明说**（红线：模型失败不能装成模型写的）：在结语下方挂一行小字。
+    // 关系/资源/史实要点都是本局真实记录，只有"那几段话"是本地写好的。
+    const note = document.createElement('p');
+    note.className = 'foot-note';
+    note.id = 'end-local-note';
+    note.textContent = '注：本局终局总评没有等到模型返回，上面这几段是本地写好的结语；'
+      + '资源、关系与史实要点都是本局真实记录。想看模型写的那一版，可以点「再来一局」。';
+    $('end-personal')?.after(note);
   }
   $('end-eyebrow').textContent = `终局 · ${end.ending_id || ''}`;
   $('end-title').textContent = end.title || '长征之后';
   for (const t of end.paragraphs || []) {
     const p = document.createElement('p');
     $('end-paras').appendChild(p);
-    await typeText(p, t, 14);
+    const typing = registerLiveTyping(typeText(p, t, 14));
+    try { await typing.promise; } finally { registerLiveTyping(null); }
   }
   $('end-history').innerHTML = (end.history_points || []).map((h) => `<li>${escapeHtml(h)}</li>`).join('');
   $('end-rel').innerHTML = renderRelations();
@@ -144,11 +165,17 @@ export async function runEnding() {
   //   · 失败分支（上面的结算未完成）不会走到这里，所以失败局不演升华；
   //   · 报告是"可带走的纸面"，让它落在诗之后，玩家读完诗再去看报告。
   // 它全程可跳过（一跳到底），且**不做任何模型调用**（诗与时间是本地数据）。
+  // 升华：会宁空镜 → 诗（背景轮播各幕全景）→ 钤印
+  const actsData = typeof getActsData === 'function' ? getActsData() : null;
+  const order = actsData?.order || [];
+  const gallery = order
+    .map((id) => actsData?.acts?.[id]?.pano)
+    .filter((u) => typeof u === 'string' && u);
   await cinemaApi()?.play('ending-poem', {
     ctx: {
-      // 第 2 轮的两张待产图（落盘即生效）：收束空镜与诗页底纹，没产出就退回会宁全景 / 纯黑场
       photoImg: sceneImage('/assets/scenes/huining_dusk.jpg', '/assets/scenes/huining_pano.jpg'),
       paperImg: sceneImage('/assets/scenes/poem_paper.jpg', ''),
+      gallery,
     },
   });
   // 升华演完必须回到结算屏：play() 内部 showScreen('screen-cutscene')，
@@ -157,6 +184,12 @@ export async function runEnding() {
 
   // 研学报告（课后复盘用；对外不出现行业与场景口径，见 docs/PITCH.md）
   try {
+    const box0 = $('end-report');
+    if (box0) {
+      box0.classList.remove('hidden');
+      const sum0 = $('report-summary');
+      if (sum0) sum0.textContent = '研学报告生成中…（模型正在写，可稍候或稍后在行军记录里查看）';
+    }
     const report = await callAI({
       scene: '研学报告',
       callType: 'study_report',
@@ -197,7 +230,7 @@ export function bindEndActions(end) {
   copyBtn.onclick = () => {
     const r = S.lastReport;
     const text = [
-      `《长征·抉择》研学报告 — ${end.title || ''}`,
+      `《星火微光·我路过他们的长征》研学报告 — ${end.title || ''}`,
       r?.summary || '',
       '史实：' + (r?.knowledge || []).join('；'),
       '价值：' + (r?.values || []).join('；'),

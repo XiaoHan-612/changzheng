@@ -40,7 +40,7 @@ say('① 标题页 —— 这一段应该没有背景声（3 秒）');
 await wait(page, 3000);
 
 say('② 进营地 —— 应该听到「于都河夜」的环境床（风声 + 水声）');
-await page.click('#btn-mode-study');
+await page.click('#btn-mode-march');
 await wait(page, 400);
 await passOrigin(page);
 await page.click('#btn-cut-skip').catch(() => {});

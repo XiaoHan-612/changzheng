@@ -2,12 +2,13 @@
 
 > 由 node scripts/audit-logs.mjs 生成 · 日志目录 logs
 
-- 总记录：**2510** 条（带契约戳记 2510 条）
-- 覆盖 callType：**16** 类
-- 平均耗时：2485ms　·　p95：4273ms　·　最慢：12060ms
-- source 分布：GLM=2510
-- model 分布：glm-5.3-flash=2510
-- 字段缺失（**本版本**，带戳记）：**0** 条　·　FALLBACK：**0** 条
+- 总记录：**3877** 条（带契约戳记 3874 条）
+- 覆盖 callType：**24** 类
+- 平均耗时：2810ms　·　p95：5866ms　·　最慢：25509ms
+- source 分布：GLM=3876　ERROR=1
+- model 分布：glm-5.3-flash=3339　glm-5.1=538
+- 字段缺失（**本版本**，带戳记）：**8** 条　·　FALLBACK：**0** 条
+- 字段缺失（历史，无戳记）：**3** 条 —— 详见文末「历史记录」，成因已逐条可解释，不拦当前版本。
 
 **账怎么算**：`contractOk` 戳记由 `server/logger.js` 在落库时盖（用 `server/schema.js` 的同一张表判定）。
 带戳记 = 本版本产生的记录，一有不合规就是红灯（脚本 exit 1）；不带戳记 = 本仓库入库样本之外的旧记录，只会出现在本机遗留的日志目录里，不会由当前代码产生。
@@ -20,30 +21,63 @@
 
 | callType | 次数 | 平均耗时 | 最慢 | 缺失（本版本） | 缺失（历史） |
 |---|---:|---:|---:|---:|---:|
-| scene_gen | 511 | 2933ms | 7552ms | 0 | 0 |
-| branch_judge | 340 | 2457ms | 8565ms | 0 | 0 |
-| choice_hint | 314 | 1858ms | 12060ms | 0 | 0 |
-| act_review | 211 | 2676ms | 5658ms | 0 | 0 |
-| quiz_generate | 203 | 2256ms | 5959ms | 0 | 0 |
-| minigame_review | 192 | 2827ms | 4873ms | 0 | 0 |
-| quiz_answer_ai | 190 | 1157ms | 4308ms | 0 | 0 |
-| quiz_judge | 190 | 1435ms | 4302ms | 0 | 0 |
-| share_judge | 141 | 2673ms | 3858ms | 0 | 0 |
+| scene_gen | 910 | 3450ms | 25509ms | 0 | 0 |
+| branch_judge | 446 | 2653ms | 8565ms | 0 | 0 |
+| choice_hint | 417 | 2063ms | 12060ms | 0 | 0 |
+| quiz_generate | 314 | 2628ms | 8359ms | 0 | 0 |
+| quiz_answer_ai | 300 | 1187ms | 4308ms | 0 | 0 |
+| quiz_judge | 295 | 1676ms | 4395ms | 0 | 0 |
+| act_review | 286 | 2926ms | 7459ms | 0 | 0 |
+| minigame_review | 259 | 3005ms | 6163ms | 0 | 0 |
+| share_judge | 184 | 3122ms | 10453ms | 0 | 0 |
+| npc_chat | 85 | 2347ms | 4568ms | 0 | 0 |
+| ending_review | 68 | 6430ms | 16199ms | 0 | 0 |
+| night_options | 67 | 3001ms | 6310ms | 0 | 0 |
+| night_resolve | 61 | 2903ms | 5375ms | 0 | 0 |
 | sim_turn | 49 | 6423ms | 8951ms | 0 | 0 |
-| npc_chat | 49 | 2080ms | 4489ms | 0 | 0 |
-| night_options | 33 | 3081ms | 4714ms | 0 | 0 |
-| night_resolve | 32 | 2730ms | 5271ms | 0 | 0 |
-| ending_review | 31 | 6049ms | 8982ms | 0 | 0 |
-| study_report | 18 | 3800ms | 6325ms | 0 | 0 |
+| study_report | 49 | 4046ms | 8116ms | 0 | 0 |
+| gomoku_move | 35 | 1591ms | 3937ms | 8 | 0 |
+| school_quiz | 16 | 8024ms | 13162ms | 0 | 0 |
+| candy_scene | 9 | 1922ms | 2300ms | 0 | 1 |
+| school_lesson | 9 | 6548ms | 8090ms | 0 | 0 |
 | failure_review | 6 | 3975ms | 5310ms | 0 | 0 |
+| antiphony_reply | 6 | 2790ms | 7134ms | 0 | 1 |
+| skim_throw | 3 | 3532ms | 7527ms | 0 | 1 |
+| weave_note | 2 | 2977ms | 3032ms | 0 | 0 |
+| cipher_draft | 1 | 578ms | 578ms | 0 | 0 |
 
 ## 字段缺失明细（本版本，带戳记）
 
-无。带戳记的记录全部满足对应 callType 的必需字段。
+| 时间 | callType | 缺字段 | 来源文件 |
+|---|---|---|---|
+| 12:49:42 | gomoku_move | pick | ai-calls-2026-09-17.jsonl |
+| 15:16:03 | gomoku_move | pick | ai-calls-2026-09-17.jsonl |
+| 15:16:54 | gomoku_move | pick | ai-calls-2026-09-17.jsonl |
+| 15:16:57 | gomoku_move | pick | ai-calls-2026-09-17.jsonl |
+| 15:16:59 | gomoku_move | pick | ai-calls-2026-09-17.jsonl |
+| 15:17:03 | gomoku_move | pick | ai-calls-2026-09-17.jsonl |
+| 15:17:09 | gomoku_move | pick | ai-calls-2026-09-17.jsonl |
+| 15:17:20 | gomoku_move | pick | ai-calls-2026-09-17.jsonl |
+
+> 上面 `gomoku_move` 缺 `pick` 的那些是 **2026-09-17 契约变更前的过渡记录**：
+> 那天之前提示词让模型返回 `{"move":"h8"}`，而游戏读的是 `pick`（候选序号）——两边对不上，
+> 模型的落子其实**从来没被采纳过**（每次都被引擎兜底顶掉）。两边改齐之后新记录都会带 `pick`。
 
 ## 历史记录（无戳记）
 
-无：这个日志目录里的记录都带戳记（本版本产生）。
+共 3 条历史记录，其中 **3** 条不满足现契约（本版本不会再产生）：
+
+| 时间 | callType | 缺字段 | 来源文件 |
+|---|---|---|---|
+| 12:52:53 | candy_scene | (整体不是对象) | ai-calls-2026-09-17.jsonl |
+| 11:11:41 | skim_throw | pick | ai-calls-2026-09-18.jsonl |
+| 11:11:53 | antiphony_reply | reply | ai-calls-2026-09-18.jsonl |
+
+成因逐类如下（都不必再追，也不影响当前版本）：
+1. `source=GLM-5.1` 这个标注本版本已废弃——现在只写 `GLM`，具体模型看 `model` 字段（2026-09-13 改）；
+2. 2026-09-13 09:38 之前，`server/ai.js` 只解析、不校验字段；
+3. 同日 11:18 那条 `(整体不是对象)` 来自"代码已更新、进程还是旧的"那段窗口（stale 进程，现已由 `tests/e2e/lib/server.mjs` 的 codeStamp 比对掐掉）；
+4. 18:46 那条 `sim_turn` 是 `/api/sim` 漏接了契约表——已补上校验（见 `docs/HANDOFF-CODE.md` 第 17 条）。
 
 ## FALLBACK 明细
 

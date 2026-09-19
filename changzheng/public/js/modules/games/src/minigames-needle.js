@@ -50,6 +50,9 @@
  *   stats(items)  数值签：宿主唯一实现，返回句柄（{标签: <b>元素}）
  *   decide(payload) 需要模型时由流程层注入（玩法自己不发请求，见 docs/MINIGAMES-INTAKE.md）
  */
+// 画布自适应（宽度铺满玩法板、高度让开 HUD 与按钮区）。同目录（src/）内的共享工具，规则允许 import。
+import { fitCanvas } from './fit-canvas.js';
+
 let SFX = () => {};
 let STATS = (items) => items;
 let DECIDE = null;
@@ -133,7 +136,7 @@ function ensureStyle() {
   s.id = 'needle-mini-style';
   s.textContent = `
 .nmini-wrap { display: flex; flex-direction: column; gap: 8px; align-items: center; }
-.nmini-canvas { display: block; width: 100%; max-width: 720px; height: auto; margin: 0 auto;
+.nmini-canvas { display: block; margin: 0 auto;
   border-radius: 6px; border: 1px solid var(--rule-strong); background: #10161a; }
 .nmini-status { min-height: 24px; margin: 0; text-align: center; font-size: 15px;
   color: var(--ink-0); font-family: var(--font-kai, var(--font)); letter-spacing: .02em; }
@@ -701,22 +704,12 @@ export function runBendHook(container, opts = {}) {
        屏幕字号因此恒定 —— 这是"文字发糊"的正面修法。 */
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     let viewScale = 1;                 // 设计坐标 → CSS 像素
-    let lastCssW = -1;
-    function applySize() {
-      const cssW = Math.max(280, Math.round(canvas.clientWidth || W));
-      if (cssW === lastCssW) return;
-      lastCssW = cssW;
-      viewScale = cssW / W;
-      const cssH = Math.round(H * viewScale);
-      canvas.width = Math.round(cssW * DPR);
-      canvas.height = Math.round(cssH * DPR);
-      canvas.style.height = cssH + 'px';
-    }
-    canvas.style.width = '100%';
-    applySize();
-    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(applySize) : null;
-    if (ro) ro.observe(canvas.parentElement || canvas);
-    window.addEventListener('resize', applySize);
+    /* 尺寸改走共享的 fitCanvas：**宽度铺满 + 高度让开状态与按钮区**。
+       这里原来只按宽度算 viewScale（cssW / W），宽高比 1.8 的画布在 1366×768 上
+       会连按钮一起顶出纸面 23px；而且宽被样式里的 max-width:720 卡着，
+       纸面放大到 960 之后右边空一截。viewScale 的来源仍是"算出来的缩放"，
+       下面 HUD 文字按 1/viewScale 反算的写法一个字没动。2026-09-17 修。 */
+    const view = fitCanvas(canvas, W, H, { onSize: (s) => { viewScale = s; } });
 
     /* ── 局内状态 ── */
     const h = { heat: 0, body: 0, tip: 0, oxide: 0, cycle: 0 };
@@ -1155,8 +1148,7 @@ export function runBendHook(container, opts = {}) {
       finishTimer = 0;
       cancelAnimationFrame(raf);
       clearInterval(syncTimer);
-      if (ro) ro.disconnect();
-      window.removeEventListener('resize', applySize);
+      view.stop();                         // 断开 ResizeObserver 与 window resize（fitCanvas 自带）
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);

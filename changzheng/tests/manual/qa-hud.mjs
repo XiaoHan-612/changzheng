@@ -20,7 +20,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, dev
 await page.goto(`${BASE}/?hud=${Date.now()}`, { waitUntil: 'networkidle' });
 await page.evaluate(() => sessionStorage.clear());
 await page.reload({ waitUntil: 'networkidle' });
-await page.click('#btn-mode-study');
+await page.click('#btn-mode-march');
 await page.waitForTimeout(300);
 await passOrigin(page);
 await page.click('#btn-cut-skip').catch(() => {});

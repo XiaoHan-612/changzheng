@@ -19,19 +19,23 @@ const LOSS_CS = {
 
 test('减员：高风险在资源吃紧时触发', () => {
   const s = createState();
-  s.体力 = 59;
+  // 方案 A：高风险阈值 体力<55 或 粮≤1
+  s.体力 = 54; s.粮食 = 5;
   assert.equal(resolveLoss(LOSS_CS, 0, s).who, '某个人');
   s.体力 = 80; s.粮食 = 0;
   assert.equal(resolveLoss(LOSS_CS, 0, s).who, '某个人', '断粮时高风险同样危险');
   s.体力 = 80; s.粮食 = 5;
   assert.equal(resolveLoss(LOSS_CS, 0, s), null, '资源充足时不该减员');
+  s.体力 = 55; s.粮食 = 2;
+  assert.equal(resolveLoss(LOSS_CS, 0, s), null, '体力≥55 且粮>1 时高风险不减员');
 });
 
 test('减员：中风险只在体力见底时触发，低风险永不', () => {
   const s = createState();
-  s.体力 = 36; s.粮食 = 5;
+  // 方案 A：中风险体力≤32
+  s.体力 = 33; s.粮食 = 5;
   assert.equal(resolveLoss(LOSS_CS, 1, s), null);
-  s.体力 = 35;
+  s.体力 = 32;
   assert.equal(resolveLoss(LOSS_CS, 1, s).who, '某个人');
   s.体力 = 1; s.粮食 = 0;
   assert.equal(resolveLoss(LOSS_CS, 2, s), null, '低风险选项不该减员');

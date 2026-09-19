@@ -19,6 +19,11 @@ import ludingChain from './luding-chain.js';
 import snowGrab from './snow-grab.js';
 import pontoonNight from './pontoon-night.js';
 import rallyRiver from './rally-river.js';
+// 2026-09-18 吸收的四支（同事单独开发那条线，收料工具开的缝合点）
+import skim from './skim.js';
+import weave from './weave.js';
+import antiphony from './antiphony.js';
+import cipher from './cipher.js';
 // ↑ 同事的新玩法往这里加：import 一行 + 下面 GAMES 里一行。
 
 export const GAMES = {
@@ -32,4 +37,8 @@ export const GAMES = {
   'snow-grab': snowGrab,
   'pontoon-night': pontoonNight,
   'rally-river': rallyRiver,
+  skim,
+  weave,
+  antiphony,
+  cipher,
 };

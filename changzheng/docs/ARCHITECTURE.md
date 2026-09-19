@@ -1,9 +1,13 @@
-# 《长征·抉择》架构说明
+# 《星火微光·我路过他们的长征》架构说明
 
 ## 定位
 
 网页端五幕 AI 科普互动游戏。核心循环：**暮色营地探索 → 抉择/小游戏 → 大模型裁决 → 史实回响 → 启程**。
 界面两条骨架：**舞台屏**（立绘 + 对白 + 抉择）与**玩法板**（小游戏：题名 + 数值签 + 玩法区）；人物在舞台交代任务，玩法在板上做，结算回舞台。
+
+**交付形态两种，跑的是同一份代码**：源码态 `npm start` 起 Express；桌面态由
+[`../../packaging/`](../../packaging/README.md) 把它套进 Electron 窗口（自带 Chromium，**不改工程任何代码**），
+产出便携目录与单文件 exe。取舍与发布口径见 [`DELIVERY.md`](DELIVERY.md)。
 
 ## 目录结构（工程规范）
 
@@ -12,7 +16,7 @@ changzheng/
   package.json          # scripts: start / test:* / qa:* / fonts:build / tts:manifest
   .env                  # GLM_API_KEY / GLM_MODEL / PORT（不入库；runtime-config.json 可覆盖）
   server/               # 服务端：静态托管 + AI 代理 + 契约 + 日志
-    index.js            # 路由 /api/decide /api/sim /api/tts /api/config /api/logs /api/data/*
+    index.js            # 路由 /api/decide /api/tts /api/config(+ /test) /api/logs(+ /export /clear) /api/data/*
     ai.js               # VN 侧：提示词 + 真调 + 重试 + 响应契约校验
     schema.js           # 响应契约唯一真源（REQUIRED / missingFields / contractStamp）
     logger.js           # JSONL 落库（按日文件 + 会话镜像 + 契约戳记 + 8MB 轮转）
@@ -30,8 +34,8 @@ changzheng/
                         #        ai（模型调用与账目）/ cinema（电影化：拍子播放器，序章 / 幕间 / 终章升华）
       main.js           # 组合根：boot + chrome 绑定 + 设置/手记/答辩面板 + 把流程入口接到按钮（535 行）
       flow/             # 流程层（批 7 从 main.js 拆出）：kit / view / echo / tables / games-flow / quiz / night / act / end
+                        #        + arcade（从玩法清单直接起一局）/ modes（标题页四种模式的入口编排）
       step.js           # 交互契约（setStep / askChoice / choiceButton / waitContinue / markMini）
-      minigames.js      # 8 个玩法（本地判手感，结算走 /api/decide）
       state.js          # 资源/好感/附身线/行动点/失败判定（可单测）
       origin.js         # 开场出身三选一 + 出发前一问（纯本地）
       audio/            # 音频框架：index（门面）/ mix（混音表）/ fade（音量斜坡）
@@ -124,9 +128,10 @@ UI 事件 ─┤ kernel.emit('ai:request', …)                                 
 npm run test:e2e      # 五幕真调通关（~76 次调用）+ 不重复结算等断言
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
 # 局部（多数不烧 AI）
-npm run test:unit     # 58 项：资源钳制 / 史实解锁 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制
+npm run dev:check     # 批次中间的快检（约 16 秒、0 真调）：总线规矩 / 单元 / 文档一致 / 内核启动 / 开局到营地 / 玩法板
+npm run test:unit     # 65 项：资源钳制 / 史实解锁 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 玩法守卫
 npm run qa:smoke      # 标题→营地→一次互动（含"用过的热点当场作废"断言）
-npm run qa:board      # 玩法板体检 36 项（板屏壳 / 数值签 / 契约标记）
+npm run qa:board      # 玩法板体检 114 项（板屏壳 / 数值签 / 契约标记 / 三方对账）
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫
 npm run qa:audit      # 日志 schema 审计 → docs/LOG-AUDIT.md · qa:handoff 交接文档一致性
 npm run tts:manifest  # 更新语音清单（改台词后必跑）
