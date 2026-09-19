@@ -10,6 +10,8 @@ session-full.jsonl
 server-out.txt
 server-err.txt
 **/tests/e2e/artifacts/
+# 逐屏截图产物（tests/manual/shot-all.mjs 输出）：可随时重跑，和 e2e/artifacts 一样不进仓库
+changzheng/logs/shots/
 
 # 编辑器 / 系统
 .DS_Store
@@ -37,3 +39,21 @@ _archive/audio-toolchain/
 # 同事的小游戏交接包（v1 = 文档 + 单支源码 / v2 = 含完整检出）：本地参考，不进源码历史。
 # 真正要接进工程的东西已经拷进 changzheng/public/js/modules/games/src/ 与 changzheng/docs/minigames/。
 _archive/handoff-minigames-*/
+
+# 桌面封装（packaging/）：只入库脚本与说明，运行时与产物都不入库（体积大且可重建）
+# 重建办法见 packaging/README.md：cd packaging && node build.mjs
+dist/
+packaging/electron-dist/
+packaging/.electron-cache/
+packaging/.npm-cache/
+packaging/.singlefile/
+packaging/.verify-state/
+packaging/.test-state*/
+packaging/icon.ico
+packaging/icon.png
+packaging/verify-shot.png
+packaging/verify-fast-shot.png
+
+# 旧“桌面版”solo 线的文档快照（2026-09-17，内容已被 changzheng/docs 取代，
+# 完整历史在 tag `solo-v0.3-2026-09-17`）：留档用，不进源码历史
+_archive/solo-v0.3-2026-09-17/

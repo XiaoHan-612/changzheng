@@ -133,7 +133,7 @@ file:.git/config        你的邮箱
   核对作者，别把别人的活儿算到自己头上（或反过来）。
 - **邮箱要填你在 GitHub 上验证过的那个**（GitHub → `Settings` → `Emails`）。填错不报错，只是提交不算你头上、贡献图没头像。不想暴露真实邮箱就用 GitHub 的匿名转发地址：`<账号ID>+<用户名>@users.noreply.github.com`，同样能正确归因。
 
-> 历史备注：本仓库最早的 62 个提交全部署名 `长征·抉择 开发组 <dev@changzheng.local>` —— 那是个**全组共用的假邮箱**，GitHub 认不出是谁提交的。
+> 历史备注：本仓库最早的 62 个提交全部署名 `星火微光·我路过他们的长征 开发组 <dev@changzheng.local>` —— 那是个**全组共用的假邮箱**，GitHub 认不出是谁提交的。
 > 中间还有一段：开发机的 local 身份被设成了 `XiaoHan <300475724+XiaoHan-612@users.noreply.github.com>`，
 > **在那台机器上提交的人（包括几个 agent）全被记到 XiaoHan 名下**（`git shortlog -sne HEAD` 一看就明白：
 > 62 条旧假邮箱 + 15 条 XiaoHan，没有第三个作者）。
@@ -252,6 +252,14 @@ git rebase --continue
 | `node_modules/` | 可再生成，clone 后 `npm install` 即可 |
 | `logs/` 运行日志、`server-out.txt`、`session-full.jsonl` | 运行产物；只保留 `logs/sample-full-run.jsonl` 这一份入库样本 |
 | `tests/e2e/artifacts/` | 测试截图产物；要交付的用 `qa:screens` 单独出 |
+| `changzheng/logs/shots/` | 逐屏截图产物（`shot-all.mjs` 输出）；可随时重跑，同上不进仓库 |
+| `dist/` | 桌面封装产物（便携目录 / 便携 zip / 单文件 exe，单个约 185 MB）。**发布走 GitHub Releases 传附件**，不进仓库 |
+| `packaging/electron-dist/`、`packaging/.electron-cache/`、`packaging/.npm-cache/` | Electron 运行时与打包缓存（≈560 MB），`node build.mjs` 可重建 |
+| `packaging/icon.ico`、`packaging/icon.png`、`packaging/verify-*.png` | 图标由 `make-icon.mjs` 生成、验收截图由 `verify-*.mjs` 出，都不入库 |
+| `_archive/solo-v0.3-2026-09-17/` | 旧「桌面版 solo 线」的文档快照；完整历史在 **tag `solo-v0.3-2026-09-17`**（已推到远端） |
+
+> `packaging/` 里**只有脚本与说明**入库（`build*.mjs` / `verify*.mjs` / `main.js` / `launcher.cs` / `README.md` / `package.json` /
+> `app-package.json`），运行时与产物一律不进——判定依据是 `packaging/README.md` 的「出成品」一节：产物都能重跑出来。
 
 万一真的推上去了：`git rm --cached .env` 只能从**最新一次提交**里删掉，历史里还留着。
 **第一动作是去智谱后台轮换 Key**，然后才谈清历史。
@@ -306,7 +314,8 @@ git blame 路径/文件名              # 看某一行是谁什么时候改的
 ## 附：仓库已经做对的地方
 
 - **换行符**：`.gitattributes` 里 `* text=auto` + 二进制资源白名单，跨 Windows/Linux 不会出现「整文件 diff」。
-- **大文件**：受版本控制 380 个文件共 30 MB，最大单文件 437 KB，离 GitHub 100 MB 硬限制很远，暂时不需要 Git LFS。
+- **大文件**：受版本控制 542 个文件共 38.4 MB，最大单文件 1.5 MB（`changzheng/public/audio/bgm/snow_bgm.ogg`），
+  离 GitHub 100 MB 硬限制很远，暂时不需要 Git LFS；**封装产物（`dist/`、约 185 MB）不进仓库，走 Releases 附件**。
 - **凭据**：系统级 `credential.helper=manager`，push 不用每次输密码。
 
 ---

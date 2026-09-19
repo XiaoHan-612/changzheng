@@ -10,7 +10,8 @@
 ## 快速开始
 
 > **团队协作（拉取 / 提交 / 推送 / 配置提交身份）见 → [`CONTRIBUTING.md`](CONTRIBUTING.md)。**
-> 本仓库是**私有**的，新人需先被加为 collaborator 才能克隆。
+> 仓库**当前是公开的**（2026-09-14 实测，见 CONTRIBUTING §零），任何人可克隆；
+> 但**推送仍要被加为 collaborator（Write）并接受邀请**。
 
 ```powershell
 git clone https://github.com/XiaoHan-612/changzheng.git   # 首次
@@ -21,6 +22,27 @@ npm start          # http://localhost:3001
 ```
 
 已经克隆过的，这里等价于在仓库根执行 `cd changzheng`。每轮开工先 `git pull --rebase`，收工 `git push`。
+
+## 桌面版（双击即玩）
+
+不想装 Node、不想开浏览器？用封装好的桌面版——**一个 exe，双击就进标题页**。
+
+| 形态 | 在哪 | 说明 |
+|------|------|------|
+| **单文件版**（推荐分发） | [Releases](https://github.com/XiaoHan-612/changzheng/releases) → `长征-抉择-单文件版.exe` | 只发这一个文件。第一次打开先展开到 `%LOCALAPPDATA%\长征-抉择\app\`（带进度条，几秒），之后双击秒开；玩家数据在 `%LOCALAPPDATA%\长征-抉择\user-data\` |
+| 便携版目录 | 本地 `npm run` 产出 `dist/长征-抉择/` | 整个文件夹拷走，双击里面的 `长征-抉择.exe`；压缩包（可选）见 `dist/长征-抉择-便携版.zip` |
+
+自己重新打包（改完 `changzheng/` 里的东西就打一次）：
+
+```powershell
+cd packaging
+node build.mjs             # ① 便携版目录：../dist/长征-抉择/
+node build-singlefile.mjs  # ② 单文件版：../dist/长征-抉择-单文件版.exe
+```
+
+封装**不改任何游戏代码**（起服务 / 开窗口 / 把会写盘的东西指到 exe 旁边），
+`dist/` 与 `packaging/electron-dist/` 都是产物、**不入库**（发布走 GitHub Releases）。
+细节、验收与已知取舍见 [`packaging/README.md`](packaging/README.md)。
 
 - 密钥：写进 `changzheng/.env`（`GLM_API_KEY=...`），或在游戏内「设置」里填后点「测试连通」；
   `.env` 与 `runtime-config.json` 已加入 `.gitignore`，不会入库
@@ -42,6 +64,10 @@ npm start          # http://localhost:3001
 | `changzheng/data/` | `acts.json` 五幕定义、`facts.json` 史实卡 |
 | `changzheng/docs/` | 架构 / QA / 评分 / 路演 / 交接 |
 | `changzheng/tests/` | unit + e2e（Playwright）；`manual/` 为一次性排查脚本 |
+| `changzheng/scripts/` | 守卫与生成物（`npm run qa:*` / `verify:*` 背后的脚本） |
+| `changzheng/tools/` | 工程辅助：字体子集化、同事玩法收料、令牌基线（见该目录 README） |
+| `packaging/` | **桌面封装（Electron）**：把工程套一个自带 Chromium 的窗口。脚本与说明入库，运行时与产物不入库 |
+| `dist/` | 封装产物（便携目录 / 便携 zip / 单文件 exe）——**不入库**，对外发布走 GitHub Releases |
 | `design/` | 策划文档生成（docx 工具链） |
 | `_archive/` | 历史快照与旧素材（只读参考，勿在此开发） |
 | `DESIGN.md` | 产品设计速览 |
@@ -49,21 +75,30 @@ npm start          # http://localhost:3001
 
 ## 测试
 
-三层尺子：改一处先跑 `dev:check`（约 13 秒、0 次真调），提交前 `verify:fast`，推送与交付前 `verify:full`。
+三层尺子：改一处先跑 `dev:check`（约 16 秒、0 次真调），提交前 `verify:fast`，推送与交付前 `verify:full`。
 
 ```powershell
 cd changzheng
-npm run dev:check     # 开发快检：总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 输入框不吃快捷键 / 终局失败不空屏 / 升华可跳过（约 13 秒）
+npm run dev:check     # 开发快检：总线规矩 / 单元测试 / 文档一致 / 内核启动 / 开局到营地 / 玩法板 / 输入框不吃快捷键 / 终局失败不空屏 / 升华可跳过（约 16 秒）
 npm run verify:fast   # 提交前那一档：上面这些 + 动效 / 音频 / 素材 / 影音守卫，并行约 30 秒
 npm run verify:full   # 推送与交付前：真调那一档（e2e / av / failure / loss / smoke），分钟级
-npm run test:unit     # 63 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 玩法守卫
+npm run test:unit     # 65 项：状态层 / 契约 / 配置层 / 减员 / 数值护栏 / 同伴一致 / 诗形制 / 玩法守卫
 npm run qa:smoke      # 标题 → 营地 → 一次互动（顺带断言用过的热点当场作废）
-npm run qa:board      # 玩法板体检：十支玩法逐屏摆上板（板屏壳/数值签/契约标记）+ 三方对账
+npm run qa:board      # 玩法板体检：14 支玩法逐屏摆上板（板屏壳/数值签/契约标记）+ 三方对账
 npm run test:e2e      # 五幕真调通关（约 76 次调用）+「不重复结算」等回归断言
 npm run qa:av         # 影音审计：资源 404 / 立绘 / 环境床 / TTS 解码
 npm run qa:ai         # AI 调用体检：预算表 ↔ 字段契约 ↔ 真调日志三方对账
 npm run qa:tokens · qa:frames · qa:tone · qa:motion   # 视觉守卫
 npm run qa:bus        # 总线守卫：模块化规则（六条）+ 内核运行时体检
+```
+
+桌面封装有独立的一档门禁（`packaging/` 里跑，不属于上面三档）：
+
+```powershell
+cd packaging
+node verify-fast.mjs              # 日常门禁：成品与仓库工程逐文件 sha256 相等 + 能起来 + 资源齐 + 调用链通
+node verify-fast.mjs --single --fresh   # 单文件版的真实「首次双击」（删掉展开结果重来一次）
+node verify-packaged.mjs          # 发布级全量验收（慢一些）：点着走过一屏 + 真调
 ```
 
 ## 重新生成策划文档
@@ -82,7 +117,9 @@ node make-docx.js     # 输出 ../长征-抉择-设计方案.docx
 |------|------|
 | `CONTRIBUTING.md` | **团队协作规范：git 工作流 / 提交身份 / 冲突处理 / 给 AI agent 的规矩** |
 | `changzheng/README.md` | 玩法与交互要点 |
+| `packaging/README.md` | **桌面封装**：怎么出单文件版 / 成品长什么样 / 外壳做了什么 / 已知取舍 |
 | `changzheng/docs/ARCHITECTURE.md` | 架构、运行时数据流、设计约束 |
+| `changzheng/docs/DELIVERY.md` | **交付形态**：桌面版怎么来的（三种方案的取舍）与现行的发布口径 |
 | `changzheng/docs/HANDOFF.md` | 已完成 / 已知缺口 / **每轮收尾清单** / **§七 注意事项（口头约定落纸：密钥纪律 · 素材来路 · 交接包 · 已删的东西）** |
 | `changzheng/docs/HANDOFF-CODE.md` | **代码接手主文档**：模块地图 / 状态机 / 契约 / 29 条踩过的坑 |
 | `changzheng/docs/DESIGN-SYSTEM.md` | 视觉体系（模板 / 区块 / 动效）与逐批打磨进度 |

@@ -15,12 +15,15 @@
 | `audio-toolchain/` | 仓库根的 `_oggpkg/` | 本机音频生成工具链（Python whl + 脚本）——**不进仓库** |
 | `audio-poem-source/` | 聊天里给的朗诵下载件 | 终局朗诵的**原始下载文件**（平台名 `M500001cofo42JISSl.mp3`）。改名为 `qilv-changzheng.mp3` 的那一份**已随仓库走**，在 `changzheng/public/audio/poem/` |
 | `audio-reactions-sandbox/` | `changzheng/public/audio/reactions/` | 随「自由行军沙盘」一起撤下的同伴反应音 6 条（该模式 2026-09-15 删除，无代码引用） |
+| `solo-v0.3-2026-09-17/` | 另一条工作线上的 `docs/` | **桌面版 solo 线**在 2026-09-17 冻结的文档快照（`docs/` 全套），内容已被现役 `changzheng/docs/` 取代，只留档。**整目录不进仓库**（见根 `.gitignore`）；同名 tag `solo-v0.3-2026-09-17` 指向当时的仓库快照 `a970d80`，`git show solo-v0.3-2026-09-17 --stat` 可查那批提交 |
 
 ## 版本管理范围
 
 - **入库**：各快照的代码与文档（`*.js` / `*.mjs` / `*.html` / `*.css` / `*.json` / `*.md`）
 - **不入库**：归档区的位图与音频（约 65MB）。它们已被 `changzheng/` 的素材取代，留在磁盘备查即可；
   需要纳管就删掉根 `.gitignore` 里 `_archive/**/*.png|jpg|jpeg|wav` 那四行
+- **不入库（整目录）**：`handoff-minigames-v1|v2/`（同事交接包）、`audio-toolchain/`（本机音频工具链）、
+  `solo-v0.3-2026-09-17/`（桌面版 solo 线的文档快照）——三者的内容都在别处有真源，只留磁盘备查
 - 各快照里的 `node_modules/` 同样被忽略，不会入库
 
 ## 已清理
