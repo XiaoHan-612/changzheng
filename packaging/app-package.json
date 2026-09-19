@@ -1,0 +1,8 @@
+{
+  "name": "changzheng-juze",
+  "productName": "长征 · 抉择",
+  "version": "1.0.0",
+  "description": "《星火微光·我路过他们的长征》桌面封装版（Electron 外壳 + 内嵌 Express 服务）",
+  "main": "main.js",
+  "private": true
+}

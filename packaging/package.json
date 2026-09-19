@@ -1,0 +1,12 @@
+{
+  "name": "changzheng-juze-packaging",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "把《星火微光·我路过他们的长征》封装成双击即玩的桌面软件（Electron 外壳 + 内嵌 Express 服务）",
+  "scripts": {
+    "build": "node build.mjs",
+    "verify": "node verify-packaged.mjs",
+    "icon": "node make-icon.mjs"
+  }
+}
