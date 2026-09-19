@@ -74,7 +74,10 @@ async function main() {
   console.log(`  ${APP_TITLE} · 桌面封装版`);
   console.log(`  游戏工程: ${GAME_DIR}`);
   console.log(`  配置目录: ${stateDir}`);
-  console.log(`  Key 来源: ${envFile}${fs.existsSync(path.join(stateDir, '.env')) ? '（user-data 覆盖）' : '（随包默认）'}`);
+  console.log(`  Key 来源: ${envFile}`
+    + (fs.existsSync(path.join(stateDir, '.env'))
+      ? '（user-data/.env）'
+      : '（发布包内不含 Key —— 没配过就请到游戏内「设置」里填）'));
   console.log(`  端口: ${port}`);
   console.log(`  启动时间: ${new Date().toLocaleString('zh-CN')}`);
   console.log('══════════════════════════════════════════════');
@@ -268,8 +271,11 @@ function pickStateDir() {
 }
 
 /**
- * Key / 接口地址的来源：user-data/.env 优先（发给别人时改自己那份就行），
- * 没有就用随包自带的那份 .env。两者都不动游戏目录，重装/换包不会互相覆盖。
+ * Key / 接口地址的来源，按优先级：
+ *   1. user-data/.env            玩家自己放的那份（推荐；发布包里只有这一条路能带 Key）
+ *   2. 工程目录里的 .env          只在开发者本地存在 —— **发布包里故意不含**（见 build.mjs 的硬断言）
+ *   3. 工程目录里的 .env.example  模板：Key 为空，界面会明确提示"未配置 Key"，不会编造内容
+ * 三条都不动游戏目录，重装 / 换包不会互相覆盖。
  */
 function pickEnvFile(stateDir) {
   const userEnv = path.join(stateDir, '.env');

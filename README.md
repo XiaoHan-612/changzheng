@@ -32,6 +32,10 @@ npm start          # http://localhost:3001
 | **单文件版**（推荐分发） | [Releases](https://github.com/XiaoHan-612/changzheng/releases) → `长征-抉择-单文件版.exe` | 只发这一个文件。第一次打开先展开到 `%LOCALAPPDATA%\长征-抉择\app\`（带进度条，几秒），之后双击秒开；玩家数据在 `%LOCALAPPDATA%\长征-抉择\user-data\` |
 | 便携版目录 | 本地 `npm run` 产出 `dist/长征-抉择/` | 整个文件夹拷走，双击里面的 `长征-抉择.exe`；压缩包（可选）见 `dist/长征-抉择-便携版.zip` |
 
+> **包里不含任何 API Key**：`changzheng/.env` 装着本机真 Key，打包**故意跳过**它（`build.mjs` 有硬断言，包内出现 `.env` 就中止打包），
+> 成品里只有 `.env.example`（Key 为空）。第一次打开请在游戏内「设置」里填自己的 Key 并点「测试连通」，
+> 或自己往 `user-data/.env` 写一行 `GLM_API_KEY=...`。没填之前 AI 裁决会明确报错（没有 MOCK 兜底），不会编造内容。
+
 自己重新打包（改完 `changzheng/` 里的东西就打一次）：
 
 ```powershell

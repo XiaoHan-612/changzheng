@@ -317,8 +317,10 @@ tests/          unit / e2e（Playwright）/ manual（体检脚本）；同事的
 - **产物不入库**：`dist/`（便携目录 + zip + 单文件 exe）与 Electron 运行时 / 打包缓存
   （`packaging/electron-dist/`、`packaging/.electron-cache/`、`packaging/.npm-cache/`）都被 `.gitignore` 挡着，
   **别用 `git add -f` 塞进仓库**。对外发布走 **GitHub Releases 传单文件 exe**。
-- **随包带 Key 是明文**：`.env` 会照搬进成品的 `resources/app/changzheng/`，所以拿到包的人就能看到那把 Key。
-  对外分发按 §七点一 的纪律办（该轮换就轮换），别把带 Key 的包发到公开场合。
+- **包里一把 Key 都不带**（2026-09-19 起）：`changzheng/.env` 装着本机真 Key，打包时**故意跳过**，
+  `build.mjs` 里还有一条硬断言——包内一旦出现 `.env` 就中止打包；成品里只有 `.env.example`（Key 为空）这份模板。
+  所以这个包发给谁、传到哪都不会泄漏 Key；代价是使用者第一次打开要在「设置」里填自己的 Key
+  （写进 `user-data/runtime-config.json`），或自己往 `user-data/.env` 放一份。没填之前 AI 裁决会明确报错，这是预期的。
 - **首次运行会弹 SmartScreen**：exe 没有代码签名，Windows 提示「未知发布者」——点「更多信息 → 仍要运行」即可；
   这一条已写进成品的 `使用说明.txt`（要彻底消掉得买签名证书）。
 - **素材红线同样适用**：包里的 BGM / 音效 / 朗诵是外部素材（§七点二），**对外发布前要换**；换完重打一次包，

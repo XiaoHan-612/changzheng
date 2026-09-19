@@ -8,9 +8,12 @@
  *     *.dll / *.pak / locales/  ← Chromium 运行时，全部自带，不依赖系统装了什么浏览器
  *     resources/app/            ← 外壳 + **原样照搬**的游戏工程
  *       main.js   package.json   icon.png
- *       changzheng/{server,public,data,.env,package.json,node_modules}
+ *       changzheng/{server,public,data,.env.example,package.json,node_modules}
  *     user-data/                ← 首次运行后在这里写配置与日志（绿色版，删掉即恢复出厂）
  *     使用说明.txt
+ *
+ * **Key 一律不随包**：本机 changzheng/.env 装着真 Key，打包时**故意不拷**（见 copyGame 末尾的硬断言）。
+ * 玩家第一次打开在游戏内「设置」里填自己的 Key，或往 user-data/.env 放一份；界面上会明确提示。
  *
  * 原则：**一行游戏代码都不改**。原工程本来就是「Express 起服务 + 静态前端」，
  * 这里做的只是给它配一个自带 Chromium 的窗口和一份可写的 user-data。
@@ -67,11 +70,11 @@ function checkGame() {
       throw new Error(`游戏工程缺文件：changzheng/${rel}（打包前请确认工程完整）`);
     }
   }
-  // .env 是 gitignore 的本机文件（装着 Key），全新克隆里没有很正常：
-  // 没有也能打，只是第一次打开要进「设置」填 Key —— 所以只提醒，不拦。
-  if (!fs.existsSync(path.join(GAME, '.env'))) {
-    console.warn('· 注意：changzheng/.env 不存在（Key 没随包）。软件仍可运行，'
-      + '但首次使用需要在游戏内「设置」里填 Key，或在 user-data/.env 里补一份。');
+  // .env 是 gitignore 的本机文件（装着真 Key）——**故意不进包**，所以这里只做说明，不作为错误。
+  if (fs.existsSync(path.join(GAME, '.env'))) {
+    log('本机 changzheng/.env 存在（源码态用），打包会跳过它：发布包里不含任何 Key');
+  } else {
+    log('本机 changzheng/.env 不存在；打包本来也不带 Key');
   }
   log('游戏工程自检通过（server / public / data 都在）');
 }
@@ -124,13 +127,20 @@ function copyGame() {
   const items = [
     'server', 'public', 'data',
     'package.json',            // 有 "type": "module"，服务端 ESM 靠它
-    '.env',                    // 随包默认 Key（设置页改的会写进 user-data，覆盖这一份）
-    '.env.example',
+    // ⚠️ 这里**故意不拷 `.env`**：它装着本机真 Key，进包就是对外泄露（无论发给谁、上传到哪）。
+    //    Key 的唯一来源是玩家自己在「设置」里填（落到 user-data/runtime-config.json）
+    //    或自己往 user-data/.env 放一份。下面的硬断言会兜住任何"手滑加回来"。
+    '.env.example',            // 模板（GLM_API_KEY 为空），给玩家照着填
   ];
   for (const item of items) {
     const src = path.join(GAME, item);
     if (!fs.existsSync(src)) continue;
     fs.cpSync(src, path.join(RES_APP, 'changzheng', item), { recursive: true });
+  }
+  // 硬断言：包内绝不允许出现 .env（含 Key）。宁可打包失败，也不出去一份带 Key 的成品。
+  const leaked = path.join(RES_APP, 'changzheng', '.env');
+  if (fs.existsSync(leaked)) {
+    throw new Error('包里出现了 .env —— 这会把本机 Key 一起发出去，已中止。请检查 copyGame 的 items 列表');
   }
 
   // 运行时依赖只留 express 那一棵树；playwright 是测试用的，进包纯属浪费体积
@@ -167,11 +177,12 @@ function copyShell() {
   fs.mkdirSync(userData, { recursive: true });
   fs.writeFileSync(path.join(userData, '说明.txt'),
     '这个文件夹是游戏运行时自己用的，删掉会自动重建：\r\n'
-    + '  runtime-config.json     设置页里改的模型 / Key / 接口地址（覆盖随包自带的 .env）\r\n'
+    + '  runtime-config.json     设置页里填的 Key / 模型 / 接口地址（推荐走设置页，写在这里）\r\n'
+    + '  .env                    也可以：新建一个 .env，写 GLM_API_KEY=你的Key（二选一即可）\r\n'
     + '  logs\\ai-calls-*.jsonl   每次 AI 裁决的 JSONL 审计日志（含响应、耗时、来源）\r\n'
     + '  logs\\session-full.jsonl 本次会话全量日志\r\n'
-    + '  .env                    可选：放一份自己的 Key，就会盖过随包默认的那份\r\n'
-    + '  启动日志.txt            外壳启动过程（排障用）\r\n', 'utf8');
+    + '  启动日志.txt            外壳启动过程（排障用）\r\n'
+    + '\r\n本包不含任何 API Key：没填之前 AI 裁决会明确报错（不会编造内容），请先填自己的 Key。\r\n', 'utf8');
 }
 
 function writeReadme() {
@@ -189,13 +200,15 @@ function writeReadme() {
   F12 或 Ctrl+Shift+I  打开调试面板（普通玩不需要）
   关闭窗口             直接退出游戏
 
-Key 与接口（一般不用改）
+API Key（第一次打开必须填，本包不含 Key）
 ------------------------------------------------------------
-随包自带的 .env 里已经填好了默认的 Key 与接口地址，打开就能玩。
-要换成自己的，两个办法：
-  1. 游戏内「设置」页填 Key，点「测试连通」确认，再保存
-     —— 写进 user-data/runtime-config.json，不动随包文件；
-  2. 在 user-data 里新建一个 .env，写 GLM_API_KEY=...（会覆盖随包默认的那份）。
+本软件包**不含任何 API Key**（游戏没有 MOCK 兜底，未配置时调用会明确报错，不会编造内容）。
+请用你自己的 Key，两个办法任选：
+  1.（推荐）游戏内「设置」页填 Key → 点「测试连通」确认能通 → 保存
+     它会写进 user-data/runtime-config.json，不动游戏目录；
+  2. 在 user-data 里新建一个 .env，写 GLM_API_KEY=你的Key（一行就行）。
+接口地址与模型名默认已配好（见 resources/app/changzheng/.env.example）；
+只有换成别的网关时才需要在「设置」里改地址。
 
 日志与审计
 ------------------------------------------------------------

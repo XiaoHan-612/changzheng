@@ -34,6 +34,20 @@ tar -a --options "zip:hdrcharset=UTF-8" -c -f ..\dist\长征-抉择-便携版.zi
 单文件版的玩家数据（配置 / 日志 / 审计 JSONL）在 `%LOCALAPPDATA%\长征-抉择\user-data\`，
 换新版 exe 覆盖过去时会**自动重新展开**（按数据指纹判定），但 user-data 不会被冲掉。
 
+### 包里不含任何 API Key
+
+打包**故意跳过** `changzheng/.env`（那是个 gitignore 的本机文件，装着你的真 Key），
+`build.mjs` 里还有一条硬断言：一旦发现包内出现 `.env` 就**直接中止打包**——宁可失败，也不出去一份带 Key 的成品。
+所以这个包**发给谁、传到哪都不会泄漏 Key**。
+
+代价是第一次打开要自己填 Key：
+
+1. （推荐）游戏内「设置」页填 Key → 点「测试连通」确认能通 → 保存（写进 `user-data/runtime-config.json`）；
+2. 或者自己往 `user-data/.env` 写一行 `GLM_API_KEY=你的Key`。
+
+没填之前，AI 裁决会**明确报错**并给出原因与「重试」（本项目没有 MOCK 兜底，不会编造内容）。
+接口地址与模型名默认已配好（`resources/app/changzheng/.env.example` 是模板，Key 为空）。
+
 第一次跑 `build.mjs` 会自动从 npmmirror 下载 Electron 运行时（约 150 MB，缓存在
 `packaging/.electron-cache/`，解压在 `packaging/electron-dist/`），之后重建是秒级。
 要换镜像：`$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"`。
@@ -73,7 +87,8 @@ node verify-packaged.mjs          # 发布级全量验收（慢一些）：界�
     main.js              外壳（起服务 / 开窗口 / 定端口 / 指配置目录）
     package.json         Electron 入口声明
     icon.png             窗口与任务栏图标
-    changzheng/          原工程照搬：server / public / data / .env / package.json / node_modules
+    changzheng/          原工程照搬：server / public / data / package.json / node_modules
+                         （外加 .env.example 这份**不含 Key** 的模板；.env 永不入包）
 ```
 
 单文件版 = 一个约 290 KB 的启动器（`launcher.cs`）+ 上述目录的 zip + 16 字节尾巴。
@@ -102,5 +117,7 @@ node verify-packaged.mjs          # 发布级全量验收（慢一些）：界�
 - 打包 ≈ 400 MB，其中约 350 MB 是 Chromium 运行时 —— 这是「不依赖用户装什么浏览器」的代价。
 - exe 没有代码签名，首次运行 Windows SmartScreen 会拦一下（「更多信息 → 仍要运行」），
   这一点写在 `使用说明.txt` 里了。要彻底消掉得买签名证书。
+- **包里没有 Key**（有意的，见上一节）：发给别人时对方要自己填一把；你自己演示用的机器
+  可以先把 `user-data/.env` 或设置页配好，之后换新版 exe 覆盖过去不会冲掉 user-data。
 - 便携版目录里的 exe 文件图标目前是 Electron 默认图标：改 PE 资源需要 `rcedit` 这类工具；
   窗口/任务栏图标与单文件版的外壳图标已是自带的那颗红星。

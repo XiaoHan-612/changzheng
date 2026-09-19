@@ -17,7 +17,7 @@
 | 运行时 | Node ≥ 18 | **封装后不需要**：Electron 自带 Node 与 Chromium，玩家只要一个 exe |
 | 依赖包 | `express`（+ 开发期 `playwright`） | 封装包只带生产依赖，不含 playwright |
 | 静态资源 | `public/` 约 27MB（字体 / 音频 / 场景 / 立绘 / 事件图 / 代码） | 全部本地文件，无 CDN；五族中文字体随包分发，换机器字形不变 |
-| 配置 | `.env` → `runtime-config.json` → 环境变量（后者覆盖前者） | 源码态在项目根；**封装后在 `user-data/`**：便携版是 exe 同级的 `user-data/`，单文件版是 `%LOCALAPPDATA%\长征-抉择\user-data\`。设置界面写入 `runtime-config.json`，**明文存 Key** |
+| 配置 | `.env` → `runtime-config.json` → 环境变量（后者覆盖前者） | 源码态在项目根；**封装后在 `user-data/`**：便携版是 exe 同级的 `user-data/`，单文件版是 `%LOCALAPPDATA%\长征-抉择\user-data\`。设置界面写入 `runtime-config.json`（明文存 Key，本机文件）。**发布包里不含任何 Key**，见 §三 第 4 条 |
 | 端口 | `CONFIG.PORT`，默认 3001 | 源码态被占用会起不来；**封装后由外壳先挑一个空闲端口**再拉起服务，不会撞端口 |
 | 日志 | `logs/ai-calls-<日期>.jsonl` + 8MB 轮转（运行产物，不入库） | 封装后落在 `user-data/logs/`；仓库里另有一份入库样本 `logs/sample-full-run.jsonl` 供离线查看 |
 | 网络 | **必需** | AI 调用走网关；已删 MOCK，断网即报错并写 `source=ERROR` |
@@ -42,8 +42,10 @@
    —— 这四个值 `server/config.js` 在模块加载时就读走了，必须赶在 import 之前设。
 3. **写盘位置**：配置与日志放 exe 同级的 `user-data/`；该目录不可写（例如装进 `C:\Program Files\`）时退回 `%APPDATA%`。
    删掉 `user-data/` ＝ 恢复出厂。
-4. **Key 策略**：随包带一份可用的 `.env`（**明文**，现场零配置），玩家在「设置」里改的值写进
-   `user-data/runtime-config.json` 覆盖它。对外分发要清楚：拿到包的人就能看到随包那份 Key（见 [`HANDOFF.md`](HANDOFF.md) §七点七）。
+4. **Key 策略：包内一把 Key 都不带**。打包**故意跳过** `changzheng/.env`，`build.mjs` 里还有一条硬断言
+   ——包内一旦出现 `.env` 就直接中止打包；`resources/app/changzheng/` 里只放 `.env.example` 这份**Key 为空**的模板。
+   玩家第一次打开在游戏内「设置」里填自己的 Key（写进 `user-data/runtime-config.json`），或自己往 `user-data/.env` 写一行。
+   没填之前 AI 裁决会明确报错并给「重试」（没有 MOCK 兜底）。这样无论包发给谁、传到哪，都不会泄漏你的 Key（见 [`HANDOFF.md`](HANDOFF.md) §七点七）。
 5. **离线兜底**：**仍然没有**（项目彻底删除了 MOCK）。风险预案见 [`OFFLINE-REPLAY.md`](OFFLINE-REPLAY.md)，**未开发**。
 6. **依赖裁剪**：包内只含生产依赖（express），不含 playwright。
 7. **验收**：`packaging/verify-fast.mjs`（成品与仓库工程逐文件 sha256 相等 + 起得来 + 资源齐 + 前端与调用链通）
@@ -53,6 +55,7 @@
 
 - **对外只发单文件版**：`dist/长征-抉择-单文件版.exe` 作为 **GitHub Releases 的附件**。
   产物**不入仓库**（`dist/` 被 `.gitignore` 挡），仓库里只保留脚本与说明。
+- **附件里没有 Key**（`build.mjs` 的硬断言保证）：首次运行必须由使用者自己填 Key；发布说明里要写明这一点。
 - 便携版目录与 zip 是**内部/现场**用：现场演示直接双击 `dist/长征-抉择/长征-抉择.exe`，不依赖解压工具。
 - **没有代码签名**：首次运行 Windows SmartScreen 会拦一下（「更多信息 → 仍要运行」），这写在成品里的 `使用说明.txt`。
 - **素材来路的红线对成品同样成立**：包里的 BGM / 音效 / 朗诵是外部素材，**对外发布前要换**（见 [`HANDOFF.md`](HANDOFF.md) §七点二）。
@@ -70,7 +73,8 @@ dist/长征-抉择/
     main.js              外壳（起服务 / 开窗口 / 定端口 / 指配置目录）
     package.json         Electron 入口声明
     icon.png             窗口与任务栏图标
-    changzheng/          原工程照搬：server / public / data / .env / package.json / node_modules
+    changzheng/          原工程照搬：server / public / data / package.json / node_modules
+                         （另有 .env.example 模板，Key 为空；.env 永不入包）
 
 dist/长征-抉择-单文件版.exe   一个约 290KB 的启动器（launcher.cs）+ 上面那套目录的 zip + 16 字节尾巴
 ```
